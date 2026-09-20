@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" fill="none">
+  <!-- Stylized graduation cap mark matching the screenshot -->
+  <path d="M24 6L2 17L24 28L44 17.5V26H47V17L24 6Z" fill="#FFFFFF"/>
+  <path d="M11 23V31C11 36.5 16.8 41 24 41C31.2 41 37 36.5 37 31V23L24 29.5L11 23Z" fill="#FFFFFF"/>
+  <!-- Typography -->
+  <text x="56" y="31" fill="#FFFFFF" font-family="'Outfit', 'Poppins', sans-serif" font-size="22" font-weight="800" letter-spacing="-0.5">Trust lesson</text>
+</svg>
