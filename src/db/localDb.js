@@ -4,8 +4,6 @@
  * Excludes heavy video binary files per architecture direction.
  */
 
-import { initialCourses, mySessions } from "../data/mentors";
-
 const DB_NAME = "TrustLesson_LocalDB";
 const DB_VERSION = 1;
 const STORES = {
@@ -85,34 +83,7 @@ async function performTx(storeName, mode, callback) {
 // -------------------------------------------------------------
 export async function seedInitialDataIfNeeded() {
   const db = await openDB();
-  if (!db) {
-    if (!localStorage.getItem("tl_db_gigs")) {
-      localStorage.setItem("tl_db_gigs", JSON.stringify(initialCourses));
-    }
-    if (!localStorage.getItem("tl_db_sessions")) {
-      localStorage.setItem("tl_db_sessions", JSON.stringify(mySessions));
-    }
-    return;
-  }
-
-  // Check if gigs store is empty
-  const tx = db.transaction([STORES.GIGS, STORES.SESSIONS], "readwrite");
-  const gigStore = tx.objectStore(STORES.GIGS);
-  const countReq = gigStore.count();
-
-  countReq.onsuccess = () => {
-    if (countReq.result === 0) {
-      initialCourses.forEach((c) => gigStore.put({ ...c, hasVideoIntro: true, videoFileName: "course_preview.mp4" }));
-    }
-  };
-
-  const sessionStore = tx.objectStore(STORES.SESSIONS);
-  const sessionCount = sessionStore.count();
-  sessionCount.onsuccess = () => {
-    if (sessionCount.result === 0) {
-      mySessions.forEach((s) => sessionStore.put(s));
-    }
-  };
+  if (!db) return;
 }
 
 // -------------------------------------------------------------
@@ -122,14 +93,14 @@ export async function getLocalGigs() {
   const db = await openDB();
   if (!db) {
     const raw = localStorage.getItem("tl_db_gigs");
-    return raw ? JSON.parse(raw) : initialCourses;
+    return raw ? JSON.parse(raw) : [];
   }
 
   return new Promise((resolve) => {
     const tx = db.transaction(STORES.GIGS, "readonly");
     const req = tx.objectStore(STORES.GIGS).getAll();
-    req.onsuccess = () => resolve(req.result.length > 0 ? req.result : initialCourses);
-    req.onerror = () => resolve(initialCourses);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => resolve([]);
   });
 }
 
@@ -138,17 +109,17 @@ export async function saveLocalGig(gig) {
   const sanitizedGig = {
     id: gig.id || `gig-${Date.now()}`,
     title: gig.title || "Untitled Gig",
-    mentorName: gig.mentorName || "Anonymous Mentor",
-    mentorEmail: gig.mentorEmail || "",
     category: gig.category || "General",
-    price: Number(gig.price) || 0,
-    duration: gig.duration || "4 Weeks",
-    description: gig.description || "",
+    price: gig.price || 50,
+    duration: gig.duration || "1 Week",
+    mentorName: gig.mentorName || "Anonymous Mentor",
+    mentorAvatar: gig.mentorAvatar || "M",
+    description: gig.description || "Project-based milestone mentorship.",
     level: gig.level || "All levels",
-    color: gig.color || "indigo",
     milestones: gig.milestones || [],
-    hasVideoIntro: Boolean(gig.hasVideoIntro),
-    videoFileName: gig.videoFileName || "intro_video.mp4",
+    deliverables: gig.deliverables || [],
+    hasVideoIntro: gig.hasVideoIntro !== undefined ? gig.hasVideoIntro : true,
+    videoFileName: gig.videoFileName || "course_preview.mp4",
     videoDuration: gig.videoDuration || "01:30",
     createdAt: gig.createdAt || new Date().toISOString(),
   };
@@ -177,14 +148,14 @@ export async function getLocalSessions() {
   const db = await openDB();
   if (!db) {
     const raw = localStorage.getItem("tl_db_sessions");
-    return raw ? JSON.parse(raw) : mySessions;
+    return raw ? JSON.parse(raw) : [];
   }
 
   return new Promise((resolve) => {
     const tx = db.transaction(STORES.SESSIONS, "readonly");
     const req = tx.objectStore(STORES.SESSIONS).getAll();
-    req.onsuccess = () => resolve(req.result.length > 0 ? req.result : mySessions);
-    req.onerror = () => resolve(mySessions);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => resolve([]);
   });
 }
 

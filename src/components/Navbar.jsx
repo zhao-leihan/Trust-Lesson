@@ -1,53 +1,98 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { LogOut, Shield, GraduationCap, ArrowRight, Menu, X, LayoutDashboard } from "lucide-react";
+import { Avatar, AvatarFallback } from "./ui/Avatar";
 
 const navLinks = [
   { to: "/", label: "Home" },
-  { to: "/explore", label: "For Learners" },
+  { to: "/explore", label: "Course" },
   { to: "/register", label: "For Mentors" },
   { to: "/about", label: "About" },
 ];
 
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   // Close mobile drawer on route transition
   useEffect(() => {
     setMobileMenuOpen(false);
-  }, [location.pathname]);
+  }, [pathname]);
+
+  // Track scroll for subtle backdrop transition
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleLogout = () => {
     logout();
-    navigate("/");
+    router.push("/");
   };
 
+  // Hide navbar on auth screens
+  if (pathname === "/login" || pathname === "/register") {
+    return null;
+  }
+
+  // ── Conditional Theme: White on Home & About, Non-White (Light/Purple) on Explore & Dashboard ──
+  const isWhiteTheme = pathname === "/" || pathname === "/about";
+  const isLightPage = pathname === "/explore" || pathname.startsWith("/dashboard");
+
+  // Header background & border classes
+  const headerBgClass = isWhiteTheme
+    ? isScrolled
+      ? "bg-slate-950/80 backdrop-blur-xl border-b border-purple-900/30 shadow-lg shadow-black/20"
+      : "bg-transparent backdrop-blur-sm border-b border-white/10"
+    : isLightPage
+    ? isScrolled
+      ? "bg-white/85 backdrop-blur-xl border-b border-purple-100 shadow-sm"
+      : "bg-white/60 backdrop-blur-md border-b border-purple-100/80"
+    : "bg-slate-950/90 backdrop-blur-xl border-b border-purple-900/30";
+
+  // Logo source
+  const logoSrc = isWhiteTheme ? "/logo-full-white.png" : "/logo-full.png";
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-slate-950/90 backdrop-blur-xl border-b border-purple-900/30 shadow-lg shadow-black/20 py-2.5 sm:py-3">
+    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-2.5 sm:py-3 ${headerBgClass}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 flex items-center justify-between gap-6">
-        {/* Brand: Uses logo-full-white.png enlarged for clear visibility */}
-        <Link to="/" className="flex items-center gap-2 group flex-shrink-0">
+        {/* Brand: Uses white logo on Home, dark logo on Explore */}
+        <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
           <img
-            src="/logo-full-white.png"
+            src={logoSrc}
             alt="Trust Lesson"
-            className="h-10 sm:h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-md"
+            className="h-10 sm:h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-sm"
           />
         </Link>
 
-        {/* Center Navigation Links - Guaranteed High Contrast on Dark Header */}
+        {/* Center Navigation Links */}
         <nav className="hidden md:flex items-center gap-8">
           {navLinks.map(({ to, label }) => {
-            const isActive = location.pathname === to;
+            const isActive = pathname === to;
             return (
               <Link
                 key={to}
-                to={to}
+                href={to}
                 className={`text-sm font-semibold tracking-wide transition-all relative py-1 ${
-                  isActive
+                  isWhiteTheme
+                    ? isActive
+                      ? "text-white font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-indigo-400 after:rounded-full"
+                      : "text-white/75 hover:text-white"
+                    : isLightPage
+                    ? isActive
+                      ? "text-purple-700 font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-purple-600 after:rounded-full"
+                      : "text-slate-600 hover:text-purple-700"
+                    : isActive
                     ? "text-white font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-indigo-400 after:rounded-full"
                     : "text-white/75 hover:text-white"
                 }`}
@@ -64,14 +109,27 @@ export default function Navbar() {
             <div className="flex items-center gap-3">
               {/* Role badge */}
               <Link
-                to="/dashboard"
+                href="/dashboard"
                 className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 ${
-                  user.role === "mentor"
-                    ? "bg-purple-600/30 text-purple-300 border border-purple-500/40"
-                    : "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40"
+                  user.role === "admin" || user.roleType === "ADMIN"
+                    ? isWhiteTheme
+                      ? "bg-rose-600/30 text-rose-300 border border-rose-500/40"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                    : user.role === "mentor" || user.roleType === "MENTOR"
+                    ? isWhiteTheme
+                      ? "bg-purple-600/30 text-purple-300 border border-purple-500/40"
+                      : "bg-purple-50 text-purple-700 border border-purple-200"
+                    : isWhiteTheme
+                    ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40"
+                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                 }`}
               >
-                {user.role === "mentor" ? (
+                {user.role === "admin" || user.roleType === "ADMIN" ? (
+                  <>
+                    <Shield size={12} />
+                    <span>Admin Panel</span>
+                  </>
+                ) : user.role === "mentor" || user.roleType === "MENTOR" ? (
                   <>
                     <Shield size={12} />
                     <span>Mentor Hub</span>
@@ -84,19 +142,23 @@ export default function Navbar() {
                 )}
               </Link>
 
-              {/* Avatar circle */}
-              <Link
-                to="/dashboard"
-                className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xs flex items-center justify-center shadow-md hover:scale-105 transition-transform"
-                title="Account Dashboard"
-              >
-                {user.avatar || user.name?.[0]?.toUpperCase() || "U"}
+              {/* Avatar using Radix UI Avatar */}
+              <Link href="/dashboard" title="Account Dashboard">
+                <Avatar className="w-9 h-9 hover:scale-105 transition-transform cursor-pointer">
+                  <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xs">
+                    {user.avatar || user.name?.[0]?.toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
               </Link>
 
               {/* Logout button */}
               <button
                 onClick={handleLogout}
-                className="text-white/60 hover:text-rose-400 p-2 rounded-full hover:bg-white/10 transition-colors"
+                className={`p-2 rounded-full transition-colors cursor-pointer ${
+                  isWhiteTheme
+                    ? "text-white/60 hover:text-rose-400 hover:bg-white/10"
+                    : "text-slate-400 hover:text-rose-600 hover:bg-slate-100"
+                }`}
                 title="Sign out"
                 aria-label="Sign out"
               >
@@ -106,13 +168,19 @@ export default function Navbar() {
           ) : (
             <div className="flex items-center gap-3">
               <Link
-                to="/login"
-                className="text-xs sm:text-sm font-semibold text-white/80 hover:text-white px-3 py-1.5 rounded-full transition-colors"
+                href="/login"
+                className={`text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-full transition-colors ${
+                  isWhiteTheme
+                    ? "text-white/80 hover:text-white"
+                    : isLightPage
+                    ? "text-slate-700 hover:text-purple-700"
+                    : "text-white/80 hover:text-white"
+                }`}
               >
                 Sign in
               </Link>
               <Link
-                to="/register"
+                href="/register"
                 className="px-5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-purple-600/25 transition-all hover:scale-105 flex items-center gap-1"
               >
                 <span>Get Started</span>
@@ -125,17 +193,22 @@ export default function Navbar() {
         {/* Mobile / Android Hamburger Toggle & Quick Avatar */}
         <div className="flex md:hidden items-center gap-2">
           {user && (
-            <Link
-              to="/dashboard"
-              className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xs flex items-center justify-center shadow-md"
-            >
-              {user.avatar || user.name?.[0]?.toUpperCase() || "U"}
+            <Link href="/dashboard">
+              <Avatar className="w-8 h-8">
+                <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xs">
+                  {user.avatar || user.name?.[0]?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
             </Link>
           )}
 
           <button
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+            className={`p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500/50 cursor-pointer ${
+              isWhiteTheme
+                ? "text-white/90 hover:text-white hover:bg-white/10"
+                : "text-slate-800 hover:text-purple-700 hover:bg-slate-100"
+            }`}
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
@@ -151,20 +224,31 @@ export default function Navbar() {
           {user && (
             <div className="mb-5 pb-4 border-b border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600 text-white font-extrabold text-sm flex items-center justify-center shadow-inner">
-                  {user.avatar || user.name?.[0]?.toUpperCase() || "U"}
-                </div>
+                <Avatar className="w-10 h-10">
+                  <AvatarFallback className="bg-gradient-to-tr from-purple-500 to-indigo-600 text-white font-extrabold text-sm">
+                    {user.avatar || user.name?.[0]?.toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
                 <div>
                   <p className="text-white font-bold text-sm leading-tight">{user.name}</p>
                   <p className="text-purple-300/80 text-xs capitalize flex items-center gap-1 mt-0.5">
-                    {user.role === "mentor" ? <Shield size={11} /> : <GraduationCap size={11} />}
-                    {user.role} Workspace
+                    {user.role === "admin" || user.roleType === "ADMIN" || user.role === "mentor" || user.roleType === "MENTOR" ? (
+                      <Shield size={11} />
+                    ) : (
+                      <GraduationCap size={11} />
+                    )}
+                    {user.role === "admin" || user.roleType === "ADMIN"
+                      ? "Admin"
+                      : user.role === "mentor" || user.roleType === "MENTOR"
+                      ? "Mentor"
+                      : "Student"}{" "}
+                    Workspace
                   </p>
                 </div>
               </div>
 
               <Link
-                to="/dashboard"
+                href="/dashboard"
                 onClick={() => setMobileMenuOpen(false)}
                 className="px-3 py-1.5 rounded-xl bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1"
               >
@@ -177,11 +261,11 @@ export default function Navbar() {
           {/* Navigation Links */}
           <nav className="flex flex-col space-y-1">
             {navLinks.map(({ to, label }) => {
-              const isActive = location.pathname === to;
+              const isActive = pathname === to;
               return (
                 <Link
                   key={to}
-                  to={to}
+                  href={to}
                   onClick={() => setMobileMenuOpen(false)}
                   className={`px-4 py-3 rounded-2xl text-sm font-semibold transition-all flex items-center justify-between ${
                     isActive
@@ -204,7 +288,7 @@ export default function Navbar() {
                   setMobileMenuOpen(false);
                   handleLogout();
                 }}
-                className="w-full py-3 rounded-2xl bg-white/5 hover:bg-rose-500/10 text-rose-300 border border-rose-500/20 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-3 rounded-2xl bg-white/5 hover:bg-rose-500/10 text-rose-300 border border-rose-500/20 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
               >
                 <LogOut size={15} />
                 <span>Sign Out ({user.name})</span>
@@ -212,14 +296,14 @@ export default function Navbar() {
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 <Link
-                  to="/login"
+                  href="/login"
                   onClick={() => setMobileMenuOpen(false)}
                   className="py-3 rounded-2xl bg-white/10 text-white font-bold text-xs text-center border border-white/10 hover:bg-white/15 transition-all"
                 >
                   Sign In
                 </Link>
                 <Link
-                  to="/register"
+                  href="/register"
                   onClick={() => setMobileMenuOpen(false)}
                   className="py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs text-center shadow-lg shadow-purple-900/30 flex items-center justify-center gap-1.5 transition-all"
                 >

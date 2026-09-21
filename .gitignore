@@ -10,7 +10,24 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# Environment & Database
+.env
+.env*.local
 *.local
+!.env.local.example
+prisma/*.db
+prisma/*.db-journal
+*.db
+*.sqlite
+
+# Next.js build output
+.next/
+out/
+
+# Foundry / Solidity build output
+artifacts/
+cache/
+cache_hardhat/
 
 # Editor directories and files
 .vscode/*

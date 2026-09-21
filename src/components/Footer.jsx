@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { Shield, Sparkles, Lock, ArrowRight, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { Shield, Lock, CheckCircle2 } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -13,10 +13,10 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 pb-12 border-b border-slate-900">
           {/* Column 1: Brand & Tagline (span 2 cols) */}
           <div className="lg:col-span-2 space-y-4">
-            <Link to="/" className="inline-block group">
+            <Link href="/" className="inline-block group">
               <img
                 src="/logo-full-white.png"
-                alt="Trust lesson"
+                alt="Trust Lesson"
                 className="h-10 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-md"
               />
             </Link>
@@ -43,23 +43,23 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-xs">
               <li>
-                <Link to="/explore" className="hover:text-purple-300 transition-colors">
+                <Link href="/explore" className="hover:text-purple-300 transition-colors">
                   Explore Mentors
                 </Link>
               </li>
               <li>
-                <Link to="/explore" className="hover:text-purple-300 transition-colors">
+                <Link href="/explore" className="hover:text-purple-300 transition-colors">
                   Milestone Gigs
                 </Link>
               </li>
               <li>
-                <Link to="/register" className="hover:text-purple-300 transition-colors">
+                <Link href="/register" className="hover:text-purple-300 transition-colors">
                   Become a Mentor
                 </Link>
               </li>
               <li>
-                <Link to="/about" className="hover:text-purple-300 transition-colors">
-                  About Trust lesson
+                <Link href="/about" className="hover:text-purple-300 transition-colors">
+                  About Trust Lesson
                 </Link>
               </li>
             </ul>
@@ -118,7 +118,7 @@ export default function Footer() {
         {/* Bottom Copyright & Security Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <p className="text-xs text-slate-500">
-            © 2026 Trust lesson. Built by <span className="text-slate-300 font-bold">Rayhan Young</span> & <span className="text-slate-300 font-bold">0xAnakMommy</span>. All rights reserved.
+            © 2026 Trust Lesson. Built by <span className="text-slate-300 font-bold">Rayhan Young</span> & <span className="text-slate-300 font-bold">0xAnakMommy</span>. All rights reserved.
           </p>
 
           <div className="flex items-center gap-3">

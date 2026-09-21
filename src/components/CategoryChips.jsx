@@ -1,5 +1,6 @@
-import { categories } from "../data/mentors";
 import { Code, Compass, Palette, Briefcase, Globe2, Music, Sparkles } from "lucide-react";
+
+const categories = ["All", "Coding", "Career", "Design", "Business", "Languages", "Music"];
 
 const categoryIcons = {
   All: Sparkles,

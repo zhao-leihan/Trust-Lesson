@@ -64,73 +64,58 @@ export default function WalletConnectCard({ compact = false }) {
   }
 
   return (
-    <div className="bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-950 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden border border-purple-500/20 shadow-xl shadow-purple-950/20">
-      {/* Decorative background glow */}
-      <div className="absolute -top-12 -right-12 w-48 h-48 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
-
-      <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center shrink-0 text-purple-300 shadow-inner">
-            <Wallet size={24} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-extrabold text-lg text-white">
-                Web3 Escrow Wallet
-              </h3>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Arbitrum One
-              </span>
-            </div>
-            <p className="text-xs text-purple-200/80 mt-1 max-w-lg leading-relaxed">
-              {walletAddress
-                ? "Your wallet is linked to the Trust lesson smart escrow contracts for instant milestone payouts and secure funds release."
-                : "Connect your Web3 wallet to fund learning milestones or receive automated payouts directly to your wallet."}
-            </p>
-          </div>
+    <div className="bg-slate-950 text-white rounded-2xl p-5 sm:p-6 border border-slate-800 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="flex items-center gap-3.5">
+        <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 text-indigo-400">
+          <Wallet size={20} />
         </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-sm text-white">
+              Arbitrum Escrow Wallet
+            </h3>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/10 text-slate-300 border border-white/10">
+              Arbitrum One
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {walletAddress
+              ? "Connected for non-custodial milestone funding and automated payouts."
+              : "Connect MetaMask or Web3 wallet to interact with on-chain milestone escrow."}
+          </p>
+        </div>
+      </div>
 
-        <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-          {walletAddress ? (
-            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md rounded-2xl p-2 px-4 border border-white/15">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="font-mono text-xs font-bold text-white tracking-wide">
-                  {shortAddr}
-                </span>
-              </div>
-              <div className="h-4 w-px bg-white/20" />
-              <button
-                onClick={handleCopy}
-                className="text-purple-200 hover:text-white transition-colors p-1"
-                title="Copy Address"
-              >
-                {copied ? (
-                  <CheckCircle2 size={15} className="text-emerald-400" />
-                ) : (
-                  <Copy size={15} />
-                )}
-              </button>
-              <button
-                onClick={disconnectWallet}
-                className="text-rose-300 hover:text-rose-100 transition-colors p-1"
-                title="Disconnect"
-              >
-                <LogOut size={15} />
-              </button>
-            </div>
-          ) : (
+      <div className="flex items-center gap-2 shrink-0">
+        {walletAddress ? (
+          <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="font-mono text-xs text-slate-200 font-semibold">{shortAddr}</span>
             <button
-              onClick={handleConnect}
-              disabled={isConnecting}
-              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-extrabold text-xs tracking-wide shadow-lg shadow-purple-900/40 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+              onClick={handleCopy}
+              className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              title="Copy Address"
             >
-              <Wallet size={16} />
-              <span>{isConnecting ? "Connecting Web3..." : "Connect Escrow Wallet"}</span>
+              {copied ? <CheckCircle2 size={13} className="text-emerald-400" /> : <Copy size={13} />}
             </button>
-          )}
-        </div>
+            <button
+              onClick={disconnectWallet}
+              className="text-slate-400 hover:text-rose-400 p-1 cursor-pointer"
+              title="Disconnect Wallet"
+            >
+              <LogOut size={13} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleConnect}
+            disabled={isConnecting}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+          >
+            <Wallet size={14} />
+            <span>{isConnecting ? "Connecting..." : "Connect Escrow Wallet"}</span>
+          </button>
+        )}
       </div>
     </div>
   );
