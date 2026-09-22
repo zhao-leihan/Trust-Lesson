@@ -5,12 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { LogOut, Shield, GraduationCap, ArrowRight, Menu, X, LayoutDashboard } from "lucide-react";
-import { Avatar, AvatarFallback } from "./ui/Avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "./ui/Avatar";
 
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/explore", label: "Course" },
-  { to: "/register", label: "For Mentors" },
+  { to: "/how-to-use", label: "How to Use" },
   { to: "/about", label: "About" },
 ];
 
@@ -47,7 +47,7 @@ export default function Navbar() {
 
   // ── Conditional Theme: White on Home & About, Non-White (Light/Purple) on Explore & Dashboard ──
   const isWhiteTheme = pathname === "/" || pathname === "/about";
-  const isLightPage = pathname === "/explore" || pathname.startsWith("/dashboard");
+  const isLightPage = pathname === "/explore" || pathname === "/how-to-use" || pathname.startsWith("/dashboard");
 
   // Header background & border classes
   const headerBgClass = isWhiteTheme
@@ -107,48 +107,50 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           {user ? (
             <div className="flex items-center gap-3">
-              {/* Role badge */}
+              {/* User Profile Avatar (Only image, no text) with role indicator */}
               <Link
                 href="/dashboard"
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 ${
+                title={
                   user.role === "admin" || user.roleType === "ADMIN"
-                    ? isWhiteTheme
-                      ? "bg-rose-600/30 text-rose-300 border border-rose-500/40"
-                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                    ? "Admin Panel"
                     : user.role === "mentor" || user.roleType === "MENTOR"
-                    ? isWhiteTheme
-                      ? "bg-purple-600/30 text-purple-300 border border-purple-500/40"
-                      : "bg-purple-50 text-purple-700 border border-purple-200"
-                    : isWhiteTheme
-                    ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40"
-                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                }`}
+                    ? "Mentor Hub"
+                    : "Student Dashboard"
+                }
               >
-                {user.role === "admin" || user.roleType === "ADMIN" ? (
-                  <>
-                    <Shield size={12} />
-                    <span>Admin Panel</span>
-                  </>
-                ) : user.role === "mentor" || user.roleType === "MENTOR" ? (
-                  <>
-                    <Shield size={12} />
-                    <span>Mentor Hub</span>
-                  </>
-                ) : (
-                  <>
-                    <GraduationCap size={12} />
-                    <span>Dashboard</span>
-                  </>
-                )}
-              </Link>
-
-              {/* Avatar using Radix UI Avatar */}
-              <Link href="/dashboard" title="Account Dashboard">
-                <Avatar className="w-9 h-9 hover:scale-105 transition-transform cursor-pointer">
-                  <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xs">
-                    {user.avatar || user.name?.[0]?.toUpperCase() || "U"}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                  <Avatar className="w-9 h-9 hover:scale-105 transition-transform cursor-pointer border border-purple-300/40 shadow-xs">
+                    <AvatarImage
+                      src={
+                        user.avatarUrl ||
+                        (user.role === "mentor" || user.roleType === "MENTOR"
+                          ? "/mentor-profile.png"
+                          : user.role === "admin" || user.roleType === "ADMIN"
+                          ? "/admin-profile.png"
+                          : "/student-profile.png")
+                      }
+                      alt={user.name || "User Profile"}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xs">
+                      {user.name?.[0]?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Role indicator badge on avatar */}
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full ring-2 ring-white bg-white overflow-hidden shadow-xs">
+                    <img
+                      src={
+                        user.role === "admin" || user.roleType === "ADMIN"
+                          ? "/admin-profile.png"
+                          : user.role === "mentor" || user.roleType === "MENTOR"
+                          ? "/mentor-profile.png"
+                          : "/student-profile.png"
+                      }
+                      alt="Role"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
               </Link>
 
               {/* Logout button */}
@@ -193,12 +195,40 @@ export default function Navbar() {
         {/* Mobile / Android Hamburger Toggle & Quick Avatar */}
         <div className="flex md:hidden items-center gap-2">
           {user && (
-            <Link href="/dashboard">
-              <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xs">
-                  {user.avatar || user.name?.[0]?.toUpperCase() || "U"}
-                </AvatarFallback>
-              </Avatar>
+            <Link href="/dashboard" title="Account Dashboard">
+              <div className="relative">
+                <Avatar className="w-8 h-8 border border-purple-300/40 shadow-xs">
+                  <AvatarImage
+                    src={
+                      user.avatarUrl ||
+                      (user.role === "mentor" || user.roleType === "MENTOR"
+                        ? "/mentor-profile.png"
+                        : user.role === "admin" || user.roleType === "ADMIN"
+                        ? "/admin-profile.png"
+                        : "/student-profile.png")
+                    }
+                    alt={user.name || "User Profile"}
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xs">
+                    {user.name?.[0]?.toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Subtle role indicator badge on corner */}
+                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ring-1.5 ring-white bg-white overflow-hidden shadow-2xs">
+                  <img
+                    src={
+                      user.role === "admin" || user.roleType === "ADMIN"
+                        ? "/admin-profile.png"
+                        : user.role === "mentor" || user.roleType === "MENTOR"
+                        ? "/mentor-profile.png"
+                        : "/student-profile.png"
+                    }
+                    alt="Role"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
             </Link>
           )}
 
@@ -224,18 +254,32 @@ export default function Navbar() {
           {user && (
             <div className="mb-5 pb-4 border-b border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Avatar className="w-10 h-10">
+                <Avatar className="w-10 h-10 border border-purple-400/30">
+                  <AvatarImage
+                    src={
+                      user.avatarUrl ||
+                      (user.role === "mentor" || user.roleType === "MENTOR"
+                        ? "/mentor-profile.png"
+                        : user.role === "admin" || user.roleType === "ADMIN"
+                        ? "/admin-profile.png"
+                        : "/student-profile.png")
+                    }
+                    alt={user.name || "User Profile"}
+                    className="object-cover"
+                  />
                   <AvatarFallback className="bg-gradient-to-tr from-purple-500 to-indigo-600 text-white font-extrabold text-sm">
-                    {user.avatar || user.name?.[0]?.toUpperCase() || "U"}
+                    {user.name?.[0]?.toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="text-white font-bold text-sm leading-tight">{user.name}</p>
-                  <p className="text-purple-300/80 text-xs capitalize flex items-center gap-1 mt-0.5">
-                    {user.role === "admin" || user.roleType === "ADMIN" || user.role === "mentor" || user.roleType === "MENTOR" ? (
-                      <Shield size={11} />
+                  <p className="text-purple-300/80 text-xs capitalize flex items-center gap-1.5 mt-0.5">
+                    {user.role === "admin" || user.roleType === "ADMIN" ? (
+                      <img src="/admin-profile.png" alt="Admin" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                    ) : user.role === "mentor" || user.roleType === "MENTOR" ? (
+                      <img src="/mentor-profile.png" alt="Mentor" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
                     ) : (
-                      <GraduationCap size={11} />
+                      <img src="/student-profile.png" alt="Student" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
                     )}
                     {user.role === "admin" || user.roleType === "ADMIN"
                       ? "Admin"

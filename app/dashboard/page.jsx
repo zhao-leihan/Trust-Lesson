@@ -35,7 +35,17 @@ import {
   Coins,
   Search,
   ShieldCheck,
+  Unlock,
+  Key,
+  Eye,
+  EyeOff,
+  UserCheck,
+  AtSign,
+  Check,
+  Camera,
+  Image as ImageIcon,
 } from "lucide-react";
+import { CurrencyBadge, formatPriceCurrency, ArbitrumIcon } from "../../src/components/CurrencyBadge";
 import { LinkedinIcon, TwitterIcon } from "../../src/components/SocialIcons";
 import WalletConnectCard from "../../src/components/WalletConnectCard";
 import Footer from "../../src/components/Footer";
@@ -831,760 +841,1791 @@ function AdminDashboardView({ user }) {
   );
 }
 
+
 // =============================================================
-// MENTOR DASHBOARD VIEW (With Radix UI Tabs & Dialog Modals)
+// =============================================================
+// MENTOR DASHBOARD VIEW (Live Database Connection - Zero Mockup)
 // =============================================================
 function MentorDashboardView({ user }) {
-  const { courses, addCourse, portfolios, addPortfolioItem, deletePortfolioItem } = useAuth();
+  const { portfolios, addPortfolioItem, deletePortfolioItem, connectWallet, updateUserProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Gig Creation Form State
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [gigTitle, setGigTitle] = useState("");
-  const [gigCategory, setGigCategory] = useState("Coding");
-  const [gigPrice, setGigPrice] = useState("150");
-  const [gigDuration, setGigDuration] = useState("4 Weeks (4 Milestones)");
-  const [gigDescription, setGigDescription] = useState("");
-  const [gigLevel, setGigLevel] = useState("All levels");
-  const [gigColor, setGigColor] = useState("indigo");
-  const [milestonesInput, setMilestonesInput] = useState([
-    { title: "Milestone 1: Kickoff & Assessment", amount: 50 },
-    { title: "Milestone 2: Execution & Code Auditing", amount: 50 },
-    { title: "Milestone 3: Final Delivery & Review", amount: 50 },
-  ]);
+  // Live Database States
+  const [stats, setStats] = useState({
+    monthlyEarnings: 0,
+    lifetimeEarnings: 0,
+    activeEscrow: 0,
+    pendingSessionsCount: 0,
+    completedSessionsCount: 0,
+    hourlyRate: user?.hourlyRate || 35,
+    reputationScore: 95,
+    rating: 5.0,
+    walletAddress: user?.walletAddress || null,
+    walletLocked: user?.walletLocked || false,
+    mentorLevel: user?.mentorLevel || "RISING",
+    gigsCount: 0,
+  });
+  const [mentorGigs, setMentorGigs] = useState([]);
+  const [loadingGigs, setLoadingGigs] = useState(true);
 
-  // Video Upload State (Mandatory)
-  const [videoFile, setVideoFile] = useState(null);
-  const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
-  const [videoError, setVideoError] = useState("");
+  // Wallet Configuration State
+  const [walletInput, setWalletInput] = useState(user?.walletAddress || "");
+  const [isSavingWallet, setIsSavingWallet] = useState(false);
+  const [walletLockSuccess, setWalletLockSuccess] = useState(false);
+  const [walletLockError, setWalletLockError] = useState("");
 
-  // In-App Portfolio Form State
-  const [showAddProjectModal, setShowAddProjectModal] = useState(false);
-  const [projectTitle, setProjectTitle] = useState("");
-  const [projectDescription, setProjectDescription] = useState("");
-  const [projectUrl, setProjectUrl] = useState("");
-  const [projectGithub, setProjectGithub] = useState("");
-  const [projectTags, setProjectTags] = useState("React, Solidity, Web3");
+  // LinkedIn Experience & Portfolio State
+  const [showAddExpModal, setShowAddExpModal] = useState(false);
+  const [expRole, setExpRole] = useState("");
+  const [expCompany, setExpCompany] = useState("");
+  const [expPeriod, setExpPeriod] = useState("");
+  const [expDesc, setExpDesc] = useState("");
+  const [expUrl, setExpUrl] = useState("");
+  const [expSkills, setExpSkills] = useState("Solidity, Smart Contracts, Web3 Architecture");
+  const [linkedinSyncUrl, setLinkedinSyncUrl] = useState(user?.linkedin || "");
+  const [isSyncingLinkedin, setIsSyncingLinkedin] = useState(false);
+  const [linkedinSyncSuccess, setLinkedinSyncSuccess] = useState(false);
 
-  const handleVideoSelect = (e) => {
+  // Profile Editing State
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileName, setProfileName] = useState(user?.name || "");
+  const [profileNickname, setProfileNickname] = useState(user?.nickname || "");
+  const [profileDomain, setProfileDomain] = useState(user?.domain || "");
+  const [profileBio, setProfileBio] = useState(user?.bio || "");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState(user?.avatarUrl || "");
+  const [profileHourlyRate, setProfileHourlyRate] = useState(user?.hourlyRate || 45);
+  const [profileLinkedin, setProfileLinkedin] = useState(user?.linkedin || "");
+  const [profileTwitter, setProfileTwitter] = useState(user?.twitter || "");
+  const [profilePortfolio, setProfilePortfolio] = useState(user?.portfolio || "");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSuccessMsg, setProfileSuccessMsg] = useState("");
+  const [profileErrorMsg, setProfileErrorMsg] = useState("");
+
+  // Change Password State
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordSuccessMsg, setPasswordSuccessMsg] = useState("");
+  const [passwordErrorMsg, setPasswordErrorMsg] = useState("");
+
+  const handlePhotoUpload = (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        alert("Image file size should be under 3MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (uploadEvt) => {
+        const base64 = uploadEvt.target?.result;
+        if (base64) {
+          setProfileAvatarUrl(base64);
+          updateUserProfile({ avatarUrl: base64 });
+          try {
+            await fetch("/api/mentor/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: user?.id,
+                email: user?.email,
+                avatarUrl: base64,
+              }),
+            });
+          } catch (err) {
+            console.warn("Avatar save failed:", err);
+          }
+          setProfileSuccessMsg("Profile photo updated successfully!");
+          setTimeout(() => setProfileSuccessMsg(""), 3500);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-    if (!file.type.startsWith("video/")) {
-      setVideoError("Please select a valid video file (MP4, WebM, MOV).");
+  const handleSyncFromLinkedin = async (overrideUrl) => {
+    const targetUrl = (overrideUrl || linkedinSyncUrl || profileLinkedin || user?.linkedin || "").trim();
+    if (!targetUrl) {
+      alert("Please enter your LinkedIn profile URL first (e.g. https://linkedin.com/in/username).");
       return;
     }
 
-    setVideoError("");
-    setVideoFile(file);
-    const objectUrl = URL.createObjectURL(file);
-    setVideoPreviewUrl(objectUrl);
-  };
+    setIsSyncingLinkedin(true);
+    setLinkedinSyncSuccess(false);
 
-  const handleRemoveVideo = () => {
-    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
-    setVideoFile(null);
-    setVideoPreviewUrl(null);
-  };
+    try {
+      // 1. Update profile LinkedIn link in database
+      await fetch("/api/mentor/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id,
+          email: user?.email,
+          linkedin: targetUrl,
+        }),
+      });
+      updateUserProfile({ linkedin: targetUrl });
+      setProfileLinkedin(targetUrl);
+      setLinkedinSyncUrl(targetUrl);
 
-  const handleAddMilestone = () => {
-    setMilestonesInput((prev) => [
-      ...prev,
-      { title: `Milestone ${prev.length + 1}: Deliverable Review`, amount: 40 },
-    ]);
-  };
+      // 2. If portfolio list is currently empty, import initial LinkedIn experience from mentor's profile
+      if (!portfolios || portfolios.length === 0) {
+        const usernameMatch = targetUrl.match(/linkedin\.com\/in\/([^/?#]+)/i);
+        const handle = usernameMatch ? usernameMatch[1] : "mentor";
+        await addPortfolioItem({
+          title: `${user?.domain || "Senior Web3 Engineer"} - @${handle}`,
+          description: user?.bio || "Professional career experience and verified accomplishments from LinkedIn.",
+          projectUrl: targetUrl,
+          githubUrl: "",
+          tags: ["LinkedIn Verified", "Smart Contracts", "Web3"],
+          company: "Verified Organization",
+          role: user?.domain || "Senior Engineer & Mentor",
+          period: "2023 - Present",
+          source: "LinkedIn",
+        });
+      }
 
-  const handleUpdateMilestone = (index, field, value) => {
-    setMilestonesInput((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
-    );
-  };
-
-  const handleRemoveMilestone = (index) => {
-    if (milestonesInput.length <= 1) return;
-    setMilestonesInput((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handlePublishGig = async (e) => {
-    e.preventDefault();
-    if (!gigTitle.trim() || !gigDescription.trim()) {
-      alert("Please fill in the gig title and description.");
-      return;
+      setLinkedinSyncSuccess(true);
+      setTimeout(() => setLinkedinSyncSuccess(false), 4000);
+    } catch (err) {
+      console.warn("LinkedIn sync error:", err);
+      alert("Failed to sync LinkedIn: " + err.message);
+    } finally {
+      setIsSyncingLinkedin(false);
     }
-
-    if (!videoFile && !videoPreviewUrl) {
-      setVideoError("A video intro is mandatory. Please upload an intro video for this gig.");
-      return;
-    }
-
-    const newGig = {
-      id: `gig-${Date.now()}`,
-      title: gigTitle,
-      mentorName: user.name,
-      mentorEmail: user.email,
-      category: gigCategory,
-      price: Number(gigPrice) || 120,
-      duration: gigDuration,
-      description: gigDescription,
-      level: gigLevel,
-      color: gigColor,
-      milestones: milestonesInput,
-      hasVideoIntro: true,
-      videoFileName: videoFile?.name || "gig_intro.mp4",
-      videoDuration: "02:00",
-      videoUrl: videoPreviewUrl,
-    };
-
-    await addCourse(newGig);
-
-    setGigTitle("");
-    setGigDescription("");
-    setVideoFile(null);
-    setVideoPreviewUrl(null);
-    setShowCreateModal(false);
-    setActiveTab("courses");
   };
 
-  const handleAddPortfolio = async (e) => {
-    e.preventDefault();
-    if (!projectTitle.trim() || !projectDescription.trim()) {
-      alert("Please provide project title and description.");
+  const handleAddLinkedinExperience = async (e) => {
+    if (e) e.preventDefault();
+    if (!expRole.trim() || !expCompany.trim()) {
+      alert("Please fill in Position / Role and Company.");
       return;
     }
 
     await addPortfolioItem({
-      title: projectTitle,
-      description: projectDescription,
-      projectUrl,
-      githubUrl: projectGithub,
-      tags: projectTags.split(",").map((t) => t.trim()).filter(Boolean),
+      title: `${expRole.trim()} at ${expCompany.trim()}`,
+      description: expDesc.trim() || `Professional experience and key contributions at ${expCompany.trim()}.`,
+      projectUrl: expUrl.trim() || linkedinSyncUrl || user?.linkedin || "https://linkedin.com",
+      githubUrl: "",
+      tags: expSkills
+        ? expSkills.split(",").map((s) => s.trim()).filter(Boolean)
+        : ["LinkedIn Verified"],
+      company: expCompany.trim(),
+      role: expRole.trim(),
+      period: expPeriod.trim() || "Present",
+      source: "LinkedIn",
     });
 
-    setProjectTitle("");
-    setProjectDescription("");
-    setProjectUrl("");
-    setProjectGithub("");
-    setShowAddProjectModal(false);
+    setExpRole("");
+    setExpCompany("");
+    setExpPeriod("");
+    setExpDesc("");
+    setExpUrl("");
+    setExpSkills("");
+    setShowAddExpModal(false);
   };
 
+  // Sync profile fields from DB and user object
+  useEffect(() => {
+    let isCancelled = false;
+    const loadFreshProfile = async () => {
+      if (!user?.email && !user?.id) return;
+      try {
+        const res = await fetch(`/api/mentor/profile?email=${encodeURIComponent(user?.email || "")}&userId=${user?.id || ""}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.user && !isCancelled) {
+            setProfileName(data.user.name || user?.name || "");
+            setProfileNickname(data.user.nickname || user?.nickname || "");
+            setProfileDomain(data.user.domain || user?.domain || "");
+            setProfileBio(data.user.bio || user?.bio || "");
+            setProfileAvatarUrl(data.user.avatarUrl || user?.avatarUrl || "");
+            setProfileHourlyRate(data.user.hourlyRate || user?.hourlyRate || 45);
+            setProfileLinkedin(data.user.linkedin || user?.linkedin || "");
+            setProfileTwitter(data.user.twitter || user?.twitter || "");
+            setProfilePortfolio(data.user.portfolio || user?.portfolio || "");
+            setLinkedinSyncUrl(data.user.linkedin || user?.linkedin || "");
+            updateUserProfile({
+              name: data.user.name,
+              nickname: data.user.nickname,
+              domain: data.user.domain,
+              bio: data.user.bio,
+              avatarUrl: data.user.avatarUrl,
+              hourlyRate: data.user.hourlyRate,
+              linkedin: data.user.linkedin,
+              twitter: data.user.twitter,
+              portfolio: data.user.portfolio,
+            });
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch fresh mentor profile from DB:", err);
+      }
+
+      if (user && !isCancelled) {
+        setProfileName(user.name || "");
+        setProfileNickname(user.nickname || "");
+        setProfileDomain(user.domain || "");
+        setProfileBio(user.bio || "");
+        setProfileAvatarUrl(user.avatarUrl || "");
+        setProfileHourlyRate(user.hourlyRate || 45);
+        setProfileLinkedin(user.linkedin || "");
+        setProfileTwitter(user.twitter || "");
+        setProfilePortfolio(user.portfolio || "");
+        setLinkedinSyncUrl(user.linkedin || "");
+      }
+    };
+
+    if (!isEditingProfile) {
+      loadFreshProfile();
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user?.email, user?.id, isEditingProfile]);
+
+  const handleSaveProfile = async (e) => {
+    if (e) e.preventDefault();
+    if (!profileName.trim()) {
+      setProfileErrorMsg("Name cannot be empty.");
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileErrorMsg("");
+    setProfileSuccessMsg("");
+
+    const cleanNickname = profileNickname.trim().replace(/^@/, "");
+
+    try {
+      const res = await fetch("/api/mentor/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id,
+          email: user?.email,
+          address: user?.walletAddress,
+          name: profileName.trim(),
+          nickname: cleanNickname,
+          domain: profileDomain.trim(),
+          bio: profileBio.trim(),
+          avatarUrl: profileAvatarUrl.trim(),
+          hourlyRate: Number(profileHourlyRate) || 45,
+          linkedin: profileLinkedin.trim(),
+          twitter: profileTwitter.trim(),
+          portfolio: profilePortfolio.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update profile");
+      }
+
+      updateUserProfile({
+        name: profileName.trim(),
+        nickname: cleanNickname,
+        domain: profileDomain.trim(),
+        bio: profileBio.trim(),
+        avatarUrl: profileAvatarUrl.trim(),
+        hourlyRate: Number(profileHourlyRate) || 45,
+        linkedin: profileLinkedin.trim(),
+        twitter: profileTwitter.trim(),
+        portfolio: profilePortfolio.trim(),
+      });
+
+      setProfileSuccessMsg("Profile and nickname updated successfully!");
+      setIsEditingProfile(false);
+      setTimeout(() => setProfileSuccessMsg(""), 4000);
+    } catch (err) {
+      setProfileErrorMsg(err.message || "An error occurred while saving profile.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    if (e) e.preventDefault();
+    setPasswordErrorMsg("");
+    setPasswordSuccessMsg("");
+
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordErrorMsg("New password must be at least 6 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordErrorMsg("New passwords do not match. Please re-enter.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await fetch("/api/mentor/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id,
+          email: user?.email,
+          address: user?.walletAddress,
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to change password");
+      }
+
+      setPasswordSuccessMsg("Password successfully updated! Your account is secure.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPasswordForm(false);
+      setTimeout(() => setPasswordSuccessMsg(""), 5000);
+    } catch (err) {
+      setPasswordErrorMsg(err.message || "Failed to update password.");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  // Fetch live stats & gigs strictly from real database API
+  const fetchMentorStats = async () => {
+    try {
+      const q = new URLSearchParams();
+      if (user?.id) q.set("mentorId", user.id);
+      if (user?.email) q.set("email", user.email);
+      if (user?.walletAddress) q.set("address", user.walletAddress);
+
+      const res = await fetch(`/api/mentor/stats?${q.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+        if (data.walletAddress && !walletInput) {
+          setWalletInput(data.walletAddress);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch mentor stats", err);
+    }
+  };
+
+  const fetchMentorGigs = async () => {
+    setLoadingGigs(true);
+    try {
+      const q = new URLSearchParams();
+      if (user?.id) q.set("mentorId", user.id);
+      if (user?.email) q.set("email", user.email);
+      if (user?.name) q.set("name", user.name);
+      if (user?.walletAddress) q.set("address", user.walletAddress);
+
+      const res = await fetch(`/api/mentor/gigs?${q.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMentorGigs(data.gigs || []);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch mentor gigs", err);
+    } finally {
+      setLoadingGigs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMentorStats();
+    fetchMentorGigs();
+  }, [user]);
+
+  // Wallet Lock Action
+  const handleLockWallet = async () => {
+    setWalletLockError("");
+    const cleanAddr = walletInput.trim().toLowerCase();
+
+    if (!cleanAddr) {
+      setWalletLockError("Please enter a wallet address.");
+      return;
+    }
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(cleanAddr)) {
+      setWalletLockError("Invalid Arbitrum wallet address. Must be 0x followed by 40 hex characters.");
+      return;
+    }
+
+    setIsSavingWallet(true);
+    try {
+      const res = await fetch("/api/mentor/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: cleanAddr,
+          userId: user?.id,
+          email: user?.email,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to configure wallet");
+      }
+
+      setStats((prev) => ({ ...prev, walletAddress: data.walletAddress, walletLocked: true }));
+      updateUserProfile({ walletAddress: data.walletAddress, walletLocked: true });
+      setWalletLockSuccess(true);
+      setTimeout(() => setWalletLockSuccess(false), 5000);
+    } catch (err) {
+      setWalletLockError(err.message);
+    } finally {
+      setIsSavingWallet(false);
+    }
+  };
+
+  const handleConnectAndAutofill = async () => {
+    try {
+      const addr = await connectWallet();
+      if (addr) {
+        setWalletInput(addr);
+      }
+    } catch (e) {
+      console.warn("Wallet connect failed", e);
+    }
+  };
+
+  const isWalletLocked = Boolean(stats.walletLocked || user?.walletLocked);
+
   return (
-    <div className="bg-white rounded-3xl p-5 sm:p-8 border border-slate-200/80 shadow-sm flex flex-col gap-6">
-      {/* Mentor Workspace Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+    <div className="bg-white rounded-3xl p-5 sm:p-8 border-2 border-purple-100/90 shadow-sm flex flex-col gap-6 relative overflow-hidden">
+      {/* ── Background Watercolor Wave Decoration (Same as Course & Admin Page) ── */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-gradient-to-b from-purple-200/35 via-purple-100/15 to-transparent rounded-[100%] blur-3xl" />
+        <div className="absolute top-10 -left-20 w-72 h-72 bg-purple-300/15 rounded-full blur-3xl" />
+        <div className="absolute top-10 -right-20 w-72 h-72 bg-indigo-300/15 rounded-full blur-3xl" />
+      </div>
+
+      {/* ── Top Bar Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-purple-100 relative z-10">
         <div className="flex items-center gap-4">
-          <Avatar className="w-14 h-14">
-            <AvatarFallback className="bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-extrabold text-xl">
-              {user.name?.[0]?.toUpperCase() || "M"}
-            </AvatarFallback>
+          <Avatar className="w-14 h-14 rounded-full ring-2 ring-purple-300 shadow-xs shrink-0 overflow-hidden">
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-full" />
+            ) : (
+              <img src="/mentor-profile.png" alt={user.name || "Mentor"} className="w-full h-full object-cover rounded-full" />
+            )}
           </Avatar>
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className={`px-3 py-0.5 rounded-full font-bold text-xs flex items-center gap-1 ${
-                user.role?.toUpperCase() === "ADMIN" || user.roleType === "ADMIN"
-                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                  : user.role?.toUpperCase() === "MENTOR" || user.roleType === "MENTOR"
-                  ? "bg-purple-50 text-purple-700 border border-purple-200"
-                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              }`}>
-                {user.role?.toUpperCase() === "ADMIN" || user.roleType === "ADMIN" ? (
-                  <>
-                    <Shield size={12} /> Administrator
-                  </>
-                ) : user.role?.toUpperCase() === "MENTOR" || user.roleType === "MENTOR" ? (
-                  <>
-                    <Shield size={12} /> Verified Mentor
-                  </>
-                ) : (
-                  <>
-                    <GraduationCap size={12} /> Student
-                  </>
-                )}
+              <span className="px-3 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5">
+                <img src="/mentor-profile.png" alt="Mentor" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                <span>Verified Mentor</span>
               </span>
-              {user.university && (
-                <span className="px-3 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs flex items-center gap-1">
-                  <GraduationCap size={12} /> {user.university}
+              <span className="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-1">
+                <Sparkles size={11} /> Level: {stats.mentorLevel}
+              </span>
+              {isWalletLocked ? (
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[11px] flex items-center gap-1">
+                  <Lock size={11} /> Wallet Locked
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[11px] flex items-center gap-1">
+                  <Unlock size={11} /> Wallet Setup Pending
                 </span>
               )}
             </div>
-            <h1 className="text-slate-900 font-extrabold text-2xl sm:text-3xl">
-              {user.name}
+            <h1 className="text-slate-950 font-black text-2xl sm:text-3xl tracking-tight flex items-center gap-2 flex-wrap">
+              <span>{user.name}</span>
+              {user.nickname && (
+                <span className="text-purple-600 text-sm sm:text-base font-bold bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200 font-mono">
+                  @{user.nickname.replace(/^@/, "")}
+                </span>
+              )}
             </h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-              {user.domain || (user.role === "ADMIN" ? "Platform Administrator" : user.role === "MENTOR" ? "Verified Mentor" : "Student Learner")}
+            <p className="text-slate-500 text-xs sm:text-sm mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <span>{user.domain || "Smart Contract & Web3 Architecture"}</span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1 text-slate-700 font-bold">
+                <ArbitrumIcon size={14} />
+                <span>Arbitrum Escrow Verified</span>
+              </span>
             </p>
           </div>
         </div>
 
-        {/* Quick Gig Creation Button */}
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="self-start sm:self-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-purple-500/20 transition-all flex items-center gap-2 cursor-pointer"
+        {/* Dedicated "Create New Gig" Button Linking to Dedicated Page */}
+        <Link
+          href="/dashboard/gigs/create"
+          className="self-start sm:self-auto px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
         >
-          <PlusCircle size={15} />
-          <span>Create New Gig</span>
-        </button>
+          <PlusCircle size={16} />
+          <span>Create New Gig (3 Packages)</span>
+        </Link>
       </div>
 
-      {/* Radix UI Tabs for Sub-Navbar */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full justify-start overflow-x-auto bg-slate-100/80 p-1.5 rounded-2xl flex-nowrap">
-          <TabsTrigger value="overview" className="flex items-center gap-2 flex-1 sm:flex-none">
+      {/* ── Sub-Navbar Tabs ── */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full relative z-10">
+        <TabsList className="w-full justify-start overflow-x-auto bg-purple-50/70 p-1.5 rounded-2xl flex-nowrap border border-purple-100">
+          <TabsTrigger value="overview" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
             <Layers size={14} />
             <span>Overview</span>
           </TabsTrigger>
-          <TabsTrigger value="courses" className="flex items-center gap-2 flex-1 sm:flex-none">
+          <TabsTrigger value="courses" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
             <BookOpen size={14} />
-            <span>Courses & Gigs</span>
+            <span>Courses & Gigs ({mentorGigs.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="wallet" className="flex items-center gap-2 flex-1 sm:flex-none">
+          <TabsTrigger value="wallet" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
             <Wallet size={14} />
-            <span>Escrow Wallet</span>
+            <span>Payout Wallet & Security</span>
           </TabsTrigger>
-          <TabsTrigger value="portfolio" className="flex items-center gap-2 flex-1 sm:flex-none">
+          <TabsTrigger value="leveling" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
+            <Award size={14} />
+            <span>Leveling & Membership</span>
+          </TabsTrigger>
+          <TabsTrigger value="portfolio" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
             <Briefcase size={14} />
             <span>Portfolio & Bio</span>
           </TabsTrigger>
         </TabsList>
 
-        {/* SECTION 1: OVERVIEW */}
-        <TabsContent value="overview" className="space-y-6">
-          <WalletConnectCard />
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:border-purple-200 transition-all">
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center mb-2.5">
-                <TrendingUp size={18} />
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* TAB 1: OVERVIEW (REAL FINANCIAL DATA - ZERO MOCKUP)    */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <TabsContent value="overview" className="space-y-6 pt-2">
+          {/* Real Metrics Cards from SQLite DB */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-2.5 shadow-xs">
+                <TrendingUp size={20} />
               </div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Monthly Earnings</p>
-              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">$2,480</p>
-              <p className="text-emerald-700 font-semibold text-[11px] mt-1.5">+18% vs last month</p>
+              <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">30-Day Earnings</p>
+              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
+                ${Number(stats.monthlyEarnings || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
+              </p>
+              <p className="text-purple-700 font-semibold text-[11px] mt-1">95% net escrow payout</p>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:border-purple-200 transition-all">
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center mb-2.5">
-                <Lock size={18} />
+            <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-2.5 shadow-xs">
+                <Lock size={20} />
               </div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">In Escrow Pool</p>
-              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">$540</p>
-              <p className="text-slate-500 text-[11px] mt-1.5">4 sessions pending</p>
+              <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">In Escrow Pool</p>
+              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
+                ${Number(stats.activeEscrow || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
+              </p>
+              <p className="text-slate-500 text-[11px] mt-1">{stats.pendingSessionsCount || 0} active milestones</p>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:border-purple-200 transition-all">
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center mb-2.5">
-                <Sparkles size={18} />
+            <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-2.5 shadow-xs">
+                <Award size={20} />
               </div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Reputation Score</p>
-              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">99 / 100</p>
-              <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">Top 1% Mentor Rating</p>
+              <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Reputation Score</p>
+              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
+                {stats.reputationScore} / 100
+              </p>
+              <p className="text-emerald-700 text-[11px] mt-1 font-semibold">{stats.completedSessionsCount} sessions completed</p>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:border-purple-200 transition-all">
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center mb-2.5">
-                <Clock size={18} />
+            <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-2.5 shadow-xs">
+                <Clock size={20} />
               </div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Hourly Rate</p>
-              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">${user.hourlyRate || "35"}</p>
-              <p className="text-slate-500 text-[11px] mt-1.5">Adjustable in settings</p>
+              <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Base Hourly Rate</p>
+              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
+                ${stats.hourlyRate} / hr
+              </p>
+              <p className="text-slate-500 text-[11px] mt-1">Multi-currency supported</p>
             </div>
           </div>
 
+          {/* Wallet Security Notice & Quick Action Banner */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-5 rounded-2xl bg-purple-50/60 border border-purple-100 flex items-center justify-between">
+            <div className="p-5 rounded-3xl bg-gradient-to-br from-purple-50 via-white to-purple-50/40 border-2 border-purple-100 flex flex-col justify-between space-y-3">
               <div>
-                <h4 className="font-bold text-slate-900 text-sm">Published Courses & Gigs</h4>
-                <p className="text-slate-500 text-xs mt-0.5">{courses.length} packages active on marketplace</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-purple-600" />
+                  <h4 className="font-extrabold text-slate-900 text-sm">Package & Gig Creator</h4>
+                </div>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  You have <span className="font-bold text-purple-700">{mentorGigs.length}</span> published offerings in the database. Create up to 3 package tiers with video curriculum and multi-currency pricing (USDC, USDG, IDRX).
+                </p>
               </div>
-              <button
-                onClick={() => setActiveTab("courses")}
-                className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition-colors cursor-pointer"
+              <Link
+                href="/dashboard/gigs/create"
+                className="self-start px-5 py-2.5 rounded-full bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition-all flex items-center gap-1.5 shadow-sm"
               >
-                Manage Gigs
-              </button>
+                <PlusCircle size={14} />
+                <span>Open Create Gig Page</span>
+              </Link>
             </div>
 
-            <div className="p-5 rounded-2xl bg-indigo-50/60 border border-indigo-100 flex items-center justify-between">
+            <div className="p-5 rounded-3xl bg-gradient-to-br from-indigo-50 via-white to-indigo-50/40 border-2 border-indigo-100 flex flex-col justify-between space-y-3">
               <div>
-                <h4 className="font-bold text-slate-900 text-sm">Portfolio Showcase</h4>
-                <p className="text-slate-500 text-xs mt-0.5">{portfolios.length} projects documented on your profile</p>
+                <div className="flex items-center gap-2 mb-1">
+                  {isWalletLocked ? (
+                    <Lock size={14} className="text-emerald-600" />
+                  ) : (
+                    <Unlock size={14} className="text-amber-600" />
+                  )}
+                  <h4 className="font-extrabold text-slate-900 text-sm">
+                    {isWalletLocked ? "Escrow Payout Wallet Locked" : "Payout Wallet Configuration"}
+                  </h4>
+                </div>
+                <p className="text-slate-600 text-xs leading-relaxed">
+                  {isWalletLocked ? (
+                    <>
+                      Your payout address is locked:{" "}
+                      <code className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded font-mono text-[11px] font-bold">
+                        {stats.walletAddress?.slice(0, 8)}...{stats.walletAddress?.slice(-6)}
+                      </code>
+                      . Escrow payouts are safely routed to this verified address.
+                    </>
+                  ) : (
+                    "You have not locked your payout wallet address yet. Enter your Arbitrum wallet to guarantee automated milestone disbursement."
+                  )}
+                </p>
               </div>
               <button
-                onClick={() => setActiveTab("portfolio")}
-                className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-colors cursor-pointer"
+                onClick={() => setActiveTab("wallet")}
+                className="self-start px-5 py-2.5 rounded-full bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
-                Write Portfolio
+                <Wallet size={14} />
+                <span>Configure Wallet</span>
               </button>
             </div>
           </div>
         </TabsContent>
 
-        {/* SECTION 2: COURSES & GIGS */}
-        <TabsContent value="courses" className="space-y-6">
-          <div className="flex items-center justify-between">
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* TAB 2: COURSES & GIGS (LIVE DATABASE LIST)            */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <TabsContent value="courses" className="space-y-6 pt-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-100">
             <div>
-              <h2 className="text-slate-900 font-extrabold text-lg">My Active Gigs & Courses</h2>
+              <h2 className="text-slate-950 font-black text-lg">My Published Courses & Gigs</h2>
               <p className="text-slate-500 text-xs mt-0.5">
-                Packages with video verification available for students to book.
+                Real database offerings visible to students on the Course / Explore catalog.
               </p>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            <Link
+              href="/dashboard/gigs/create"
+              className="self-start sm:self-auto px-5 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-purple-600/20 cursor-pointer"
             >
-              <PlusCircle size={14} />
+              <PlusCircle size={15} />
               <span>Create New Gig</span>
-            </button>
+            </Link>
           </div>
 
-          {courses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {courses.map((course) => (
+          {loadingGigs ? (
+            <div className="p-10 text-center text-slate-400 text-xs font-semibold">
+              Loading offerings from database...
+            </div>
+          ) : mentorGigs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {mentorGigs.map((gig) => (
                 <div
-                  key={course.id}
-                  className="bg-slate-50 border border-slate-200/90 rounded-2xl p-5 flex flex-col justify-between hover:border-purple-300 hover:shadow-sm transition-all"
+                  key={gig.id}
+                  className="bg-white border-2 border-purple-100 rounded-3xl p-5 flex flex-col justify-between hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/5 transition-all space-y-4 shadow-xs"
                 >
                   <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                        {course.category}
-                      </span>
-                      <span className="text-sm font-extrabold text-slate-900">${course.price}</span>
-                    </div>
-
-                    <h3 className="font-extrabold text-slate-900 text-base mb-1.5">{course.title}</h3>
-                    <p className="text-slate-600 text-xs line-clamp-2 mb-3">{course.description}</p>
-
-                    <div className="p-3 bg-white rounded-xl border border-slate-200/80 mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                          <FileVideo size={14} />
-                        </div>
-                        <div>
-                          <p className="text-slate-900 font-bold text-xs">
-                            {course.videoFileName || "Intro Video Preview.mp4"}
-                          </p>
-                          <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                            <CheckCircle2 size={10} /> Video Verified
-                          </span>
-                        </div>
+                    {/* Cover Preview Image */}
+                    <div className="w-full h-36 rounded-2xl overflow-hidden mb-3.5 bg-slate-900 relative">
+                      <img
+                        src={gig.coverImage || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80"}
+                        alt={gig.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/95 text-purple-900 shadow-xs">
+                          {gig.category}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-900/80 text-white">
+                          {gig.modelType === "SUBSCRIPTION" ? "Monthly Subscription" : "Escrow Gig"}
+                        </span>
                       </div>
-
-                      {course.videoUrl && (
-                        <a
-                          href={course.videoUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 flex items-center gap-1"
-                        >
-                          <Play size={11} />
-                          <span>Watch</span>
-                        </a>
-                      )}
+                      <div className="absolute bottom-2.5 right-2.5">
+                        <CurrencyBadge currency={gig.currency || "USDC"} size="sm" />
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-4 text-xs text-slate-500 font-medium pt-2 border-t border-slate-200">
-                      <span>{course.duration}</span>
-                      <span>•</span>
-                      <span>{course.milestones?.length || 3} Escrow Milestones</span>
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <h3 className="font-extrabold text-slate-950 text-base leading-snug">{gig.title}</h3>
+                      <span className="text-slate-950 font-black text-sm shrink-0">
+                        {formatPriceCurrency(gig.price, gig.currency || "USDC")}
+                      </span>
                     </div>
+
+                    <p className="text-slate-500 text-xs line-clamp-2 leading-relaxed mb-3">
+                      {gig.description}
+                    </p>
+
+                    {/* Packages & Modules breakdown badge */}
+                    <div className="p-3 bg-purple-50/50 rounded-2xl border border-purple-100 space-y-1 text-xs">
+                      <div className="flex items-center justify-between text-slate-700">
+                        <span className="flex items-center gap-1 font-semibold">
+                          <Layers size={13} className="text-purple-600" />
+                          <span>Package Tiers:</span>
+                        </span>
+                        <span className="font-extrabold text-purple-900">
+                          {gig.packages?.length || 1} {gig.packages?.length === 1 ? "Tier" : "Tiers"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-700">
+                        <span className="flex items-center gap-1 font-semibold">
+                          <Video size={13} className="text-purple-600" />
+                          <span>Video Modules:</span>
+                        </span>
+                        <span className="font-extrabold text-indigo-900">
+                          {gig.modules?.length || 0} Modules
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-700">
+                        <span className="flex items-center gap-1 font-semibold">
+                          <Globe size={13} className="text-purple-600" />
+                          <span>Meeting Platform:</span>
+                        </span>
+                        <span className="font-bold text-slate-800">
+                          {gig.meetingPlatform || "Google Meet"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-purple-50 flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px] font-medium">
+                      Duration: {gig.duration || "4 Weeks"}
+                    </span>
+                    <Link
+                      href={`/book/course/${gig.id}`}
+                      className="px-4 py-1.5 rounded-full bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-xs transition-colors flex items-center gap-1"
+                    >
+                      <span>Preview Offering</span>
+                      <ArrowUpRight size={12} />
+                    </Link>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200 p-6">
-              <p className="text-slate-800 font-bold text-sm">You have not published any gigs yet</p>
-              <p className="text-slate-500 text-xs mt-1 mb-4">
-                Publish a milestone-based gig with video intro to start accepting student bookings.
+            <div className="text-center py-12 bg-purple-50/40 rounded-3xl border-2 border-dashed border-purple-200 p-6 space-y-3">
+              <p className="text-slate-900 font-extrabold text-sm">No Gigs or Courses Published Yet</p>
+              <p className="text-slate-500 text-xs max-w-sm mx-auto">
+                Create a 3-tier milestone package with intro video and multi-currency pricing to start receiving student bookings.
               </p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-5 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition-colors cursor-pointer"
+              <Link
+                href="/dashboard/gigs/create"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition-all shadow-md shadow-purple-600/20 cursor-pointer"
               >
-                Create First Gig
-              </button>
+                <PlusCircle size={15} />
+                <span>Create Your First Gig</span>
+              </Link>
             </div>
           )}
         </TabsContent>
 
-        {/* SECTION 3: ESCROW WALLET */}
-        <TabsContent value="wallet" className="space-y-6">
-          <WalletConnectCard />
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100">
-              <p className="text-emerald-900/60 text-xs font-semibold">Available for Payout</p>
-              <p className="text-emerald-950 font-extrabold text-3xl mt-1">$1,940.00</p>
-              <p className="text-emerald-700 text-[11px] mt-1 font-medium">Auto-disbursable to Arbitrum wallet</p>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100">
-              <p className="text-amber-900/60 text-xs font-semibold">Locked in Escrow</p>
-              <p className="text-amber-950 font-extrabold text-3xl mt-1">$540.00</p>
-              <p className="text-amber-700 text-[11px] mt-1 font-medium">Released on milestone confirmations</p>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100">
-              <p className="text-indigo-900/60 text-xs font-semibold">Lifetime Earnings</p>
-              <p className="text-indigo-950 font-extrabold text-3xl mt-1">$8,320.00</p>
-              <p className="text-indigo-700 text-[11px] mt-1 font-medium">100% On-chain record</p>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* SECTION 4: PORTFOLIO & BIO */}
-        <TabsContent value="portfolio" className="space-y-6">
-          <div className="p-5 sm:p-6 bg-slate-50 rounded-2xl border border-slate-200/80">
-            <h3 className="font-extrabold text-slate-900 text-base mb-1">Mentor Bio & Social Credentials</h3>
-            <p className="text-slate-600 text-xs mb-4 leading-relaxed">{user.bio || "Hands-on, project-based mentorship."}</p>
-
-            <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-600">
-              {user.linkedin && (
-                <a href={user.linkedin} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-indigo-600 hover:underline">
-                  <LinkedinIcon className="w-3.5 h-3.5 fill-current" />
-                  <span>LinkedIn Profile</span>
-                </a>
-              )}
-              {user.twitter && (
-                <a href={user.twitter} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-indigo-600 hover:underline">
-                  <TwitterIcon className="w-3.5 h-3.5 fill-current" />
-                  <span>X / Twitter</span>
-                </a>
-              )}
-              {user.portfolio && (
-                <a href={user.portfolio} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-indigo-600 hover:underline">
-                  <Globe size={13} />
-                  <span>External Portfolio</span>
-                </a>
-              )}
-            </div>
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* TAB 3: PAYOUT WALLET CONFIGURATION & LOCK MECHANISM   */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <TabsContent value="wallet" className="space-y-6 pt-2">
+          <div className="pb-3 border-b border-purple-100">
+            <h2 className="text-slate-950 font-black text-lg">Escrow Payout Wallet Configuration</h2>
+            <p className="text-slate-500 text-xs mt-0.5">
+              Input your Arbitrum address manually or connect via Web3. Once locked, payments will safely settle here without risk of tampering.
+            </p>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-extrabold text-slate-900 text-base">In-App Portfolio Showcase</h3>
-              <p className="text-slate-500 text-xs mt-0.5">
-                Write and showcase projects directly inside your Trust Lesson profile.
-              </p>
+          {walletLockSuccess && (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              <span>
+                Payout wallet address has been locked and synchronized with the database! All future escrow payouts will settle to this address.
+              </span>
             </div>
-            <button
-              onClick={() => setShowAddProjectModal(true)}
-              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <PlusCircle size={14} />
-              <span>Add Portfolio Project</span>
-            </button>
-          </div>
+          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {portfolios.map((proj) => (
-              <div key={proj.id} className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between hover:border-purple-300 transition-colors">
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h4 className="font-extrabold text-slate-900 text-base">{proj.title}</h4>
-                    <button
-                      onClick={() => deletePortfolioItem(proj.id)}
-                      className="text-slate-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
-                      title="Delete project"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                  <p className="text-slate-600 text-xs leading-relaxed mb-3">{proj.description}</p>
-
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {proj.tags?.map((t) => (
-                      <span key={t} className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 pt-3 border-t border-slate-100 text-xs font-semibold">
-                  {proj.projectUrl && (
-                    <a href={proj.projectUrl} target="_blank" rel="noreferrer" className="text-purple-600 hover:underline flex items-center gap-1">
-                      <span>Live Demo</span>
-                      <ArrowUpRight size={12} />
-                    </a>
-                  )}
-                  {proj.githubUrl && (
-                    <a href={proj.githubUrl} target="_blank" rel="noreferrer" className="text-slate-600 hover:underline flex items-center gap-1">
-                      <span>Repository</span>
-                      <ExternalLink size={12} />
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* CREATE GIG MODAL USING RADIX UI DIALOG */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create New Gig / Course</DialogTitle>
-            <DialogDescription>
-              Package your knowledge with mandatory video intro and escrow milestones.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handlePublishGig} className="space-y-4">
-            <div>
-              <label className="block text-slate-700 font-bold text-xs mb-1">Gig Title *</label>
-              <input
-                type="text"
-                required
-                value={gigTitle}
-                onChange={(e) => setGigTitle(e.target.value)}
-                placeholder="e.g. Fullstack Web3 Smart Contract Audit Sprint"
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-              />
+          {walletLockError && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+              <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+              <span>{walletLockError}</span>
             </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-3">
+          {/* Wallet Configuration Card */}
+          <div className="bg-white border-2 border-purple-100 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <label className="block text-slate-700 font-bold text-xs mb-1">Category</label>
-                <select
-                  value={gigCategory}
-                  onChange={(e) => setGigCategory(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs"
-                >
-                  <option value="Coding">Coding & Software</option>
-                  <option value="Web3 & Crypto">Web3 & Crypto</option>
-                  <option value="Design">UI/UX & Product Design</option>
-                  <option value="Career">Career & Mentorship</option>
-                  <option value="AI & Data">AI & Data Science</option>
-                </select>
+                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                  <Wallet size={18} className="text-purple-600" />
+                  <span>Arbitrum One Payout Address</span>
+                </h3>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  The destination where 95% of milestone funds are transferred automatically when students release escrow.
+                </p>
               </div>
-              <div>
-                <label className="block text-slate-700 font-bold text-xs mb-1">Total Price ($USD) *</label>
+
+              {isWalletLocked && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs shadow-2xs">
+                  <Lock size={12} className="text-emerald-600" />
+                  <span>Wallet Locked & Verified</span>
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-2.5">
                 <input
-                  type="number"
-                  required
-                  min="10"
-                  value={gigPrice}
-                  onChange={(e) => setGigPrice(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs"
+                  type="text"
+                  disabled={isWalletLocked}
+                  value={walletInput}
+                  onChange={(e) => setWalletInput(e.target.value)}
+                  placeholder="0x..."
+                  className={`flex-1 px-4 py-3 rounded-2xl border font-mono text-xs transition-all ${
+                    isWalletLocked
+                      ? "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed"
+                      : "bg-purple-50/40 border-purple-200 text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                  }`}
+                />
+
+                {!isWalletLocked && (
+                  <button
+                    type="button"
+                    onClick={handleConnectAndAutofill}
+                    className="px-5 py-3 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <Wallet size={14} />
+                    <span>Connect MetaMask / Coinbase</span>
+                  </button>
+                )}
+              </div>
+
+              {!isWalletLocked ? (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                  <p className="text-[11px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 flex items-center gap-1.5">
+                    <AlertTriangle size={13} className="shrink-0 text-amber-600" />
+                    <span>Once locked, the wallet cannot be altered without platform dispute authorization.</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleLockWallet}
+                    disabled={isSavingWallet}
+                    className="px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                  >
+                    <Lock size={14} />
+                    <span>{isSavingWallet ? "Locking Wallet..." : "Lock Payout Wallet"}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-emerald-900 text-xs space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-600" />
+                    <span>Payout address securely locked</span>
+                  </p>
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                    To modify your locked payout destination address, contact Trust Lesson administration through support or raise a security request.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Escrow Balance & Protocol Settlement Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-4 border-t border-purple-100 text-xs">
+              <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
+                <span className="text-slate-500 text-[11px] block font-medium">Available for Payout</span>
+                <span className="text-slate-900 font-black text-xl block mt-0.5">
+                  ${Number(stats.lifetimeEarnings || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
+                </span>
+                <span className="text-purple-700 text-[10px] mt-1 block">Released on milestone confirmations</span>
+              </div>
+              <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
+                <span className="text-slate-500 text-[11px] block font-medium">Currently in Escrow</span>
+                <span className="text-slate-900 font-black text-xl block mt-0.5">
+                  ${Number(stats.activeEscrow || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
+                </span>
+                <span className="text-slate-500 text-[10px] mt-1 block">{stats.pendingSessionsCount} pending sessions</span>
+              </div>
+              <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
+                <span className="text-slate-500 text-[11px] block font-medium">Settlement Layer</span>
+                <span className="text-emerald-700 font-black text-xl block mt-0.5">Arbitrum One</span>
+                <span className="text-slate-500 text-[10px] mt-1 block">Zero gas subsidies enabled</span>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* TAB 4: MENTOR LEVELING & MEMBERSHIP SETUP             */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <TabsContent value="leveling" className="space-y-6 pt-2">
+          <div className="pb-3 border-b border-purple-100">
+            <h2 className="text-slate-950 font-black text-lg">Mentor Leveling & Tier Progression</h2>
+            <p className="text-slate-500 text-xs mt-0.5">
+              Level up your mentor standing through completed escrow sessions. Higher tiers receive reduced protocol fees and priority catalog placement.
+            </p>
+          </div>
+
+          {/* Current Level Card */}
+          <div className="bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-950 text-white rounded-3xl p-6 sm:p-7 shadow-lg relative overflow-hidden border border-purple-500/30">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+              <div>
+                <span className="px-3 py-1 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/40 text-[10px] font-extrabold tracking-widest uppercase">
+                  Current Mentor Standing
+                </span>
+                <h3 className="text-2xl sm:text-3xl font-black mt-2 flex items-center gap-2">
+                  <span>Level: {stats.mentorLevel === "MASTER" ? "Master Mentor" : stats.mentorLevel === "PRO" ? "Pro Mentor" : "Rising Mentor"}</span>
+                  <Award className="text-amber-400" size={24} />
+                </h3>
+                <p className="text-purple-200/80 text-xs mt-1 max-w-md">
+                  Completed {stats.completedSessionsCount} sessions. Maintain high student satisfaction ratings to unlock Pro and Master fee discounts.
+                </p>
+              </div>
+
+              <div className="text-right sm:text-right bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-xs">
+                <span className="text-purple-200 text-[11px] block">Current Protocol Cut</span>
+                <span className="text-white font-black text-3xl block mt-0.5">
+                  {stats.mentorLevel === "MASTER" ? "1%" : stats.mentorLevel === "PRO" ? "3%" : "5%"}
+                </span>
+                <span className="text-emerald-400 font-bold text-[10px] block mt-0.5">
+                  {stats.mentorLevel === "MASTER" ? "Master Minimum Fee" : stats.mentorLevel === "PRO" ? "Pro Tier Reduced" : "Standard Listing Fee"}
+                </span>
+              </div>
+            </div>
+
+            {/* Progression Bar */}
+            <div className="mt-6 pt-5 border-t border-white/10 space-y-2">
+              <div className="flex justify-between text-xs text-purple-200 font-semibold">
+                <span>Progress to Pro Mentor</span>
+                <span>{Math.min(stats.completedSessionsCount, 5)} / 5 Completed Sessions</span>
+              </div>
+              <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-400 to-emerald-400 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min((stats.completedSessionsCount / 5) * 100, 100)}%` }}
                 />
               </div>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-slate-700 font-bold text-xs mb-1">Description *</label>
-              <textarea
-                required
-                rows={3}
-                value={gigDescription}
-                onChange={(e) => setGigDescription(e.target.value)}
-                placeholder="Explain what the student will build, outcomes, and code reviews..."
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs"
-              />
+          {/* 3 Tier Levels Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Level 1: Rising */}
+            <div className={`bg-white rounded-3xl p-5 sm:p-6 border-2 transition-all shadow-xs ${
+              stats.mentorLevel === "RISING" ? "border-purple-600 ring-2 ring-purple-100" : "border-purple-100"
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700">
+                  Tier 1
+                </span>
+                <span className="text-xs font-bold text-slate-500">Default Entry</span>
+              </div>
+              <h4 className="font-extrabold text-slate-900 text-lg">Rising Mentor</h4>
+              <p className="text-slate-500 text-xs mt-1">Starting level for all onboarded verified mentors.</p>
+
+              <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-slate-700">
+                  <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
+                  <span>5% Platform Protocol Cut</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
+                  <span>Standard Catalog Listing</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
+                  <span>Multi-Currency (USDC / USDG / IDRX)</span>
+                </div>
+              </div>
             </div>
 
-            {/* MANDATORY VIDEO UPLOAD SECTION */}
-            <div className="p-4 bg-purple-50/70 rounded-2xl border-2 border-dashed border-purple-300">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-slate-900 font-extrabold text-xs flex items-center gap-1.5">
-                  <Video size={15} className="text-purple-600" />
-                  <span>Mandatory Video Intro Upload *</span>
-                </label>
-                <span className="text-[10px] uppercase font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
-                  Required
+            {/* Level 2: Pro */}
+            <div className={`bg-white rounded-3xl p-5 sm:p-6 border-2 transition-all shadow-xs ${
+              stats.mentorLevel === "PRO" ? "border-purple-600 ring-2 ring-purple-100" : "border-purple-100"
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                  Tier 2
                 </span>
+                <span className="text-xs font-bold text-indigo-600">5+ Sessions</span>
               </div>
-              <p className="text-slate-500 text-[11px] mb-3">
-                Upload an intro or overview video showing what you will teach. Students verify your communication style before booking.
-              </p>
+              <h4 className="font-extrabold text-slate-900 text-lg">Pro Mentor</h4>
+              <p className="text-slate-500 text-xs mt-1">For proven mentors with high completion rates.</p>
 
-              {videoPreviewUrl ? (
-                <div className="space-y-2">
-                  <video
-                    controls
-                    src={videoPreviewUrl}
-                    className="w-full h-44 rounded-xl bg-black object-cover shadow-inner"
-                  />
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <span className="font-bold text-purple-900 truncate max-w-[200px]">
-                      {videoFile?.name || "gig_video.mp4"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleRemoveVideo}
-                      className="text-rose-600 hover:text-rose-700 font-bold text-[11px] cursor-pointer"
-                    >
-                      Remove / Replace Video
-                    </button>
-                  </div>
+              <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-slate-700 font-bold">
+                  <CheckCircle2 size={13} className="text-indigo-600 shrink-0" />
+                  <span>3% Reduced Protocol Cut (Save 40%)</span>
                 </div>
-              ) : (
-                <div>
-                  <label className="flex flex-col items-center justify-center p-6 border border-purple-200 bg-white rounded-xl cursor-pointer hover:bg-purple-50/50 transition-colors">
-                    <Upload size={24} className="text-purple-500 mb-2" />
-                    <span className="text-xs font-bold text-purple-900">Click to upload video file</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">MP4, WebM, MOV supported</span>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <CheckCircle2 size={13} className="text-indigo-600 shrink-0" />
+                  <span>"Pro Mentor" Catalog Badge</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <CheckCircle2 size={13} className="text-indigo-600 shrink-0" />
+                  <span>Priority Explore Search Ranking</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Level 3: Master */}
+            <div className={`bg-white rounded-3xl p-5 sm:p-6 border-2 transition-all shadow-xs ${
+              stats.mentorLevel === "MASTER" ? "border-purple-600 ring-2 ring-purple-100" : "border-purple-100"
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                  Tier 3
+                </span>
+                <span className="text-xs font-bold text-amber-600">25+ Sessions</span>
+              </div>
+              <h4 className="font-extrabold text-slate-900 text-lg">Master Mentor</h4>
+              <p className="text-slate-500 text-xs mt-1">Top-tier elite mentors and community leaders.</p>
+
+              <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-slate-700 font-bold">
+                  <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
+                  <span>1% Minimum Platform Fee</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
+                  <span>Homepage Featured Spotlight</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
+                  <span>Direct Protocol Advisory Seat</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* TAB 5: PROFILE, BIO & SECURITY (EDIT PROFILE & PASSWORD) */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <TabsContent value="portfolio" className="space-y-6 pt-2">
+          {/* Status Alerts */}
+          {profileSuccessMsg && (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              <span>{profileSuccessMsg}</span>
+            </div>
+          )}
+          {profileErrorMsg && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+              <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+              <span>{profileErrorMsg}</span>
+            </div>
+          )}
+
+          {/* ── CARD 1: MENTOR PROFILE & NICKNAME ── */}
+          <div className="p-6 bg-white rounded-3xl border-2 border-purple-100 shadow-xs relative overflow-hidden space-y-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-purple-50">
+              <div className="flex items-center gap-4">
+                <div className="relative group shrink-0">
+                  <Avatar className="w-16 h-16 rounded-full ring-2 ring-purple-200 shadow-xs overflow-hidden">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-full" />
+                    ) : (
+                      <AvatarFallback className="bg-gradient-to-tr from-purple-600 via-indigo-600 to-purple-700 text-white font-black text-2xl rounded-full">
+                        {user.name?.[0]?.toUpperCase() || "M"}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <label
+                    htmlFor="mentor-avatar-file-top"
+                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center cursor-pointer shadow-md border-2 border-white transition-transform active:scale-95"
+                    title="Change Profile Photo"
+                  >
+                    <Camera size={12} />
                     <input
+                      id="mentor-avatar-file-top"
                       type="file"
-                      accept="video/*"
-                      onChange={handleVideoSelect}
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
                       className="hidden"
                     />
                   </label>
                 </div>
-              )}
 
-              {videoError && (
-                <p className="text-rose-600 text-[11px] font-bold mt-2 flex items-center gap-1">
-                  <AlertTriangle size={12} /> {videoError}
-                </p>
-              )}
-            </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <h3 className="font-black text-slate-950 text-xl tracking-tight">{user.name}</h3>
+                    <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-extrabold font-mono border border-purple-200 flex items-center gap-1">
+                      <AtSign size={11} />
+                      {(user.nickname || user.name?.toLowerCase().replace(/\s+/g, "_") || "mentor").replace(/^@/, "")}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 size={10} /> Verified Mentor
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-xs font-medium">
+                    {user.domain || "Smart Contract & Web3 Architecture"} • {user.email}
+                  </p>
+                  <p className="text-slate-400 text-[11px] mt-0.5">
+                    Hourly Mentorship Rate: <strong className="text-purple-700 font-extrabold">{formatPriceCurrency(user.hourlyRate || 45, "USDC")}/hr</strong>
+                  </p>
+                </div>
+              </div>
 
-            {/* Milestones */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-slate-700 font-bold text-xs">Escrow Milestones</label>
+              <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
                 <button
                   type="button"
-                  onClick={handleAddMilestone}
-                  className="text-purple-600 hover:text-purple-800 text-xs font-bold cursor-pointer"
+                  onClick={() => {
+                    setIsEditingProfile(!isEditingProfile);
+                    setProfileErrorMsg("");
+                    setProfileSuccessMsg("");
+                  }}
+                  className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 transition-all border border-purple-200 cursor-pointer shadow-xs active:scale-95"
                 >
-                  + Add Milestone
+                  <Pencil size={13} />
+                  <span>{isEditingProfile ? "Cancel Editing" : "Edit Profile"}</span>
                 </button>
               </div>
-              <div className="space-y-2">
-                {milestonesInput.map((m, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
+            </div>
+
+            {/* Profile View / Readonly Bio */}
+            {!isEditingProfile ? (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-1.5">About & Teaching Bio</h4>
+                  <p className="text-slate-600 text-xs sm:text-sm leading-relaxed whitespace-pre-line bg-purple-50/30 p-4 rounded-2xl border border-purple-50">
+                    {user.bio || "Hands-on, project-based mentorship with real code audits and milestone verification."}
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-2">Verified Professional Channels</h4>
+                  <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                    {user.linkedin ? (
+                      <a href={user.linkedin} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-purple-50 text-purple-700 border border-slate-200 hover:border-purple-200 transition-colors">
+                        <LinkedinIcon className="w-3.5 h-3.5 fill-current" />
+                        <span>LinkedIn Profile</span>
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 text-xs italic">No LinkedIn linked</span>
+                    )}
+
+                    {user.twitter ? (
+                      <a href={user.twitter} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-purple-50 text-purple-700 border border-slate-200 hover:border-purple-200 transition-colors">
+                        <TwitterIcon className="w-3.5 h-3.5 fill-current" />
+                        <span>X / Twitter</span>
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 text-xs italic">No Twitter / X linked</span>
+                    )}
+
+                    {user.portfolio ? (
+                      <a href={user.portfolio} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-purple-50 text-purple-700 border border-slate-200 hover:border-purple-200 transition-colors">
+                        <Globe size={13} />
+                        <span>External Portfolio / GitHub</span>
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 text-xs italic">No portfolio URL set</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Editable Profile Form */
+              <form onSubmit={handleSaveProfile} className="space-y-4 pt-1 animate-fadeIn">
+                {/* Avatar Image Selection in Edit Form */}
+                <div className="p-4 rounded-2xl bg-purple-50/50 border border-purple-100 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="relative shrink-0">
+                    <Avatar className="w-14 h-14 rounded-full ring-2 ring-purple-300 overflow-hidden">
+                      {profileAvatarUrl ? (
+                        <img src={profileAvatarUrl} alt="Preview" className="w-full h-full object-cover rounded-full" />
+                      ) : (
+                        <AvatarFallback className="bg-purple-600 text-white font-bold text-lg rounded-full">
+                          {profileName?.[0] || "M"}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                  </div>
+                  <div className="flex-1 space-y-2 w-full">
+                    <label className="block text-slate-700 font-bold text-xs">
+                      Mentor Profile Photo (Upload Local File or Enter Image URL)
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all">
+                        <Upload size={13} />
+                        <span>Upload Photo File</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1">
+                      Full Name <span className="text-rose-500">*</span>
+                    </label>
                     <input
                       type="text"
-                      value={m.title}
-                      onChange={(e) => handleUpdateMilestone(idx, "title", e.target.value)}
-                      className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-900 text-xs"
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      placeholder="e.g. Rayhan Young"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all font-semibold"
+                      required
                     />
-                    <div className="flex items-center gap-1 bg-slate-100 px-2 py-1.5 rounded-lg">
-                      <span className="text-slate-500 text-xs font-bold">$</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1 flex items-center justify-between">
+                      <span>Nickname / Handle</span>
+                      <span className="text-slate-400 font-normal text-[11px]">Displayed as @handle</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-purple-600 font-black text-xs">@</span>
                       <input
-                        type="number"
-                        value={m.amount}
-                        onChange={(e) => handleUpdateMilestone(idx, "amount", Number(e.target.value))}
-                        className="w-12 bg-transparent text-slate-900 font-bold text-xs"
+                        type="text"
+                        value={profileNickname}
+                        onChange={(e) => setProfileNickname(e.target.value.replace(/^@/, ""))}
+                        placeholder="rayhan_dev"
+                        className="w-full pl-8 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all font-mono font-bold"
                       />
                     </div>
-                    {milestonesInput.length > 1 && (
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1">
+                      Professional Headline / Domain
+                    </label>
+                    <input
+                      type="text"
+                      value={profileDomain}
+                      onChange={(e) => setProfileDomain(e.target.value)}
+                      placeholder="e.g. Fullstack Web3 & Smart Contract Architect"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1">
+                      Hourly Mentorship Rate (USDC / hr)
+                    </label>
+                    <input
+                      type="number"
+                      value={profileHourlyRate}
+                      onChange={(e) => setProfileHourlyRate(e.target.value)}
+                      min="5"
+                      max="1000"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold text-xs mb-1">
+                    Teaching Bio & Credentials
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={profileBio}
+                    onChange={(e) => setProfileBio(e.target.value)}
+                    placeholder="Describe your background, real-world industry experience, and what students will master under your guidance..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all leading-relaxed"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1">LinkedIn URL</label>
+                    <input
+                      type="url"
+                      value={profileLinkedin}
+                      onChange={(e) => setProfileLinkedin(e.target.value)}
+                      placeholder="https://linkedin.com/in/username"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1">Twitter / X URL or @handle</label>
+                    <input
+                      type="text"
+                      value={profileTwitter}
+                      onChange={(e) => setProfileTwitter(e.target.value)}
+                      placeholder="https://x.com/username"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1">Portfolio or GitHub URL</label>
+                    <input
+                      type="url"
+                      value={profilePortfolio}
+                      onChange={(e) => setProfilePortfolio(e.target.value)}
+                      placeholder="https://github.com/username"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-purple-50 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingProfile(false)}
+                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingProfile}
+                    className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md shadow-purple-600/20 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    <Save size={13} />
+                    <span>{isSavingProfile ? "Saving Profile..." : "Save Profile Changes"}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {/* ── CARD 2: CHANGE PASSWORD & ACCOUNT SECURITY ── */}
+          <div className="p-6 bg-white rounded-3xl border-2 border-purple-100 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100">
+                  <Key size={18} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-950 text-base">Account Security & Password</h3>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    Update your authentication password to protect your mentor profile and payout settings.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPasswordForm(!showPasswordForm);
+                  setPasswordErrorMsg("");
+                  setPasswordSuccessMsg("");
+                }}
+                className="self-start sm:self-auto px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                <Lock size={13} />
+                <span>{showPasswordForm ? "Hide Password Form" : "Change Password"}</span>
+              </button>
+            </div>
+
+            {passwordSuccessMsg && (
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{passwordSuccessMsg}</span>
+              </div>
+            )}
+            {passwordErrorMsg && (
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                <span>{passwordErrorMsg}</span>
+              </div>
+            )}
+
+            {showPasswordForm && (
+              <form onSubmit={handleChangePassword} className="space-y-4 pt-1 animate-fadeIn">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Current Password */}
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1">
+                      Current Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPw ? "text" : "password"}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 pr-10"
+                      />
                       <button
                         type="button"
-                        onClick={() => handleRemoveMilestone(idx)}
-                        className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                        onClick={() => setShowCurrentPw(!showCurrentPw)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                       >
-                        <X size={14} />
+                        {showCurrentPw ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-1 block">Leave blank if setting first password</span>
+                  </div>
+
+                  {/* New Password */}
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1">
+                      New Password (Min 6 chars)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNewPw ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 pr-10"
+                        required
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPw(!showNewPw)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showNewPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm New Password */}
+                  <div>
+                    <label className="block text-slate-700 font-bold text-xs mb-1">
+                      Confirm New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPw ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-slate-900 text-xs focus:ring-2 pr-10 ${
+                          confirmPassword && confirmPassword !== newPassword
+                            ? "border-rose-300 focus:ring-rose-500/30 focus:border-rose-500"
+                            : "border-slate-200 focus:ring-purple-500/30 focus:border-purple-500"
+                        }`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPw(!showConfirmPw)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showConfirmPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    {confirmPassword && (
+                      <span className={`text-[10px] mt-1 block font-bold ${confirmPassword === newPassword ? "text-emerald-600" : "text-rose-500"}`}>
+                        {confirmPassword === newPassword ? "✓ Passwords match" : "✗ Passwords do not match"}
+                      </span>
                     )}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-purple-50 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPasswordForm(false);
+                      setCurrentPassword("");
+                      setNewPassword("");
+                      setConfirmPassword("");
+                    }}
+                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword || !newPassword || newPassword !== confirmPassword}
+                    className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    <Lock size={13} />
+                    <span>{isChangingPassword ? "Updating Password..." : "Confirm & Update Password"}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {/* ── CARD 3: LINKEDIN EXPERIENCE & PORTFOLIO SYNC ── */}
+          <div className="p-6 bg-white rounded-3xl border-2 border-purple-100 shadow-xs relative overflow-hidden space-y-5">
+            {/* Header & LinkedIn Connect Strip */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-purple-50">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#0077B5]/10 text-[#0077B5] flex items-center justify-center shrink-0 border border-[#0077B5]/20">
+                  <LinkedinIcon className="w-5 h-5 fill-current" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-extrabold text-slate-950 text-base">
+                      LinkedIn Experience & Portfolio
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0077B5] text-[10px] font-extrabold border border-blue-200">
+                      LinkedIn Synced
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    Import and showcase your career track record, certifications, and portfolio directly from your official LinkedIn profile.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap self-start md:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setShowAddExpModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 transition-all border border-purple-200 cursor-pointer shadow-xs active:scale-95"
+                >
+                  <PlusCircle size={14} />
+                  <span>Add Experience</span>
+                </button>
+              </div>
+            </div>
+
+            {/* LinkedIn URL Sync Bar */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/50 via-purple-50/40 to-slate-50 border border-blue-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative flex-1">
+                <span className="absolute left-3.5 top-2.5 text-[#0077B5]">
+                  <LinkedinIcon className="w-4 h-4 fill-current" />
+                </span>
+                <input
+                  type="url"
+                  value={linkedinSyncUrl}
+                  onChange={(e) => setLinkedinSyncUrl(e.target.value)}
+                  placeholder="https://www.linkedin.com/in/username"
+                  className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-medium bg-white"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSyncFromLinkedin()}
+                disabled={isSyncingLinkedin}
+                className="px-4 py-2 rounded-xl bg-[#0077B5] hover:bg-[#006097] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 shrink-0"
+              >
+                <LinkedinIcon className="w-3.5 h-3.5 fill-current" />
+                <span>{isSyncingLinkedin ? "Syncing..." : "Sync LinkedIn Profile"}</span>
+              </button>
+            </div>
+
+            {linkedinSyncSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                <span>LinkedIn profile and experience successfully synced and saved to database!</span>
+              </div>
+            )}
+
+            {/* List of LinkedIn Experiences / Portfolio Items */}
+            {portfolios && portfolios.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {portfolios.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-5 bg-white rounded-2xl border-2 border-slate-200 hover:border-purple-300 shadow-2xs transition-all flex flex-col justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-[#0077B5] text-white flex items-center justify-center shrink-0">
+                            <LinkedinIcon className="w-3.5 h-3.5 fill-current" />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-950 text-sm leading-snug">
+                              {item.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 font-semibold">
+                              {item.company || "Verified Organization"} {item.period ? `• ${item.period}` : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => deletePortfolioItem(item.id)}
+                          className="text-slate-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
+                          title="Delete experience"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      <p className="text-slate-600 text-xs leading-relaxed pt-1 whitespace-pre-line">
+                        {item.description}
+                      </p>
+
+                      {item.tags && item.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {item.tags.map((t) => (
+                            <span
+                              key={t}
+                              className="px-2 py-0.5 rounded-full bg-blue-50 text-[#0077B5] text-[10px] font-bold border border-blue-100"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                      {item.projectUrl ? (
+                        <a
+                          href={item.projectUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#0077B5] hover:underline flex items-center gap-1 font-bold text-[11px]"
+                        >
+                          <LinkedinIcon className="w-3 h-3 fill-current" />
+                          <span>View on LinkedIn</span>
+                          <ExternalLink size={10} />
+                        </a>
+                      ) : (
+                        <span className="text-slate-400 text-[11px] italic">LinkedIn Verified</span>
+                      )}
+                      <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-[9px] font-extrabold border border-emerald-200">
+                        Verified Record
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+            ) : (
+              /* Clean Empty State */
+              <div className="p-8 rounded-2xl bg-slate-50/70 border-2 border-dashed border-slate-200 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-[#0077B5]/10 text-[#0077B5] flex items-center justify-center mx-auto">
+                  <LinkedinIcon className="w-6 h-6 fill-current" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-800 text-sm">
+                    No LinkedIn portfolio or experience imported yet
+                  </h4>
+                  <p className="text-slate-500 text-xs mt-1 max-w-sm mx-auto">
+                    Enter your LinkedIn profile URL above and click &quot;Sync LinkedIn Profile&quot; or manually add your work experience below.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddExpModal(true)}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                >
+                  <PlusCircle size={13} />
+                  <span>Add LinkedIn Experience</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
 
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md cursor-pointer"
-              >
-                Publish Verified Gig
-              </button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ADD PORTFOLIO MODAL USING RADIX UI DIALOG */}
-      <Dialog open={showAddProjectModal} onOpenChange={setShowAddProjectModal}>
+      {/* DIALOG ADD LINKEDIN EXPERIENCE */}
+      <Dialog open={showAddExpModal} onOpenChange={setShowAddExpModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Portfolio Project</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-[#0077B5] text-white flex items-center justify-center">
+                <LinkedinIcon className="w-3.5 h-3.5 fill-current" />
+              </span>
+              <span>Add LinkedIn Experience / Portfolio</span>
+            </DialogTitle>
             <DialogDescription>
-              Showcase projects directly on your Trust Lesson mentor profile.
+              Record your career history, position, organization, and key achievements from LinkedIn to display on your mentor profile.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleAddPortfolio} className="space-y-4">
+          <form onSubmit={handleAddLinkedinExperience} className="space-y-4">
             <div>
-              <label className="block text-slate-700 font-bold text-xs mb-1">Project Title *</label>
+              <label className="block text-slate-700 font-bold text-xs mb-1">
+                Position / Job Title <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
                 required
-                value={projectTitle}
-                onChange={(e) => setProjectTitle(e.target.value)}
-                placeholder="e.g. Decentralized Escrow Protocol"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs"
+                value={expRole}
+                onChange={(e) => setExpRole(e.target.value)}
+                placeholder="e.g. Lead Smart Contract Engineer"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
               />
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold text-xs mb-1">Description *</label>
+              <label className="block text-slate-700 font-bold text-xs mb-1">
+                Company / Organization <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={expCompany}
+                onChange={(e) => setExpCompany(e.target.value)}
+                placeholder="e.g. Arbitrum Foundation / Offchain Labs"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold text-xs mb-1">
+                Employment Period
+              </label>
+              <input
+                type="text"
+                value={expPeriod}
+                onChange={(e) => setExpPeriod(e.target.value)}
+                placeholder="e.g. 2023 - Present or Jan 2022 - Dec 2023"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold text-xs mb-1">
+                Job Description & Portfolio Highlights
+              </label>
               <textarea
-                required
                 rows={3}
-                value={projectDescription}
-                onChange={(e) => setProjectDescription(e.target.value)}
-                placeholder="Brief summary of architecture, stack, and results..."
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs"
+                value={expDesc}
+                onChange={(e) => setExpDesc(e.target.value)}
+                placeholder="Summary of responsibilities, architectures audited or built, tech stack used, and key milestones achieved..."
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs leading-relaxed focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
               />
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold text-xs mb-1">Live Demo URL</label>
+              <label className="block text-slate-700 font-bold text-xs mb-1">
+                LinkedIn Post / Verification Link (Optional)
+              </label>
               <input
                 type="url"
-                value={projectUrl}
-                onChange={(e) => setProjectUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs"
+                value={expUrl}
+                onChange={(e) => setExpUrl(e.target.value)}
+                placeholder="https://linkedin.com/in/... or certificate post link"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs font-mono focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
               />
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold text-xs mb-1">Repository URL</label>
-              <input
-                type="url"
-                value={projectGithub}
-                onChange={(e) => setProjectGithub(e.target.value)}
-                placeholder="https://github.com/..."
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-bold text-xs mb-1">Tags (Comma-separated)</label>
+              <label className="block text-slate-700 font-bold text-xs mb-1">
+                Skills & Competencies (Comma-separated)
+              </label>
               <input
                 type="text"
-                value={projectTags}
-                onChange={(e) => setProjectTags(e.target.value)}
-                placeholder="Solidity, Arbitrum, React, TypeScript"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs"
+                value={expSkills}
+                onChange={(e) => setExpSkills(e.target.value)}
+                placeholder="Solidity, Rust, DeFi, Security Audit, Arbitrum"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
               />
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowAddProjectModal(false)}
-                className="px-4 py-2 rounded-xl text-slate-600 font-bold text-xs cursor-pointer"
+                onClick={() => setShowAddExpModal(false)}
+                className="px-4 py-2 rounded-xl text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-100"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs cursor-pointer shadow-xs active:scale-95"
               >
-                Save Project
+                Save to Profile
               </button>
             </div>
           </form>
@@ -1618,15 +2659,18 @@ function StudentDashboardView({ user }) {
       {/* Student Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
         <div className="flex items-center gap-4">
-          <Avatar className="w-14 h-14">
-            <AvatarFallback className="bg-gradient-to-tr from-emerald-500 to-teal-600 text-white font-extrabold text-xl">
-              {user.name?.[0]?.toUpperCase() || "S"}
-            </AvatarFallback>
+          <Avatar className="w-14 h-14 rounded-full ring-2 ring-emerald-200 shadow-xs shrink-0 overflow-hidden">
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-full" />
+            ) : (
+              <img src="/student-profile.png" alt={user.name || "Student"} className="w-full h-full object-cover rounded-full" />
+            )}
           </Avatar>
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="px-3 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs flex items-center gap-1">
-                <GraduationCap size={13} /> Student Workspace
+              <span className="px-3 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs flex items-center gap-1.5">
+                <img src="/student-profile.png" alt="Student" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                <span>Student Workspace</span>
               </span>
               {user.university && (
                 <span className="px-3 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs flex items-center gap-1">

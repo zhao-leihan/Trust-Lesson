@@ -1,8 +1,9 @@
 "use client";
 
-import { Shield, Star, Clock, ArrowRight, CheckCircle2, Layers } from "lucide-react";
+import { Shield, Star, Clock, ArrowRight, CheckCircle2, Layers, Radio } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { CurrencyBadge, formatPriceCurrency } from "./CurrencyBadge";
 
 const categoryStyles = {
   Coding: {
@@ -48,7 +49,10 @@ export default function ExploreCard({ item }) {
   const type = isCourse ? "course" : "mentor";
   const title = item.skill || item.title;
   const name = item.name || item.mentorName;
-  const price = item.price;
+  const currency = item.currency || "USDC";
+  const modelType = item.modelType || (isCourse ? "GIG" : "MENTOR");
+  const packagesList = item.packages || [];
+  const displayPrice = packagesList.length > 0 ? packagesList[0].price : item.price;
   const rating = item.rating || 4.9;
   const duration = item.duration || (isCourse ? "4 Weeks" : "1 hour");
   const category = item.category || "Coding";
@@ -78,6 +82,8 @@ export default function ExploreCard({ item }) {
     }?w=150&auto=format&fit=crop&q=80`;
 
   const [imgError, setImgError] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+
   return (
     <div className="group bg-white rounded-3xl border-2 border-purple-100 p-5 sm:p-6 flex flex-col justify-between hover:border-purple-500 hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1.5 transition-all duration-300 relative shadow-sm">
       {/* ── 1. Top Cover / Banner Image ── */}
@@ -98,23 +104,33 @@ export default function ExploreCard({ item }) {
 
         {/* Top Badges */}
         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2 pointer-events-none">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/95 text-slate-900 shadow-sm border border-slate-200/60 backdrop-blur-xs">
-            {category}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/95 text-slate-900 shadow-sm border border-slate-200/60 backdrop-blur-xs">
+              {category}
+            </span>
+            {modelType === "SUBSCRIPTION" && (
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-600 text-white shadow-xs">
+                Monthly Sub
+              </span>
+            )}
+          </div>
           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-xs">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span>Escrow Protected</span>
           </span>
         </div>
 
-        {/* Bottom Price Tag */}
-        <div className="absolute bottom-2.5 right-2.5 bg-slate-950/90 text-white px-3 py-1 rounded-xl border border-white/10 text-right shadow-sm backdrop-blur-xs">
-          <span className="text-[9px] text-slate-300 font-semibold uppercase tracking-wider block leading-none">
-            {isCourse ? "Gig Total" : "Hourly Rate"}
-          </span>
-          <span className="text-white font-black text-sm leading-tight">
-            ${price} <span className="text-[9px] text-purple-300 font-bold">USDC</span>
-          </span>
+        {/* Bottom Price Tag with Currency Badge */}
+        <div className="absolute bottom-2.5 right-2.5 bg-slate-950/90 text-white px-3 py-1 rounded-xl border border-white/10 text-right shadow-sm backdrop-blur-xs flex items-center gap-2">
+          <div>
+            <span className="text-[9px] text-slate-300 font-semibold uppercase tracking-wider block leading-none">
+              {modelType === "SUBSCRIPTION" ? "Per Month" : packagesList.length > 0 ? "From" : isCourse ? "Gig Total" : "Hourly"}
+            </span>
+            <span className="text-white font-black text-xs sm:text-sm leading-tight">
+              {formatPriceCurrency(displayPrice, currency)}
+            </span>
+          </div>
+          <CurrencyBadge currency={currency} size="sm" />
         </div>
       </div>
 
@@ -199,10 +215,10 @@ export default function ExploreCard({ item }) {
         <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
           <div>
             <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">
-              {isCourse ? "Settlement" : "Rate"}
+              {modelType === "SUBSCRIPTION" ? "Subscription" : isCourse ? "Settlement" : "Rate"}
             </span>
             <span className="text-slate-900 font-bold text-xs">
-              ${price} USDC {isCourse ? "total" : "/ hr"}
+              {formatPriceCurrency(displayPrice, currency)} {modelType === "SUBSCRIPTION" ? "/ mo" : isCourse ? "" : "/ hr"}
             </span>
           </div>
 

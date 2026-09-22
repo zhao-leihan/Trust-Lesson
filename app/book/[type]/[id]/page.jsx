@@ -19,6 +19,7 @@ import {
   Wallet,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
+import { CurrencyBadge, formatPriceCurrency } from "@/src/components/CurrencyBadge";
 
 const timeSlots = [
   "09:00 AM",
@@ -37,12 +38,6 @@ const availableDates = [
   { day: "Wednesday", date: "Sep 24" },
 ];
 
-const paymentMethods = [
-  { id: "usdc", label: "USDC (Arbitrum One)", sub: "Native smart contract escrow settlement", Icon: DollarSign, isWeb3: true },
-  { id: "card", label: "Credit or Debit Card", sub: "Visa, Mastercard, Amex (Auto-converted)", Icon: CreditCard },
-  { id: "apple", label: "Apple Pay or Google Pay", sub: "Instant 1-tap mobile checkout", Icon: Smartphone },
-];
-
 export default function BookingPage() {
   const params = useParams();
   const type = params?.type;
@@ -56,6 +51,7 @@ export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState("Sep 21");
   const [selectedSlot, setSelectedSlot] = useState("10:30 AM");
   const [packageType, setPackageType] = useState("single"); // 'single' | 'pack'
+  const [selectedPkgIndex, setSelectedPkgIndex] = useState(0);
   const [studentNote, setStudentNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("usdc");
 
@@ -125,14 +121,42 @@ export default function BookingPage() {
     );
   }
 
-  // Calculations
-  const basePrice = isMentor
+  // Calculations & Currency
+  const currency = item?.currency || "USDC";
+  const hasPackages = Boolean(item?.packages && item.packages.length > 0);
+  const selectedPackage = hasPackages ? item.packages[selectedPkgIndex] : null;
+
+  const basePrice = hasPackages
+    ? Number(selectedPackage?.price) || Number(item.price) || 0
+    : isMentor
     ? packageType === "pack"
       ? item.price * 5 * 0.9
       : item.price
     : item.price;
-  const platformFee = basePrice * 0.07;
+  const platformFee = Number((basePrice * 0.05).toFixed(2));
   const grandTotal = basePrice + platformFee;
+
+  // Payment methods with dynamic currency support
+  const paymentMethods = [
+    {
+      id: "crypto",
+      label: `${currency} (Arbitrum One)`,
+      sub: `Native smart contract escrow settlement in ${currency}`,
+      isWeb3: true,
+    },
+    {
+      id: "card",
+      label: "Credit or Debit Card",
+      sub: "Visa, Mastercard, Amex (Auto-settled)",
+      isWeb3: false,
+    },
+    {
+      id: "mobile",
+      label: "Instant Mobile Checkout",
+      sub: "Apple Pay, Google Pay, or QRIS",
+      isWeb3: false,
+    },
+  ];
 
   // Handle escrow deposit action
   const handleDepositEscrow = () => {
@@ -143,8 +167,9 @@ export default function BookingPage() {
       mentor: isMentor ? item.name : item.mentorName,
       skill: isMentor ? item.skill : item.title,
       date: isMentor ? selectedDate : "Kickoff This Week",
-      time: isMentor ? selectedSlot : item.duration,
+      time: hasPackages ? selectedPackage?.duration : (isMentor ? selectedSlot : item.duration),
       price: grandTotal,
+      currency,
       status: "locked",
       escrowStatus: "Locked",
       type: isMentor ? "session" : "course",
@@ -183,7 +208,7 @@ export default function BookingPage() {
                 Escrow Deposit Secured!
               </h1>
               <p className="text-slate-600 text-xs sm:text-sm mt-2 leading-relaxed">
-                Your deposit of <span className="font-extrabold text-purple-700">${grandTotal.toFixed(2)} USDC</span> is now safely locked in escrow. The mentor cannot claim payment until you confirm completion.
+                Your deposit of <span className="font-extrabold text-purple-700">{formatPriceCurrency(grandTotal, currency)}</span> is now safely locked in escrow. The mentor cannot claim payment until you confirm completion.
               </p>
             </div>
 
@@ -277,8 +302,69 @@ export default function BookingPage() {
                 </div>
               </div>
 
-              {/* Mentor Package Choice */}
-              {isMentor && (
+              {/* Online Meeting Platform Indicator */}
+              {item.meetingPlatform && (
+                <div className="p-3.5 bg-purple-50/60 rounded-2xl border border-purple-100 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">📹</span>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block font-semibold">Online Meeting Platform</span>
+                      <span className="font-extrabold text-slate-900">{item.meetingPlatform}</span>
+                    </div>
+                  </div>
+                  <span className="text-purple-700 font-bold text-[11px] bg-white px-2.5 py-1 rounded-full border border-purple-200">
+                    Live Session
+                  </span>
+                </div>
+              )}
+
+              {/* Package Tiers Selection (If Offering Has Packages) */}
+              {hasPackages ? (
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <label className="text-slate-900 font-extrabold text-xs block">
+                      Select Package Tier ({item.packages.length} Available):
+                    </label>
+                    <CurrencyBadge currency={currency} size="sm" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {item.packages.map((pkg, pIdx) => {
+                      const isSelected = selectedPkgIndex === pIdx;
+                      return (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => setSelectedPkgIndex(pIdx)}
+                          className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                            isSelected
+                              ? "border-purple-600 bg-purple-50/70 text-purple-950 font-bold shadow-md shadow-purple-600/15 scale-[1.02]"
+                              : "border-slate-200 text-slate-600 hover:border-slate-300 bg-white"
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                                {pkg.tier || `Tier ${pIdx + 1}`}
+                              </span>
+                              {isSelected && <span className="w-2 h-2 rounded-full bg-purple-600" />}
+                            </div>
+                            <p className="text-xs font-black text-slate-950">{pkg.name}</p>
+                            <p className="text-[11px] text-slate-500 font-normal mt-1 line-clamp-2">{pkg.description}</p>
+                          </div>
+                          <div className="pt-3 mt-3 border-t border-purple-100/60">
+                            <p className="text-purple-700 font-black text-base">
+                              {formatPriceCurrency(pkg.price, currency)}
+                            </p>
+                            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
+                              {pkg.duration}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : isMentor ? (
                 <div>
                   <label className="text-slate-900 font-extrabold text-xs mb-2.5 block">
                     Select Mentorship Package:
@@ -295,7 +381,9 @@ export default function BookingPage() {
                     >
                       <p className="text-xs font-bold">Single 1-on-1 Session</p>
                       <p className="text-[11px] text-slate-400 mt-0.5 font-normal">60 minutes live screen-share call</p>
-                      <p className="text-slate-900 font-black text-lg mt-2">${item.price}</p>
+                      <p className="text-slate-900 font-black text-lg mt-2">
+                        {formatPriceCurrency(item.price, currency)}
+                      </p>
                     </button>
 
                     <button
@@ -313,15 +401,12 @@ export default function BookingPage() {
                       <p className="text-xs font-bold">5-Session Accelerator</p>
                       <p className="text-[11px] text-slate-400 mt-0.5 font-normal">Multi-week structured mentorship</p>
                       <p className="text-slate-900 font-black text-lg mt-2">
-                        ${(item.price * 5 * 0.9).toFixed(0)}{" "}
-                        <span className="text-xs text-slate-400 line-through font-normal">
-                          ${item.price * 5}
-                        </span>
+                        {formatPriceCurrency(item.price * 5 * 0.9, currency)}
                       </p>
                     </button>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Date & Time (for mentors) */}
               {isMentor && (
@@ -526,39 +611,48 @@ export default function BookingPage() {
                   <div>
                     <p className="font-bold text-slate-900 line-clamp-1">{isMentor ? item.skill : item.title}</p>
                     <p className="text-slate-500 text-[11px] mt-0.5">
-                      {isMentor ? `Session: ${selectedDate} • ${selectedSlot}` : `${item.duration}`}
+                      {hasPackages
+                        ? `${selectedPackage?.name} • ${selectedPackage?.duration}`
+                        : isMentor
+                        ? `Session: ${selectedDate} • ${selectedSlot}`
+                        : `${item.duration}`}
                     </p>
                   </div>
-                  <span className="font-black text-slate-900 text-sm">${basePrice}</span>
+                  <span className="font-black text-slate-900 text-sm">
+                    {formatPriceCurrency(basePrice, currency)}
+                  </span>
                 </div>
 
                 {/* Cost Breakdown */}
                 <div className="space-y-2 text-xs pt-1">
                   <div className="flex justify-between text-slate-600">
                     <span>Offering Base Price</span>
-                    <span className="font-bold text-slate-900">${basePrice.toFixed(2)}</span>
+                    <span className="font-bold text-slate-900">{formatPriceCurrency(basePrice, currency)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
                     <span className="flex items-center gap-1">
-                      <span>Platform & Escrow Fee</span>
-                      <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.2 rounded font-bold">7%</span>
+                      <span>Platform Protocol Cut</span>
+                      <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.2 rounded font-bold">5%</span>
                     </span>
-                    <span className="font-bold text-slate-900">${platformFee.toFixed(2)}</span>
+                    <span className="font-bold text-slate-900">{formatPriceCurrency(platformFee, currency)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600 text-[11px]">
-                    <span>Network Gas Subsidies</span>
+                    <span>Arbitrum Gas Subsidies</span>
                     <span className="font-bold text-emerald-600">FREE (Zero Gas)</span>
                   </div>
 
                   <div className="border-t border-slate-200 pt-3 flex items-baseline justify-between text-slate-950">
                     <div>
                       <span className="font-extrabold text-base block">Total Due</span>
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Settled in USDC / USD</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-purple-600 font-black text-2xl leading-none">
-                        ${grandTotal.toFixed(2)}
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                        Settled in {currency}
                       </span>
+                    </div>
+                    <div className="text-right flex items-center gap-2">
+                      <span className="text-purple-600 font-black text-xl sm:text-2xl leading-none">
+                        {formatPriceCurrency(grandTotal, currency)}
+                      </span>
+                      <CurrencyBadge currency={currency} size="sm" />
                     </div>
                   </div>
                 </div>
@@ -578,7 +672,7 @@ export default function BookingPage() {
                   ) : (
                     <>
                       <Lock size={16} />
-                      <span>Deposit ${grandTotal.toFixed(2)} to Escrow</span>
+                      <span>Deposit {formatPriceCurrency(grandTotal, currency)} to Escrow</span>
                       <ArrowRight size={15} />
                     </>
                   )}

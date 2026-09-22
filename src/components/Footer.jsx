@@ -58,6 +58,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/how-to-use" className="hover:text-purple-300 transition-colors">
+                  How to Use DApp
+                </Link>
+              </li>
+              <li>
                 <Link href="/about" className="hover:text-purple-300 transition-colors">
                   About Trust Lesson
                 </Link>

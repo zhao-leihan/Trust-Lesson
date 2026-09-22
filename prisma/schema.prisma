@@ -13,6 +13,7 @@ model User {
   passwordHash  String?
   role          String    @default("LEARNER") // "LEARNER" | "MENTOR" | "ADMIN"
   name          String?
+  nickname      String?
   email         String?   @unique
   university    String?
   avatarUrl     String?
@@ -25,6 +26,8 @@ model User {
   hourlyRate    Float     @default(35)
   stakeAmount   Float     @default(0)
   isVerified    Boolean   @default(false)
+  walletLocked  Boolean   @default(false)
+  mentorLevel   String    @default("RISING") // "RISING" | "PRO" | "MASTER"
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -36,25 +39,32 @@ model User {
 }
 
 model Offering {
-  id            String   @id @default(uuid())
-  offeringType  String   // "mentor" | "course"
-  title         String
-  category      String   // "Coding", "Career", "Design", "Business", "Languages", "Music"
-  price         Float    @default(0)
-  duration      String   // "1 hour", "4 Weeks (4 Milestones)"
-  rating        Float    @default(5.0)
-  sessionsCount Int      @default(0)
-  reputation    Int      @default(95)
-  level         String   @default("All levels")
-  description   String
-  coverImage    String
-  mentorName    String
-  mentorPhoto   String
-  mentorAddress String?
-  verified      Boolean  @default(true)
-  milestones    String?  // JSON serialized milestones array
-  deliverables  String?  // JSON serialized deliverables array
-  createdAt     DateTime @default(now())
+  id              String   @id @default(uuid())
+  offeringType    String   // "mentor" | "course" | "gig"
+  modelType       String   @default("GIG") // "GIG" | "SUBSCRIPTION"
+  currency        String   @default("USDC") // "USDC" | "USDT"
+  title           String
+  category        String   // "Coding", "Career", "Design", "Business", "Languages", "Music"
+  price           Float    @default(0)
+  duration        String   // "1 hour", "4 Weeks", "1 Month"
+  rating          Float    @default(5.0)
+  sessionsCount   Int      @default(0)
+  reputation      Int      @default(95)
+  level           String   @default("All levels")
+  description     String
+  coverImage      String
+  mentorName      String
+  mentorPhoto     String
+  mentorAddress   String?
+  mentorId        String?
+  meetingPlatform String?  @default("Google Meet") // "Google Meet" | "Zoom" | "Discord" | "In-App"
+  meetingLink     String?
+  verified        Boolean  @default(true)
+  packages        String?  // JSON serialized up to 3 package tiers (Basic, Standard, Premium)
+  modules         String?  // JSON serialized curriculum modules (title, desc, videoUrl, resources)
+  milestones      String?  // JSON serialized milestones array
+  deliverables    String?  // JSON serialized deliverables array
+  createdAt       DateTime @default(now())
 }
 
 model Resource {

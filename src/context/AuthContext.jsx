@@ -110,6 +110,40 @@ export function AuthProvider({ children }) {
 
         const dbPortfolios = await getLocalPortfolio(user?.email);
         if (dbPortfolios) setPortfolios(dbPortfolios);
+
+        // Fetch fresh profile from database to ensure no profile loss across logout/login
+        if (user?.email) {
+          try {
+            const profileRes = await fetch(`/api/mentor/profile?email=${encodeURIComponent(user.email)}&userId=${user.id || ""}`);
+            if (profileRes.ok) {
+              const profileData = await profileRes.json();
+              if (profileData?.user) {
+                setUser((prev) => {
+                  if (!prev) return prev;
+                  const merged = {
+                    ...prev,
+                    name: profileData.user.name || prev.name,
+                    nickname: profileData.user.nickname || prev.nickname,
+                    avatarUrl: profileData.user.avatarUrl || prev.avatarUrl,
+                    bio: profileData.user.bio || prev.bio,
+                    domain: profileData.user.domain || prev.domain,
+                    hourlyRate: profileData.user.hourlyRate || prev.hourlyRate,
+                    linkedin: profileData.user.linkedin || prev.linkedin,
+                    twitter: profileData.user.twitter || prev.twitter,
+                    portfolio: profileData.user.portfolio || prev.portfolio,
+                    walletAddress: profileData.user.walletAddress || prev.walletAddress,
+                    walletLocked: profileData.user.walletLocked ?? prev.walletLocked,
+                    mentorLevel: profileData.user.mentorLevel || prev.mentorLevel,
+                  };
+                  localStorage.setItem("trust_lesson_user", JSON.stringify(merged));
+                  return merged;
+                });
+              }
+            }
+          } catch (syncErr) {
+            console.warn("[AuthContext] Profile sync warning:", syncErr);
+          }
+        }
       } catch (err) {
         console.warn("DB init warning:", err);
       }
@@ -213,12 +247,14 @@ export function AuthProvider({ children }) {
 
     const userObj = {
       id: userData.id,
-      name: userData.name || userData.email.split("@")[0],
+      name: userData.name || userData.email?.split("@")[0] || "User",
+      nickname: userData.nickname || userData.name?.toLowerCase().replace(/\s+/g, "_") || userData.email?.split("@")[0] || "user",
       email: userData.email,
       role: roleNormalized,
       roleType: roleUpper,
       university: userData.university || null,
-      avatar: (userData.name || userData.email)[0].toUpperCase(),
+      avatar: (userData.name || userData.email || "U")[0].toUpperCase(),
+      avatarUrl: userData.avatarUrl || null,
       domain: userData.domain || (roleUpper === "ADMIN" ? "Platform Administrator" : roleUpper === "MENTOR" ? "Smart Contract & Web3 Architecture" : "Student Learner"),
       linkedin: userData.linkedin || "",
       instagram: userData.instagram || "",
@@ -228,9 +264,14 @@ export function AuthProvider({ children }) {
       hourlyRate: userData.hourlyRate || (roleUpper === "MENTOR" ? "45" : "35"),
       isVerified: userData.isVerified ?? false,
       walletAddress: userData.walletAddress || null,
-      joinedDate: "September 2026",
+      walletLocked: userData.walletLocked ?? false,
+      mentorLevel: userData.mentorLevel || "RISING",
+      joinedDate: userData.joinedDate || "September 2026",
     };
     setUser(userObj);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("trust_lesson_user", JSON.stringify(userObj));
+    }
 
     // Sync profile to API if available
     if (USE_API) {
@@ -242,6 +283,7 @@ export function AuthProvider({ children }) {
             role: roleUpper === "MENTOR" ? "MENTOR" : roleUpper === "ADMIN" ? "ADMIN" : "LEARNER",
             domain: userObj.domain,
             bio: userObj.bio,
+            avatarUrl: userObj.avatarUrl,
             linkedin: userObj.linkedin,
             instagram: userObj.instagram,
             twitter: userObj.twitter,
@@ -255,9 +297,26 @@ export function AuthProvider({ children }) {
   };
 
   const updateUserProfile = (updatedFields) => {
-    setUser((prev) => ({ ...prev, ...updatedFields }));
+    setUser((prev) => {
+      const nextUser = { ...prev, ...updatedFields };
+      if (typeof window !== "undefined") {
+        localStorage.setItem("trust_lesson_user", JSON.stringify(nextUser));
+      }
+      return nextUser;
+    });
 
-    // Sync to API
+    // Sync to API via /api/mentor/profile or /users/onboarding
+    fetch("/api/mentor/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: user?.id,
+        email: user?.email,
+        address: walletAddress || user?.walletAddress,
+        ...updatedFields,
+      }),
+    }).catch((e) => console.warn("[API] Mentor profile update failed:", e.message));
+
     if (USE_API) {
       const token = localStorage.getItem("tl_jwt");
       if (token) {

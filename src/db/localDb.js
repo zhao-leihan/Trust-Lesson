@@ -263,28 +263,5 @@ export async function deleteLocalPortfolioItem(itemId) {
   });
 }
 
-// Initial demo portfolio items
-const defaultPortfolio = [
-  {
-    id: "port-1",
-    mentorEmail: "",
-    title: "Arbitrum P2P Micro-Escrow Smart Contracts",
-    description: "Production-ready Solidity escrow vault contracts featuring time-locked milestone disbursement and multi-sig arbitration.",
-    projectUrl: "https://arbitrum.io",
-    githubUrl: "https://github.com/example/escrow-vault",
-    tags: ["Solidity", "Arbitrum", "Hardhat", "Foundry"],
-    featured: true,
-    createdAt: "2026-01-15T00:00:00.000Z",
-  },
-  {
-    id: "port-2",
-    mentorEmail: "",
-    title: "Fullstack Web3 Academy LMS & Playground",
-    description: "Interactive React + TypeScript learning management system with simulated testnet execution and peer code review.",
-    projectUrl: "https://trustlearn.app",
-    githubUrl: "https://github.com/example/web3-academy",
-    tags: ["React", "TypeScript", "Tailwind CSS", "Ethers.js"],
-    featured: false,
-    createdAt: "2026-02-10T00:00:00.000Z",
-  },
-];
+// Default portfolio items (empty by default, loaded from LinkedIn or mentor input)
+const defaultPortfolio = [];
