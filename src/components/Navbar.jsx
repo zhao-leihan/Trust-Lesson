@@ -45,9 +45,16 @@ export default function Navbar() {
     return null;
   }
 
-  // ── Conditional Theme: White on Home & About, Non-White (Light/Purple) on Explore & Dashboard ──
+  // ── Conditional Theme: White on Home & About, Light/Purple on Explore, Course, Book & Dashboard ──
   const isWhiteTheme = pathname === "/" || pathname === "/about";
-  const isLightPage = pathname === "/explore" || pathname === "/how-to-use" || pathname.startsWith("/dashboard");
+  const isLightPage =
+    pathname === "/explore" ||
+    pathname === "/course" ||
+    pathname === "/how-to-use" ||
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/book") ||
+    pathname.startsWith("/mentor") ||
+    pathname.startsWith("/certificate");
 
   // Header background & border classes
   const headerBgClass = isWhiteTheme

@@ -138,7 +138,7 @@ export default function LandingPage() {
             </div>
           </Reveal>
 
-          {/* Bottom Ecosystem Badges (USDC, USDG, ARBITRUM) */}
+          {/* Bottom Ecosystem Badges (USDT, USDC, ARBITRUM) */}
           <Reveal direction="up" delay={450}>
             <div className="pt-2">
               <EcosystemLogos />

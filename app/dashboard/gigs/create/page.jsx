@@ -23,6 +23,7 @@ import {
   Clock,
   CheckCircle2,
   Plus,
+  X,
   Trash2,
   Calendar,
   Image as ImageIcon,
@@ -83,16 +84,6 @@ function MilestoneGigIcon({ className = "w-5 h-5" }) {
   );
 }
 
-function SubscriptionCycleIcon({ className = "w-5 h-5" }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-      <path d="M16 16h5v5" />
-    </svg>
-  );
-}
 
 // Official Platform Logos (Google Meet, Zoom, Discord)
 function GoogleMeetIcon({ className = "w-7 h-7" }) {
@@ -133,7 +124,7 @@ const PLATFORMS = [
 ];
 
 const STEPS = [
-  { id: 1, title: "General Info", subtitle: "Model, currency & details" },
+  { id: 1, title: "General Info", subtitle: "Currency & details" },
   { id: 2, title: "Packages", subtitle: "Tiers, pricing & scope" },
   { id: 3, title: "Live & Modules", subtitle: "Meeting & video lessons" },
   { id: 4, title: "Cover & Publish", subtitle: "Review & deploy" },
@@ -146,18 +137,22 @@ export default function CreateGigPage() {
   // Wizard Step State (1 to 4)
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Model & Currency State (Only USDC and USDT)
-  const [modelType, setModelType] = useState("GIG"); // "GIG" | "SUBSCRIPTION"
+  // Model & Currency State (Milestone Gig model only; USDC & USDT settlement)
+  const modelType = "GIG";
   const [currency, setCurrency] = useState("USDC"); // "USDC" | "USDT"
 
-  // Gig Details
+  // Gig Details & Category (Preset or Custom)
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Coding");
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [customCategory, setCustomCategory] = useState("");
   const [level, setLevel] = useState("All levels");
   const [description, setDescription] = useState("");
 
-  // Cover Image
-  const [coverImage, setCoverImage] = useState(COVER_PRESETS[0].url);
+  // Cover & Gallery Images (Max 5)
+  const [galleryImages, setGalleryImages] = useState([COVER_PRESETS[0].url]);
+  const [coverIndex, setCoverIndex] = useState(0);
+  const coverImage = galleryImages[coverIndex] || galleryImages[0] || COVER_PRESETS[0].url;
   const [customCoverUrl, setCustomCoverUrl] = useState("");
 
   // Online Collaboration (Live meeting is optional)
@@ -171,51 +166,35 @@ export default function CreateGigPage() {
   const [packages, setPackages] = useState([
     {
       tier: "Basic",
-      name: "Starter Milestone",
-      price: 50,
-      duration: "3 Days Delivery",
-      description: "Initial code architecture review, roadmap alignment, and 1-on-1 strategy call.",
-      deliverables: ["1-hour 1-on-1 live session", "Code audit report", "Milestone roadmap"],
+      name: "",
+      price: "",
+      duration: "1 Live Meeting",
+      description: "",
+      deliverables: [""],
     },
     {
       tier: "Standard",
-      name: "Accelerator Sprint",
-      price: 120,
-      duration: "7 Days Delivery",
-      description: "Comprehensive hands-on pairing, full pull-request reviews, and architecture debugging.",
-      deliverables: [
-        "3 hours live pairing calls",
-        "Direct code review & PR comments",
-        "Step-by-step curriculum modules",
-        "Direct Discord / Telegram support",
-      ],
+      name: "",
+      price: "",
+      duration: "3 Live Meetings",
+      description: "",
+      deliverables: [""],
     },
     {
       tier: "Premium",
-      name: "Full Mentorship Mastery",
-      price: 250,
-      duration: "1 Month Delivery",
-      description: "End-to-end mentorship bootcamp: complete smart contract audit, production deploy, and lifetime access.",
-      deliverables: [
-        "Weekly 1-on-1 milestone calls",
-        "Complete production codebase audit",
-        "Full video lesson access & resources",
-        "Job referral & portfolio certification",
-      ],
+      name: "",
+      price: "",
+      duration: "8 Live Meetings",
+      description: "",
+      deliverables: [""],
     },
   ]);
 
   // Curriculum Modules & Video Uploads
   const [modules, setModules] = useState([
     {
-      title: "Module 1: Orientation & System Architecture",
-      description: "Overview of tech stack, repository setup, and development environment.",
-      videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-      resources: "https://github.com/example/trust-lesson-starter",
-    },
-    {
-      title: "Module 2: Smart Contract Implementation & Testing",
-      description: "Writing unit tests, fuzzing with Foundry/Hardhat, and testnet deployments.",
+      title: "",
+      description: "",
       videoUrl: "",
       resources: "",
     },
@@ -237,7 +216,7 @@ export default function CreateGigPage() {
     setPackages((prev) =>
       prev.map((pkg, i) =>
         i === pkgIndex
-          ? { ...pkg, deliverables: [...pkg.deliverables, "New deliverable item"] }
+          ? { ...pkg, deliverables: [...pkg.deliverables, ""] }
           : pkg
       )
     );
@@ -271,7 +250,7 @@ export default function CreateGigPage() {
     setModules((prev) => [
       ...prev,
       {
-        title: `Module ${prev.length + 1}: Advanced Topics`,
+        title: "",
         description: "",
         videoUrl: "",
         resources: "",
@@ -289,23 +268,85 @@ export default function CreateGigPage() {
     setModules((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Cover image upload
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Cover image must be less than 5MB");
-        return;
-      }
+  // Compress single image file using HTML5 canvas
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
         const resultUrl = uploadEvent.target?.result;
-        if (resultUrl) {
-          setCoverImage(resultUrl);
-        }
+        if (!resultUrl) return resolve(null);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const maxW = 1200;
+          const maxH = 675;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxW || h > maxH) {
+            const ratio = Math.min(maxW / w, maxH / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.onerror = () => resolve(null);
+        img.src = resultUrl;
       };
+      reader.onerror = () => resolve(null);
       reader.readAsDataURL(file);
+    });
+  };
+
+  // Multiple image file upload handler (Max 5 total)
+  const handleMultipleFileUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const remainingSlots = 5 - galleryImages.length;
+    if (remainingSlots <= 0) {
+      alert("You can upload a maximum of 5 images.");
+      return;
     }
+
+    const filesToProcess = files.slice(0, remainingSlots);
+    const compressedList = [];
+    for (const f of filesToProcess) {
+      if (f.size > 12 * 1024 * 1024) continue;
+      const res = await compressImage(f);
+      if (res) compressedList.push(res);
+    }
+
+    if (compressedList.length > 0) {
+      setGalleryImages((prev) => [...prev, ...compressedList].slice(0, 5));
+    }
+  };
+
+  const handleAddImageUrl = () => {
+    if (!customCoverUrl.trim()) return;
+    if (galleryImages.length >= 5) {
+      alert("Maximum of 5 images allowed.");
+      return;
+    }
+    setGalleryImages((prev) => [...prev, customCoverUrl.trim()].slice(0, 5));
+    setCustomCoverUrl("");
+  };
+
+  const handleRemoveImage = (index) => {
+    setGalleryImages((prev) => {
+      const filtered = prev.filter((_, i) => i !== index);
+      if (coverIndex >= filtered.length) {
+        setCoverIndex(Math.max(0, filtered.length - 1));
+      }
+      return filtered.length > 0 ? filtered : [COVER_PRESETS[0].url];
+    });
+  };
+
+  const handleSetCover = (index) => {
+    setCoverIndex(index);
   };
 
   // Step Validation & Navigation
@@ -315,6 +356,10 @@ export default function CreateGigPage() {
     if (currentStep === 1) {
       if (!title.trim()) {
         setStepErrorMsg("Please enter a clear, descriptive gig title.");
+        return;
+      }
+      if (isCustomCategory && !customCategory.trim()) {
+        setStepErrorMsg("Please enter a custom category name, or switch back to presets.");
         return;
       }
       if (!description.trim()) {
@@ -328,15 +373,16 @@ export default function CreateGigPage() {
       for (let i = 0; i < effective.length; i++) {
         const p = effective[i];
         if (!p.name.trim()) {
-          setStepErrorMsg(`Please enter a name for the ${p.tier} package tier.`);
+          setStepErrorMsg(`Please enter a name for your ${p.tier} package tier.`);
           return;
         }
         if (!p.price || Number(p.price) <= 0) {
-          setStepErrorMsg(`Please enter a valid price for the ${p.tier} package tier.`);
+          setStepErrorMsg(`Please enter a valid price for your ${p.tier} package tier.`);
           return;
         }
-        if (!p.deliverables || p.deliverables.length === 0) {
-          setStepErrorMsg(`Please include at least 1 deliverable for the ${p.tier} package tier.`);
+        const validDels = (p.deliverables || []).filter((d) => d.trim().length > 0);
+        if (validDels.length === 0) {
+          setStepErrorMsg(`Please add at least 1 deliverable for your ${p.tier} package tier.`);
           return;
         }
       }
@@ -352,6 +398,11 @@ export default function CreateGigPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Resolved Category (preset vs custom typed)
+  const effectiveCategory = isCustomCategory && customCategory.trim()
+    ? customCategory.trim()
+    : category;
+
   // Final Publish Handler
   const handlePublishGig = async () => {
     setStepErrorMsg("");
@@ -362,7 +413,15 @@ export default function CreateGigPage() {
       return;
     }
 
-    const effectivePackages = packages.slice(0, activeTierCount);
+    const effectivePackages = packages.slice(0, activeTierCount).map((p) => ({
+      ...p,
+      name: p.name.trim(),
+      price: Number(p.price) || 0,
+      duration: p.duration.trim() || "1 Live Meeting",
+      description: p.description.trim(),
+      deliverables: (p.deliverables || []).filter((d) => d.trim().length > 0),
+    }));
+
     if (effectivePackages.length === 0) {
       setStepErrorMsg("At least 1 package tier is required.");
       setCurrentStep(2);
@@ -374,17 +433,18 @@ export default function CreateGigPage() {
     try {
       const payload = {
         title: title.trim(),
-        category,
-        modelType,
+        category: effectiveCategory,
+        modelType: "GIG",
         currency,
         level,
         description: description.trim(),
         coverImage,
+        galleryImages: galleryImages.slice(0, 5),
         meetingPlatform: hasOnlineMeeting ? meetingPlatform : "None (Asynchronous)",
         meetingLink: hasOnlineMeeting ? (meetingLink.trim() || null) : null,
         packages: effectivePackages,
         modules,
-        duration: effectivePackages[0]?.duration || "4 Weeks",
+        duration: effectivePackages[0]?.duration || "1 Live Meeting",
         price: Number(effectivePackages[0]?.price) || 0,
         mentorName: user?.name || "Verified Mentor",
         mentorPhoto: user?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
@@ -416,11 +476,11 @@ export default function CreateGigPage() {
   const previewItem = {
     id: "preview-card",
     title: title || "Your Gig Title will appear here",
-    category,
-    modelType,
+    category: effectiveCategory,
+    modelType: "GIG",
     currency,
-    price: packages[0]?.price || 50,
-    duration: packages[0]?.duration || "3 Days Delivery",
+    price: Number(packages[0]?.price) || 0,
+    duration: packages[0]?.duration || "1 Live Meeting",
     rating: 5.0,
     sessionsCount: 0,
     level,
@@ -545,71 +605,43 @@ export default function CreateGigPage() {
               )}
 
               {/* ════════════════════════════════════════════════════════════════ */}
-              {/* STEP 1: BUSINESS MODEL, CURRENCY & BASIC INFO                   */}
+              {/* STEP 1: GENERAL INFO, CURRENCY & CUSTOM CATEGORY                */}
               {/* ════════════════════════════════════════════════════════════════ */}
               {currentStep === 1 && (
                 <div className="bg-white rounded-3xl border-2 border-purple-100 p-6 sm:p-8 shadow-xs space-y-6 animate-fadeIn">
                   <div className="pb-4 border-b border-purple-50">
                     <h2 className="text-slate-950 font-black text-xl tracking-tight">
-                      Step 1: General Info & Business Model
+                      Step 1: General Info & Pricing Currency
                     </h2>
                     <p className="text-slate-500 text-xs mt-1">
-                      Choose whether you want to offer milestone gigs or monthly recurring subscriptions, and choose your settlement currency.
+                      Configure your milestone escrow gig offering, select your settlement currency, and specify your category and details.
                     </p>
                   </div>
 
-                  {/* Model Selector: GIG vs SUBSCRIPTION */}
-                  <div>
-                    <label className="block text-slate-800 font-extrabold text-xs mb-2">
-                      Mentorship Business Model
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <button
-                        type="button"
-                        onClick={() => setModelType("GIG")}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                          modelType === "GIG"
-                            ? "bg-purple-50/60 border-purple-600 ring-2 ring-purple-400/20"
-                            : "bg-white border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-extrabold text-slate-950 text-sm flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 shadow-2xs border border-purple-200">
-                              <MilestoneGigIcon className="w-4 h-4" />
-                            </div>
-                            <span>One-Time Milestone Gig</span>
+                  {/* Milestone Escrow Gig Banner */}
+                  <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 border border-purple-200 shadow-2xs">
+                        <MilestoneGigIcon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-slate-950 text-sm">
+                            Milestone Escrow Gig Model
                           </span>
-                          {modelType === "GIG" && <CheckCircle2 size={16} className="text-purple-600" />}
-                        </div>
-                        <p className="text-slate-500 text-xs leading-relaxed">
-                          Students fund milestones in Arbitrum escrow. Funds disburse progressively upon milestone deliverable approval.
-                        </p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setModelType("SUBSCRIPTION")}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                          modelType === "SUBSCRIPTION"
-                            ? "bg-purple-50/60 border-purple-600 ring-2 ring-purple-400/20"
-                            : "bg-white border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-extrabold text-slate-950 text-sm flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 shadow-2xs border border-indigo-200">
-                              <SubscriptionCycleIcon className="w-4 h-4" />
-                            </div>
-                            <span>Monthly Mentorship Subscription</span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wide border border-emerald-200">
+                            Escrow Protected
                           </span>
-                          {modelType === "SUBSCRIPTION" && <CheckCircle2 size={16} className="text-purple-600" />}
                         </div>
-                        <p className="text-slate-500 text-xs leading-relaxed">
-                          Recurring monthly mentorship and ongoing pairing access. Displays a &quot;Monthly Sub&quot; badge in the catalog.
+                        <p className="text-slate-600 text-xs mt-0.5">
+                          Students fund project milestones into Arbitrum smart contract escrow, releasing payment upon verified deliverables.
                         </p>
-                      </button>
+                      </div>
                     </div>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white text-purple-700 border border-purple-200 text-xs font-bold shadow-2xs self-start sm:self-auto shrink-0">
+                      <Shield size={13} />
+                      Arbitrum Escrow
+                    </span>
                   </div>
 
                   {/* Currency Selector: USDC vs USDT on Arbitrum */}
@@ -668,27 +700,99 @@ export default function CreateGigPage() {
                   {/* Category & Level */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-slate-800 font-extrabold text-xs mb-1">Category</label>
-                      <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
-                      >
-                        <option value="Coding">Coding & Smart Contracts</option>
-                        <option value="Career">Career & Tech Interview</option>
-                        <option value="Design">UI/UX & Product Design</option>
-                        <option value="Business">Web3 Business & Tokenomics</option>
-                        <option value="Languages">Languages & Communication</option>
-                        <option value="Music">Audio & Creative Production</option>
-                      </select>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-slate-800 font-extrabold text-xs">
+                          Category <span className="text-rose-500">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !isCustomCategory;
+                            setIsCustomCategory(next);
+                            if (next && !customCategory) {
+                              setCustomCategory("");
+                            }
+                          }}
+                          className="text-[11px] font-bold text-purple-600 hover:text-purple-800 transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          {isCustomCategory ? (
+                            <span className="inline-flex items-center gap-1">
+                              <ArrowLeft size={12} />
+                              <span>Choose presets</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <Plus size={12} />
+                              <span>Custom category</span>
+                            </span>
+                          )}
+                        </button>
+                      </div>
+
+                      {!isCustomCategory ? (
+                        <select
+                          value={category}
+                          onChange={(e) => {
+                            if (e.target.value === "__custom__") {
+                              setIsCustomCategory(true);
+                            } else {
+                              setCategory(e.target.value);
+                            }
+                          }}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 bg-white"
+                        >
+                          <option value="Coding">Coding & Smart Contracts</option>
+                          <option value="Career">Career & Tech Interview</option>
+                          <option value="Design">UI/UX & Product Design</option>
+                          <option value="Business">Web3 Business & Tokenomics</option>
+                          <option value="Languages">Languages & Communication</option>
+                          <option value="Music">Audio & Creative Production</option>
+                          <option value="__custom__">+ Enter Custom Category...</option>
+                        </select>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={customCategory}
+                              onChange={(e) => setCustomCategory(e.target.value)}
+                              placeholder="e.g. AI Prompting, Security Auditing, ZK Proofs..."
+                              className="w-full px-3.5 py-2.5 rounded-xl border-2 border-purple-400 bg-purple-50/20 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-600 transition-all placeholder:text-slate-400"
+                              autoFocus
+                            />
+                            {customCategory && (
+                              <button
+                                type="button"
+                                onClick={() => setCustomCategory("")}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            <span className="text-[10px] text-slate-400 font-bold">Suggestions:</span>
+                            {["AI & ML", "Zero Knowledge", "DeFi Security", "Game Development"].map((item) => (
+                              <button
+                                key={item}
+                                type="button"
+                                onClick={() => setCustomCategory(item)}
+                                className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-purple-100 text-slate-600 hover:text-purple-700 text-[10px] font-semibold transition-colors cursor-pointer"
+                              >
+                                {item}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div>
-                      <label className="block text-slate-800 font-extrabold text-xs mb-1">Target Skill Level</label>
+                      <label className="block text-slate-800 font-extrabold text-xs mb-1.5">Target Skill Level</label>
                       <select
                         value={level}
                         onChange={(e) => setLevel(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 bg-white"
                       >
                         <option value="All levels">All Levels</option>
                         <option value="Beginner">Beginner Friendly</option>
@@ -726,7 +830,7 @@ export default function CreateGigPage() {
                         Step 2: Package Tiers (Max 3: Basic, Standard, Premium)
                       </h2>
                       <p className="text-slate-500 text-xs mt-1">
-                        Configure pricing, deliverables, and delivery timeline in {currency}.
+                        Configure pricing, deliverables, and mentorship meetings in {currency}.
                       </p>
                     </div>
 
@@ -753,23 +857,23 @@ export default function CreateGigPage() {
                   </div>
 
                   {/* Tier Navigation Tabs */}
-                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2 overflow-x-auto">
                     {packages.slice(0, activeTierCount).map((pkg, idx) => (
                       <button
                         key={pkg.tier}
                         type="button"
                         onClick={() => setSelectedTierTab(idx)}
-                        className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
+                        className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                           selectedTierTab === idx
                             ? "bg-purple-600 text-white shadow-xs"
                             : "bg-slate-100 text-slate-600 hover:bg-purple-50 hover:text-purple-700"
                         }`}
                       >
-                        <span>{pkg.tier} Tier</span>
+                        <span>{pkg.name.trim() || `${pkg.tier} Tier`}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                           selectedTierTab === idx ? "bg-white/20 text-white" : "bg-white text-slate-700 border"
                         }`}>
-                          ${pkg.price} {currency}
+                          {pkg.price ? `$${pkg.price} ${currency}` : `Set price`}
                         </span>
                       </button>
                     ))}
@@ -786,73 +890,87 @@ export default function CreateGigPage() {
                         <div className="flex items-center justify-between pb-3 border-b border-purple-50">
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full bg-purple-600" />
-                            <h3 className="font-black text-slate-950 text-base">{pkg.tier} Package Configuration</h3>
+                            <h3 className="font-black text-slate-950 text-base">
+                              {pkg.name.trim() ? `${pkg.name} (${pkg.tier})` : `${pkg.tier} Tier Configuration`}
+                            </h3>
                           </div>
                           <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 font-extrabold text-[10px]">
-                            {idx === 0 ? "Starter Tier" : idx === 1 ? "Popular Sprint" : "Mastery Bootcamp"}
+                            {idx === 0 ? "Tier 1" : idx === 1 ? "Tier 2" : "Tier 3"}
                           </span>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-slate-700 font-bold text-xs mb-1">Package Name</label>
+                            <label className="block text-slate-700 font-bold text-xs mb-1">
+                              Package Name <span className="text-rose-500">*</span>
+                            </label>
                             <input
                               type="text"
                               value={pkg.name}
                               onChange={(e) => handleUpdatePackage(idx, "name", e.target.value)}
-                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                              placeholder="e.g. Starter Milestone, Consultation Sprint, Full Mastery..."
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 placeholder:text-slate-400"
                             />
                           </div>
 
                           <div>
                             <label className="block text-slate-700 font-bold text-xs mb-1 flex items-center gap-1">
-                              <span>Price ({currency})</span>
+                              <span>Price ({currency})</span> <span className="text-rose-500">*</span>
                             </label>
                             <div className="relative">
                               <span className="absolute left-3 top-2 text-slate-400 font-bold text-xs">$</span>
                               <input
                                 type="number"
-                                min="5"
+                                min="1"
                                 max="100000"
                                 value={pkg.price}
-                                onChange={(e) => handleUpdatePackage(idx, "price", Number(e.target.value))}
-                                className="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs font-bold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                                onChange={(e) => handleUpdatePackage(idx, "price", e.target.value ? Number(e.target.value) : "")}
+                                placeholder="50"
+                                className="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs font-bold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 placeholder:text-slate-400"
                               />
                             </div>
                           </div>
 
                           <div>
-                            <label className="block text-slate-700 font-bold text-xs mb-1">Estimated Delivery Time</label>
+                            <label className="block text-slate-700 font-bold text-xs mb-1">
+                              Mentorship Meetings / Sessions <span className="text-rose-500">*</span>
+                            </label>
                             <input
                               type="text"
                               value={pkg.duration}
                               onChange={(e) => handleUpdatePackage(idx, "duration", e.target.value)}
-                              placeholder="e.g. 3 Days Delivery, 2 Weeks"
-                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                              placeholder="e.g. 1 Live Meeting, 3 Live Sessions, 8 Meetings"
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 placeholder:text-slate-400"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-slate-700 font-bold text-xs mb-1">Package Summary</label>
+                          <label className="block text-slate-700 font-bold text-xs mb-1">Package Summary & Scope</label>
                           <input
                             type="text"
                             value={pkg.description}
                             onChange={(e) => handleUpdatePackage(idx, "description", e.target.value)}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                            placeholder="Describe what's included in this milestone and what students will achieve..."
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 placeholder:text-slate-400"
                           />
                         </div>
 
                         {/* Deliverables Checklist */}
                         <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <label className="block text-slate-700 font-bold text-xs">
-                              Deliverable Checklist (Milestone Scope)
-                            </label>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                            <div>
+                              <label className="block text-slate-700 font-bold text-xs">
+                                Deliverable Checklist (Milestone Scope) <span className="text-rose-500">*</span>
+                              </label>
+                              <p className="text-[11px] text-slate-400">
+                                Add the tangible outcomes students receive before milestone escrow funds release.
+                              </p>
+                            </div>
                             <button
                               type="button"
                               onClick={() => handleAddDeliverable(idx)}
-                              className="text-purple-700 hover:text-purple-800 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                              className="text-purple-700 hover:text-purple-800 text-xs font-bold flex items-center gap-1 cursor-pointer self-start sm:self-auto hover:underline"
                             >
                               <Plus size={13} />
                               <span>Add Deliverable</span>
@@ -867,16 +985,19 @@ export default function CreateGigPage() {
                                   type="text"
                                   value={item}
                                   onChange={(e) => handleUpdateDeliverable(idx, dIdx, e.target.value)}
-                                  className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                                  placeholder={`e.g. Deliverable ${dIdx + 1}: 1-hour live pairing call, code review comments, roadmap review...`}
+                                  className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 placeholder:text-slate-400"
                                 />
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteDeliverable(idx, dIdx)}
-                                  className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer transition-colors"
-                                  title="Remove item"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
+                                {pkg.deliverables.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteDeliverable(idx, dIdx)}
+                                    className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer transition-colors"
+                                    title="Remove item"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -905,10 +1026,10 @@ export default function CreateGigPage() {
                   <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div>
                       <span className="font-extrabold text-slate-900 text-xs sm:text-sm block">
-                        Sediakan Sesi Live 1-on-1 Online? (Opsional)
+                        Include 1-on-1 Online Live Session? (Optional)
                       </span>
                       <span className="text-slate-500 text-xs">
-                        Aktifkan jika gig ini menyediakan panggilan tatap muka live. Jika tidak, gig bersifat modul mandiri.
+                        Enable if this offering includes live face-to-face mentorship calls. Otherwise, this offering consists of self-paced curriculum modules only.
                       </span>
                     </div>
                     <div className="flex items-center gap-2 self-stretch sm:self-auto">
@@ -926,7 +1047,7 @@ export default function CreateGigPage() {
                             : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                         }`}
                       >
-                        Sediakan Sesi Live
+                        Provide Live Session
                       </button>
                       <button
                         type="button"
@@ -941,7 +1062,7 @@ export default function CreateGigPage() {
                             : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                         }`}
                       >
-                        Tanpa Sesi Live (Async)
+                        Self-Paced / Async Only
                       </button>
                     </div>
                   </div>
@@ -951,7 +1072,7 @@ export default function CreateGigPage() {
                     <>
                       <div>
                         <label className="block text-slate-800 font-extrabold text-xs mb-2">
-                          Pilih Platform Live Video Call (Google Meet, Zoom, Discord)
+                          Select Live Video Call Platform (Google Meet, Zoom, Discord)
                         </label>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           {PLATFORMS.map((plat) => {
@@ -987,7 +1108,7 @@ export default function CreateGigPage() {
                       {/* Meeting Invite Link */}
                       <div>
                         <label className="block text-slate-800 font-extrabold text-xs mb-1">
-                          Meeting Room / Invite Link (Opsional)
+                          Meeting Room / Invite Link (Optional)
                         </label>
                         <input
                           type="url"
@@ -997,7 +1118,7 @@ export default function CreateGigPage() {
                           className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-mono"
                         />
                         <p className="text-[11px] text-slate-400 mt-1">
-                          Link ini akan otomatis terbuka untuk siswa setelah deposit escrow Arbitrum mereka terkonfirmasi.
+                          This link will be unlocked for students once their Arbitrum escrow deposit is confirmed.
                         </p>
                       </div>
                     </>
@@ -1005,7 +1126,7 @@ export default function CreateGigPage() {
                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-center gap-3">
                       <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
                       <span>
-                        <strong>Mode Mandiri / Asinkron Aktif:</strong> Siswa akan belajar melalui modul video, tugas praktek, dan repositori di bawah tanpa jadwal tatap muka langsung.
+                        <strong>Asynchronous Mode Active:</strong> Students will learn through recorded video modules, practice tasks, and repository links below without live scheduled meetings.
                       </span>
                     </div>
                   )}
@@ -1106,51 +1227,127 @@ export default function CreateGigPage() {
               {/* ════════════════════════════════════════════════════════════════ */}
               {currentStep === 4 && (
                 <div className="space-y-6 animate-fadeIn">
-                  {/* Cover Selection Card */}
+                  {/* Gallery & Cover Selection Card */}
                   <div className="bg-white rounded-3xl border-2 border-purple-100 p-6 sm:p-8 shadow-xs space-y-5">
-                    <div className="pb-3 border-b border-purple-50">
-                      <h2 className="text-slate-950 font-black text-xl tracking-tight">
-                        Step 4: Cover Image & Final Review
-                      </h2>
-                      <p className="text-slate-500 text-xs mt-1">
-                        Select a curated cover image or upload your own to showcase on the Course catalog.
-                      </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-50">
+                      <div>
+                        <h2 className="text-slate-950 font-black text-xl tracking-tight">
+                          Step 4: Gig Gallery & Cover Images
+                        </h2>
+                        <p className="text-slate-500 text-xs mt-1">
+                          Upload up to 5 images showcasing your work or curriculum. Choose one as the primary cover.
+                        </p>
+                      </div>
+                      <span className="self-start sm:self-auto px-3 py-1 rounded-full text-xs font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
+                        {galleryImages.length} / 5 Images Added
+                      </span>
+                    </div>
+
+                    {/* Active Uploaded Gallery Grid (Up to 5 images) */}
+                    <div>
+                      <label className="block text-slate-800 font-extrabold text-xs mb-2">
+                        Uploaded Showcase Gallery ({galleryImages.length}/5)
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        {galleryImages.map((imgUrl, idx) => {
+                          const isCover = coverIndex === idx;
+                          return (
+                            <div
+                              key={idx}
+                              className={`relative rounded-2xl overflow-hidden border-2 transition-all flex flex-col justify-between bg-slate-900 group ${
+                                isCover
+                                  ? "border-purple-600 ring-3 ring-purple-500/25 shadow-md"
+                                  : "border-slate-200 hover:border-slate-300"
+                              }`}
+                            >
+                              <div className="h-24 w-full overflow-hidden relative">
+                                <img
+                                  src={imgUrl}
+                                  alt={`Gig Image ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                {isCover && (
+                                  <span className="absolute top-1.5 left-1.5 bg-purple-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs">
+                                    Primary Cover
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveImage(idx)}
+                                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-slate-950/70 hover:bg-rose-600 text-white flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Remove image"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                              <div className="p-2 bg-white flex items-center justify-between border-t border-slate-100">
+                                <span className="text-[10px] font-bold text-slate-500">Image {idx + 1}</span>
+                                {!isCover && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetCover(idx)}
+                                    className="text-[10px] font-bold text-purple-700 hover:text-purple-900 underline cursor-pointer"
+                                  >
+                                    Set as Cover
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Add image slot button if less than 5 */}
+                        {galleryImages.length < 5 && (
+                          <label className="h-32 rounded-2xl border-2 border-dashed border-purple-200 hover:border-purple-400 bg-purple-50/40 hover:bg-purple-50 transition-all flex flex-col items-center justify-center p-3 text-center cursor-pointer group">
+                            <Upload size={20} className="text-purple-600 group-hover:scale-110 transition-transform mb-1" />
+                            <span className="text-[11px] font-bold text-purple-800">Add More</span>
+                            <span className="text-[10px] text-purple-600/70">(Up to 5)</span>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              onChange={handleMultipleFileUpload}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
                     </div>
 
                     {/* Presets */}
                     <div>
                       <label className="block text-slate-800 font-extrabold text-xs mb-2">
-                        Curated Preset Covers
+                        Add from Curated Presets:
                       </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                         {COVER_PRESETS.map((preset) => {
-                          const isSelected = coverImage === preset.url;
+                          const isAlreadyInGallery = galleryImages.includes(preset.url);
                           return (
                             <button
                               key={preset.url}
                               type="button"
                               onClick={() => {
-                                setCoverImage(preset.url);
-                                setCustomCoverUrl("");
+                                if (isAlreadyInGallery) {
+                                  const idx = galleryImages.indexOf(preset.url);
+                                  handleSetCover(idx);
+                                } else if (galleryImages.length < 5) {
+                                  setGalleryImages((prev) => [...prev, preset.url]);
+                                } else {
+                                  alert("Maximum of 5 images allowed. Remove an image first.");
+                                }
                               }}
-                              className={`relative rounded-2xl overflow-hidden border-2 text-left transition-all group cursor-pointer ${
-                                isSelected
-                                  ? "border-purple-600 ring-3 ring-purple-500/20 shadow-md"
-                                  : "border-slate-200 hover:border-slate-300"
-                              }`}
+                              className="relative rounded-xl overflow-hidden border border-slate-200 hover:border-purple-400 text-left transition-all group cursor-pointer"
                             >
-                              <div className="h-20 w-full overflow-hidden bg-slate-900">
+                              <div className="h-14 w-full overflow-hidden bg-slate-900">
                                 <img
                                   src={preset.url}
                                   alt={preset.label}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
                               </div>
-                              <div className="p-2 bg-white flex items-center justify-between">
-                                <span className="text-[11px] font-bold text-slate-800 truncate">
-                                  {preset.label}
-                                </span>
-                                {isSelected && <CheckCircle2 size={14} className="text-purple-600 shrink-0" />}
+                              <div className="p-1.5 bg-white flex items-center justify-between text-[10px] font-bold text-slate-700">
+                                <span className="truncate">{preset.label}</span>
+                                {isAlreadyInGallery && <CheckCircle2 size={12} className="text-purple-600 shrink-0" />}
                               </div>
                             </button>
                           );
@@ -1158,38 +1355,27 @@ export default function CreateGigPage() {
                       </div>
                     </div>
 
-                    {/* Custom URL or File Upload */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                      <div>
-                        <label className="block text-slate-800 font-extrabold text-xs mb-1">
-                          Custom Image URL
-                        </label>
+                    {/* Custom Image URL Upload */}
+                    <div className="pt-2">
+                      <label className="block text-slate-800 font-extrabold text-xs mb-1">
+                        Or Add Image by URL (Web link)
+                      </label>
+                      <div className="flex gap-2">
                         <input
                           type="url"
                           value={customCoverUrl}
-                          onChange={(e) => {
-                            setCustomCoverUrl(e.target.value);
-                            if (e.target.value.trim()) setCoverImage(e.target.value.trim());
-                          }}
-                          placeholder="https://images.unsplash.com/..."
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-mono"
+                          onChange={(e) => setCustomCoverUrl(e.target.value)}
+                          placeholder="https://images.unsplash.com/... or hosted screenshot"
+                          className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-mono"
                         />
-                      </div>
-
-                      <div>
-                        <label className="block text-slate-800 font-extrabold text-xs mb-1">
-                          Or Upload Local File
-                        </label>
-                        <label className="w-full px-3.5 py-2.5 rounded-xl border border-dashed border-purple-300 bg-purple-50/50 hover:bg-purple-100/50 text-purple-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors">
-                          <Upload size={14} />
-                          <span>Choose Cover Image File</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                          />
-                        </label>
+                        <button
+                          type="button"
+                          onClick={handleAddImageUrl}
+                          disabled={!customCoverUrl.trim() || galleryImages.length >= 5}
+                          className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          + Add Image
+                        </button>
                       </div>
                     </div>
                   </div>
