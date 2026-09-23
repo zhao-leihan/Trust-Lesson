@@ -17,9 +17,49 @@ import {
   ArrowRight,
   Layers,
   Wallet,
+  Video,
+  ExternalLink,
+  Copy,
+  Check,
+  Building2,
+  QrCode,
+  X,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
-import { CurrencyBadge, formatPriceCurrency } from "@/src/components/CurrencyBadge";
+import { CurrencyBadge, formatPriceCurrency, UsdcIcon, UsdtIcon, ArbitrumIcon } from "@/src/components/CurrencyBadge";
+
+function GoogleMeetIcon({ className = "w-6 h-6" }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M29.5 24V14.5C29.5 12.57 27.93 11 26 11H8.5C6.57 11 5 12.57 5 14.5V33.5C5 35.43 6.57 37 8.5 37H26C27.93 37 29.5 35.43 29.5 33.5V24Z" fill="#00832D"/>
+      <path d="M29.5 19.5L39.84 12.61C40.94 11.88 42.5 12.67 42.5 14V34C42.5 35.33 40.94 36.12 39.84 35.39L29.5 28.5V19.5Z" fill="#00AA47"/>
+      <path d="M8.5 11H26C27.93 11 29.5 12.57 29.5 14.5V17.5H5V14.5C5 12.57 6.57 11 8.5 11Z" fill="#EA4335"/>
+      <path d="M29.5 30.5V33.5C29.5 35.43 27.93 37 26 37H8.5C6.57 37 5 35.43 5 33.5V30.5H29.5Z" fill="#2684FC"/>
+      <path d="M5 17.5H29.5V30.5H5V17.5Z" fill="#FFBA00"/>
+    </svg>
+  );
+}
+
+function ZoomIcon({ className = "w-6 h-6" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="6" fill="#2D8CFF"/>
+      <path d="M4.5 9C4.5 7.62 5.62 6.5 7 6.5H13C14.38 6.5 15.5 7.62 15.5 9V15C15.5 16.38 14.38 17.5 13 17.5H7C5.62 17.5 4.5 16.38 4.5 15V9Z" fill="white"/>
+      <path d="M16.5 10.2L19.5 7.8C19.8 7.6 20.2 7.8 20.2 8.2V15.8C20.2 16.2 19.8 16.4 19.5 16.2L16.5 13.8V10.2Z" fill="white"/>
+    </svg>
+  );
+}
+
+function DiscordIcon({ className = "w-6 h-6" }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="6" fill="#5865F2"/>
+      <path d="M18.1 7.15C17.07 6.67 15.96 6.32 14.81 6.13C14.67 6.38 14.51 6.72 14.4 6.98C13.18 6.8 11.96 6.8 10.76 6.98C10.65 6.72 10.49 6.38 10.35 6.13C9.2 6.32 8.09 6.67 7.06 7.15C5.03 10.15 4.47 13.07 4.74 15.95C6.09 16.95 7.4 17.55 8.68 17.95C9 17.52 9.28 17.05 9.51 16.55C9.05 16.38 8.61 16.16 8.2 15.9C8.31 15.82 8.42 15.74 8.52 15.65C11.14 16.85 13.99 16.85 16.59 15.65C16.69 15.74 16.8 15.82 16.91 15.9C16.5 16.16 16.06 16.38 15.6 16.55C15.83 17.05 16.11 17.52 16.43 17.95C17.71 17.55 19.03 16.95 20.37 15.95C20.69 12.61 19.82 9.72 18.1 7.15ZM9.68 14.28C8.94 14.28 8.33 13.6 8.33 12.77C8.33 11.94 8.92 11.26 9.68 11.26C10.44 11.26 11.05 11.94 11.03 12.77C11.03 13.6 10.44 14.28 9.68 14.28ZM15.44 14.28C14.7 14.28 14.09 13.6 14.09 12.77C14.09 11.94 14.68 11.26 15.44 11.26C16.2 11.26 16.81 11.94 16.79 12.77C16.79 13.6 16.2 14.28 15.44 14.28Z" fill="white"/>
+    </svg>
+  );
+}
 
 const timeSlots = [
   "09:00 AM",
@@ -53,9 +93,12 @@ export default function BookingPage() {
   const [packageType, setPackageType] = useState("single"); // 'single' | 'pack'
   const [selectedPkgIndex, setSelectedPkgIndex] = useState(0);
   const [studentNote, setStudentNote] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("usdc");
+  const [paymentMethod, setPaymentMethod] = useState("crypto");
+  const [copiedVault, setCopiedVault] = useState(false);
+  const [showTransakModal, setShowTransakModal] = useState(false);
 
   // Processing & booking state
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBooked, setIsBooked] = useState(false);
 
@@ -133,27 +176,36 @@ export default function BookingPage() {
       ? item.price * 5 * 0.9
       : item.price
     : item.price;
-  const platformFee = Number((basePrice * 0.05).toFixed(2));
+  const platformFee = Number((basePrice * 0.10).toFixed(2));
   const grandTotal = basePrice + platformFee;
+  const escrowVaultAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT || "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9";
+  const transakApiKey = process.env.NEXT_PUBLIC_TRANSAK_API_KEY || "4fcd6904-706b-4aa4-bd68-2495b452e805";
+  const destinationWallet = (walletAddress && walletAddress.startsWith("0x") && walletAddress.length === 42)
+    ? walletAddress
+    : escrowVaultAddress;
+  const safeTransakAmount = Math.max(30, Math.round(grandTotal));
+  const transakTesterUrl = `https://global-stg.transak.com/?apiKey=${transakApiKey}&environment=STAGING&cryptoCurrencyCode=${currency === "USDT" ? "USDT" : "USDC"}&network=arbitrum&walletAddress=${destinationWallet}&fiatAmount=${safeTransakAmount}&fiatCurrency=USD&themeColor=7c3aed&disableWalletAddressForm=true`;
 
-  // Payment methods with dynamic currency support
   const paymentMethods = [
     {
       id: "crypto",
-      label: `${currency} (Arbitrum One)`,
-      sub: `Native smart contract escrow settlement in ${currency}`,
+      label: `${currency} (Web3 Connected Wallet)`,
+      sub: `Deposit directly from MetaMask, Coinbase, or Rabby with 100% Subsidized Gas`,
+      Icon: Wallet,
       isWeb3: true,
     },
     {
-      id: "card",
-      label: "Credit or Debit Card",
-      sub: "Visa, Mastercard, Amex (Auto-settled)",
+      id: "transak",
+      label: `Buy ${currency} via Transak (Credit Card / Apple Pay)`,
+      sub: `Fiat-to-crypto on-ramp directly to your Arbitrum wallet via Visa, Mastercard, or Bank Transfer`,
+      Icon: CreditCard,
       isWeb3: false,
     },
     {
-      id: "mobile",
-      label: "Instant Mobile Checkout",
-      sub: "Apple Pay, Google Pay, or QRIS",
+      id: "direct",
+      label: `Direct Transfer / Exchange Deposit (${currency})`,
+      sub: `Transfer directly from Indodax, Tokocrypto, Binance, Bybit, or Hardware Wallet to Escrow Vault`,
+      Icon: Building2,
       isWeb3: false,
     },
   ];
@@ -275,15 +327,73 @@ export default function BookingPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left Column: Form & Configuration */}
             <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-sm space-y-6">
-              {/* Header overview */}
+              {/* Offering Cover Banner */}
+              {(() => {
+                const galleryList = Array.isArray(item.galleryImages) && item.galleryImages.length > 0
+                  ? item.galleryImages
+                  : [item.coverImage || item.image || item.mentorPhoto || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop&q=80"];
+                const currentBannerImg = galleryList[activeImageIndex] || galleryList[0];
+
+                return (
+                  <div>
+                    <div className="relative w-full h-48 sm:h-60 rounded-2xl overflow-hidden bg-slate-900 border border-purple-100 shadow-xs">
+                      <img
+                        src={currentBannerImg}
+                        alt={isMentor ? item.skill : item.title}
+                        className="w-full h-full object-cover transition-all duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
+                      <div className="absolute bottom-3.5 left-4 right-4 flex items-center justify-between pointer-events-none">
+                        <span className="text-[11px] font-bold text-white bg-slate-900/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
+                          {isMentor ? "Mentorship Session" : "Milestone Offering"}
+                        </span>
+                        {item.category && (
+                          <span className="text-[11px] font-bold text-purple-200 bg-purple-900/70 backdrop-blur-md px-3 py-1 rounded-full border border-purple-400/30">
+                            {item.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Gallery Thumbnails (If offering has multiple images) */}
+                    {galleryList.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pt-2 pb-1 no-scrollbar">
+                        {galleryList.map((imgUrl, gIdx) => (
+                          <button
+                            key={gIdx}
+                            type="button"
+                            onClick={() => setActiveImageIndex(gIdx)}
+                            className={`w-14 h-10 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
+                              activeImageIndex === gIdx
+                                ? "border-purple-600 scale-105 shadow-sm"
+                                : "border-slate-200 opacity-60 hover:opacity-100"
+                            }`}
+                          >
+                            <img src={imgUrl} alt={`Thumb ${gIdx + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Header overview with Mentor Profile Link */}
               <div className="flex items-start gap-4 pb-6 border-b border-slate-100">
-                <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 shadow-md border-2 border-purple-200/80 bg-slate-100">
+                <Link
+                  href={`/mentor/${encodeURIComponent(item.mentorId || item.mentorName || item.name || "verified-mentor")}`}
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden flex-shrink-0 shadow-md border-2 border-purple-200/80 bg-slate-100 group relative cursor-pointer"
+                  title="View Mentor Profile"
+                >
                   <img
-                    src={item.mentorPhoto || item.coverImage || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80"}
+                    src={item.mentorPhoto || item.avatarUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80"}
                     alt={isMentor ? item.name : item.mentorName}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                   />
-                </div>
+                  <div className="absolute inset-0 bg-purple-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                    View
+                  </div>
+                </Link>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800">
@@ -296,24 +406,40 @@ export default function BookingPage() {
                   <h1 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug">
                     {isMentor ? item.skill : item.title}
                   </h1>
-                  <p className="text-slate-500 text-xs mt-1">
-                    Guided by <span className="font-bold text-purple-700">{isMentor ? item.name : item.mentorName}</span> • {item.rating || 4.9} ★ Rating
+                  <p className="text-slate-500 text-xs mt-1 flex items-center gap-1.5 flex-wrap">
+                    <span>Guided by</span>
+                    <Link
+                      href={`/mentor/${encodeURIComponent(item.mentorId || item.mentorName || item.name || "verified-mentor")}`}
+                      className="font-bold text-purple-700 hover:text-purple-900 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <span>{isMentor ? item.name : item.mentorName}</span>
+                      <ExternalLink size={11} className="text-purple-500" />
+                    </Link>
+                    <span>• {item.rating || 4.9} ★ Rating</span>
                   </p>
                 </div>
               </div>
 
-              {/* Online Meeting Platform Indicator */}
+              {/* Online Meeting Platform Indicator (Clean SVG Icons, No Emoji) */}
               {item.meetingPlatform && (
                 <div className="p-3.5 bg-purple-50/60 rounded-2xl border border-purple-100 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xl">📹</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white shadow-xs border border-purple-100 flex items-center justify-center shrink-0">
+                      {item.meetingPlatform.toLowerCase().includes("zoom") ? (
+                        <ZoomIcon className="w-5 h-5 text-blue-500" />
+                      ) : item.meetingPlatform.toLowerCase().includes("discord") ? (
+                        <DiscordIcon className="w-5 h-5 text-indigo-500" />
+                      ) : (
+                        <GoogleMeetIcon className="w-5 h-5" />
+                      )}
+                    </div>
                     <div>
                       <span className="text-slate-500 text-[10px] block font-semibold">Online Meeting Platform</span>
                       <span className="font-extrabold text-slate-900">{item.meetingPlatform}</span>
                     </div>
                   </div>
                   <span className="text-purple-700 font-bold text-[11px] bg-white px-2.5 py-1 rounded-full border border-purple-200">
-                    Live Session
+                    Live Sessions
                   </span>
                 </div>
               )}
@@ -355,9 +481,10 @@ export default function BookingPage() {
                             <p className="text-purple-700 font-black text-base">
                               {formatPriceCurrency(pkg.price, currency)}
                             </p>
-                            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                              {pkg.duration}
-                            </span>
+                            <div className="flex items-center gap-1.5 text-[11px] text-purple-800 font-semibold mt-1">
+                              <Video size={11} className="text-purple-600 shrink-0" />
+                              <span className="truncate">{pkg.duration || "1 Live Meeting"}</span>
+                            </div>
                           </div>
                         </button>
                       );
@@ -532,24 +659,135 @@ export default function BookingPage() {
                   ))}
                 </div>
 
-                {/* Web3 Connected Info if USDC is chosen */}
-                {paymentMethod === "usdc" && (
-                  <div className="mt-3 p-3 bg-purple-50 rounded-xl border border-purple-200 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <Wallet size={14} className="text-purple-600" />
-                      <span className="font-semibold text-purple-900">
-                        {walletAddress ? `Connected: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "Web3 Escrow Ready"}
+                {/* Method 1: Web3 Connected Wallet */}
+                {paymentMethod === "crypto" && (
+                  <div className="mt-3 p-4 bg-purple-50/80 rounded-2xl border border-purple-200/90 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Wallet size={16} className="text-purple-600" />
+                        <span className="font-extrabold text-xs text-purple-950">
+                          {walletAddress ? `Connected: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "Web3 Browser Wallet"}
+                        </span>
+                      </div>
+                      {!walletAddress ? (
+                        <button
+                          type="button"
+                          onClick={connectWallet}
+                          className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
+                        >
+                          Connect Wallet
+                        </button>
+                      ) : (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle2 size={10} /> Ready to Escrow
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Compatible with MetaMask, Coinbase Wallet, Rabby, and OKX Wallet on Arbitrum One. When you click deposit, all gas fees are 100% subsidized by the platform sponsor vault.
+                    </p>
+                  </div>
+                )}
+
+                {/* Method 2: Transak Fiat On-Ramp */}
+                {paymentMethod === "transak" && (
+                  <div className="mt-3 p-4 bg-gradient-to-br from-blue-50/90 to-indigo-50/80 rounded-2xl border border-blue-200/90 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                        <CreditCard size={18} />
+                      </div>
+                      <div className="text-xs">
+                        <p className="font-extrabold text-slate-900">Transak Fiat On-Ramp Gateway</p>
+                        <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
+                          Purchase {currency} directly into your Arbitrum wallet using Visa, Mastercard, Apple Pay, or Local Bank Transfer.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Regional Availability Notice */}
+                    <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2.5">
+                      <Shield size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                      <div className="leading-relaxed">
+                        <p className="font-bold text-amber-950">Regional Availability Notice:</p>
+                        <p className="text-amber-800 text-[10px] mt-0.5">
+                          Please note that Transak fiat on-ramp services may be restricted or unavailable in certain countries due to local financial regulations and compliance policies. If unavailable in your region, please use Web3 Wallet or Direct Transfer.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Auto-filled Summary snippet */}
+                    <div className="p-2.5 bg-white/90 rounded-xl border border-blue-200 text-[11px] flex items-center justify-between text-slate-700 shadow-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Auto-Filled Payment:</span>
+                        <span className="font-extrabold text-blue-900">{formatPriceCurrency(grandTotal, currency)}</span>
+                        <span className="text-[10px] text-slate-500 ml-1">on Arbitrum One</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Sparkles size={11} /> Sandbox Tester
                       </span>
                     </div>
-                    {!walletAddress && (
-                      <button
-                        type="button"
-                        onClick={connectWallet}
-                        className="text-xs font-bold text-purple-700 hover:underline cursor-pointer"
-                      >
-                        Connect Wallet
-                      </button>
-                    )}
+
+                    {/* Ready Indicator: Click Deposit button on the right */}
+                    <div className="p-3 bg-blue-100/70 rounded-xl border border-blue-200 text-blue-900 text-xs flex items-center gap-2.5">
+                      <CheckCircle2 size={16} className="text-blue-600 shrink-0" />
+                      <span className="text-[11px] leading-snug">
+                        Ready for checkout. Click <strong className="text-blue-950 font-bold">&quot;Proceed to Transak Payment&quot;</strong> in the summary panel on the right to open the payment widget.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Method 3: Direct Transfer / Exchange Deposit */}
+                {paymentMethod === "direct" && (
+                  <div className="mt-3 p-4 bg-purple-50/70 rounded-2xl border border-purple-200/90 space-y-3">
+                    <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+                      <span className="text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
+                        <Building2 size={15} className="text-purple-600" />
+                        <span>Direct Transfer / Exchange Deposit</span>
+                      </span>
+                      <span className="text-[10px] text-purple-700 font-bold bg-purple-100 px-2 py-0.5 rounded-full">
+                        Arbitrum One L2
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        Transfer <strong className="text-purple-900 font-bold">{formatPriceCurrency(grandTotal, currency)}</strong> directly from <span className="font-semibold text-slate-800">Indodax, Tokocrypto, Binance, Bybit</span>, or any crypto wallet:
+                      </p>
+
+                      <div className="p-3 bg-white rounded-xl border border-purple-200 flex items-center justify-between gap-2 shadow-xs">
+                        <div className="min-w-0">
+                          <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-bold">Escrow Vault Contract</span>
+                          <span className="font-mono text-[11px] text-slate-800 truncate block font-semibold">
+                            {escrowVaultAddress}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              navigator.clipboard.writeText(escrowVaultAddress);
+                              setCopiedVault(true);
+                              setTimeout(() => setCopiedVault(false), 2000);
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold shrink-0 flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          {copiedVault ? <Check size={12} className="text-emerald-300" /> : <Copy size={12} />}
+                          <span>{copiedVault ? "Copied!" : "Copy"}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-purple-100 text-[11px] text-slate-500 space-y-1">
+                      <div className="flex items-center gap-1 text-emerald-700 font-semibold">
+                        <CheckCircle2 size={12} />
+                        <span>Select Network: Arbitrum One (L2)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        Compatible with withdrawals from Indodax, Tokocrypto, Pintu, Binance, Bybit, KuCoin, OKX, and hardware wallets.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -612,10 +850,10 @@ export default function BookingPage() {
                     <p className="font-bold text-slate-900 line-clamp-1">{isMentor ? item.skill : item.title}</p>
                     <p className="text-slate-500 text-[11px] mt-0.5">
                       {hasPackages
-                        ? `${selectedPackage?.name} • ${selectedPackage?.duration}`
+                        ? `${selectedPackage?.name} • ${selectedPackage?.duration || "1 Live Meeting"}`
                         : isMentor
                         ? `Session: ${selectedDate} • ${selectedSlot}`
-                        : `${item.duration}`}
+                        : `${item.duration || "1 Live Meeting"}`}
                     </p>
                   </div>
                   <span className="font-black text-slate-900 text-sm">
@@ -632,13 +870,15 @@ export default function BookingPage() {
                   <div className="flex justify-between text-slate-600">
                     <span className="flex items-center gap-1">
                       <span>Platform Protocol Cut</span>
-                      <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.2 rounded font-bold">5%</span>
+                      <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.2 rounded font-bold">10%</span>
                     </span>
                     <span className="font-bold text-slate-900">{formatPriceCurrency(platformFee, currency)}</span>
                   </div>
-                  <div className="flex justify-between text-slate-600 text-[11px]">
-                    <span>Arbitrum Gas Subsidies</span>
-                    <span className="font-bold text-emerald-600">FREE (Zero Gas)</span>
+                  <div className="flex justify-between items-center text-slate-600 text-xs">
+                    <span>Arbitrum Gas Fee</span>
+                    <span className="font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full text-[10px]">
+                      FREE (100% Subsidized)
+                    </span>
                   </div>
 
                   <div className="border-t border-slate-200 pt-3 flex items-baseline justify-between text-slate-950">
@@ -657,10 +897,10 @@ export default function BookingPage() {
                   </div>
                 </div>
 
-                {/* Deposit CTA Button */}
+                {/* Deposit / Transak CTA Button */}
                 <button
                   type="button"
-                  onClick={handleDepositEscrow}
+                  onClick={paymentMethod === "transak" ? () => setShowTransakModal(true) : handleDepositEscrow}
                   disabled={isProcessing}
                   className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-sm shadow-lg shadow-purple-900/30 hover:shadow-purple-900/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
                 >
@@ -669,6 +909,12 @@ export default function BookingPage() {
                       <Lock size={16} className="animate-bounce text-emerald-300" />
                       <span>Deploying Escrow Smart Lock...</span>
                     </span>
+                  ) : paymentMethod === "transak" ? (
+                    <>
+                      <CreditCard size={16} />
+                      <span>Proceed to Transak Payment ({formatPriceCurrency(grandTotal, currency)})</span>
+                      <ArrowRight size={15} />
+                    </>
                   ) : (
                     <>
                       <Lock size={16} />
@@ -690,6 +936,10 @@ export default function BookingPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                    <span>Zero gas fee • Platform sponsor covers 100% of Arbitrum network costs</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
                     <span>Session link & mentor contact added to your dashboard</span>
                   </div>
                 </div>
@@ -698,6 +948,102 @@ export default function BookingPage() {
           </div>
         </div>
       </div>
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* IN-APP TRANSAK SANDBOX TESTER MODAL (AUTO-FILLED ESCROW FUNDS)   */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {showTransakModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl w-full max-w-lg border border-purple-200 shadow-2xl overflow-hidden flex flex-col relative animate-scaleUp max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-950 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/40 text-blue-300 flex items-center justify-center">
+                  <CreditCard size={16} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-xs flex items-center gap-1.5">
+                    <span>Transak Sandbox Tester</span>
+                    <span className="text-[9px] bg-blue-500/30 text-blue-200 px-2 py-0.2 rounded-full font-mono uppercase font-bold">
+                      Staging Mode
+                    </span>
+                  </h3>
+                  <p className="text-[10px] text-purple-200/80">
+                    Auto-filled: {formatPriceCurrency(grandTotal, currency)} on Arbitrum One
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTransakModal(false)}
+                className="p-1.5 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Diagnostic Notice for T-INF-002 & Regional ISP blocks */}
+            <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-[11px] flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <Shield size={13} className="text-amber-600 shrink-0" />
+                <span className="text-[10px] leading-tight text-amber-900">
+                  <strong>Staging Gateway Notice:</strong> If Transak displays <em>&quot;Error code: T-INF-002&quot;</em> or regional ISP block, you can open in a new tab or click instant simulation below.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const iframe = document.getElementById("transakIframe");
+                  if (iframe) iframe.src = transakTesterUrl;
+                }}
+                className="text-[10px] font-bold text-purple-700 hover:text-purple-900 shrink-0 flex items-center gap-0.5 cursor-pointer px-2 py-1 rounded-md hover:bg-purple-100"
+              >
+                <RefreshCw size={10} /> Reload
+              </button>
+            </div>
+
+            {/* Embedded Transak Widget Iframe */}
+            <div className="relative w-full h-[480px] bg-slate-100 flex items-center justify-center">
+              <iframe
+                id="transakIframe"
+                src={transakTesterUrl}
+                allow="camera;microphone;fullscreen;payment"
+                className="w-full h-full border-0"
+                title="Transak Sandbox Tester"
+              />
+            </div>
+
+            {/* Footer with testing actions */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
+              <span className="text-[10px] text-slate-500 font-medium">
+                Sandbox Mode (Simulated deposit for testing)
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={transakTesterUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center gap-1"
+                >
+                  <span>Open Tab</span>
+                  <ExternalLink size={11} />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTransakModal(false);
+                    handleDepositEscrow();
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Check size={13} />
+                  <span>Simulate Payment & Lock Escrow</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   );

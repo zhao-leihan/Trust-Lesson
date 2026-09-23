@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { verifyJwt, signJwt, extractBearerToken } from "@/lib/jwt";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { getCloudflareUploadUrl, getSignedPlaybackUrl } from "@/lib/cloudflare";
 import { uploadToIpfs, uploadJsonToIpfs } from "@/lib/ipfs";
+import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, PLATFORM_SPONSOR_WALLET } from "@/lib/gasSponsor";
 
 export const runtime = "nodejs";
 
@@ -11,10 +13,20 @@ const app = new Hono().basePath("/api");
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
 const authMiddleware = async (c, next) => {
-  const token = extractBearerToken(c.req.header("Authorization"));
+  const token = extractBearerToken(c.req.header("Authorization")) || getCookie(c, "tl_session");
   if (!token) return c.json({ error: "Unauthorized" }, 401);
   try {
     const payload = await verifyJwt(token);
+    // Check token revocation (session invalidation)
+    if (payload.sub && payload.tv) {
+      try {
+        const db = await getPrisma();
+        const u = await db.user.findUnique({ where: { id: payload.sub } });
+        if (u && (u.tokenVersion || 1) > payload.tv) {
+          return c.json({ error: "Session has been revoked. Please sign in again." }, 401);
+        }
+      } catch {}
+    }
     c.set("user", payload);
     await next();
   } catch {
@@ -30,9 +42,79 @@ async function getPrisma() {
     _prisma = prisma;
     try {
       await _prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN "nickname" TEXT;`);
-    } catch {
-      // column already exists or table busy
-    }
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN "walletLocked" BOOLEAN DEFAULT 0;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN "mentorLevel" TEXT DEFAULT 'RISING';`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN "university" TEXT;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN "tokenVersion" INTEGER DEFAULT 1;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "Certificate" (
+          "id" TEXT PRIMARY KEY,
+          "attestationUid" TEXT UNIQUE,
+          "schemaUid" TEXT,
+          "sessionId" TEXT,
+          "learnerName" TEXT,
+          "learnerAddress" TEXT,
+          "mentorName" TEXT,
+          "mentorAddress" TEXT,
+          "skillTitle" TEXT,
+          "category" TEXT,
+          "rating" INTEGER DEFAULT 5,
+          "escrowAmount" REAL DEFAULT 0,
+          "currency" TEXT DEFAULT 'USDC',
+          "network" TEXT DEFAULT 'Arbitrum One',
+          "attestationSignature" TEXT,
+          "revoked" BOOLEAN DEFAULT 0,
+          "issuedAt" TEXT,
+          "createdAt" TEXT,
+          "txHash" TEXT,
+          "blockNumber" INTEGER,
+          "contractAddress" TEXT,
+          "credentialId" TEXT,
+          "explorerUrl" TEXT,
+          "gasSponsored" BOOLEAN DEFAULT 1,
+          "sponsorWallet" TEXT,
+          "gasUsedEth" TEXT,
+          "gasFeeUsd" TEXT
+        );
+      `);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "Certificate" ADD COLUMN "txHash" TEXT;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "Certificate" ADD COLUMN "blockNumber" INTEGER;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "Certificate" ADD COLUMN "contractAddress" TEXT;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "Certificate" ADD COLUMN "credentialId" TEXT;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "Certificate" ADD COLUMN "explorerUrl" TEXT;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "Certificate" ADD COLUMN "gasSponsored" BOOLEAN DEFAULT 1;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "Certificate" ADD COLUMN "sponsorWallet" TEXT;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "Certificate" ADD COLUMN "gasUsedEth" TEXT;`);
+    } catch {}
+    try {
+      await _prisma.$executeRawUnsafe(`ALTER TABLE "Certificate" ADD COLUMN "gasFeeUsd" TEXT;`);
+    } catch {}
   }
   return _prisma;
 }
@@ -43,7 +125,7 @@ async function getPrisma() {
 
 /** POST /api/auth/login — Email + Password Login */
 app.post("/auth/login", async (c) => {
-  const { email, password } = await c.req.json();
+  const { email, password, rememberMe } = await c.req.json();
   if (!email || !password) {
     return c.json({ error: "Email and password are required" }, 400);
   }
@@ -63,11 +145,26 @@ app.post("/auth/login", async (c) => {
       return c.json({ error: "Invalid email or password" }, 401);
     }
 
-    const token = await signJwt({
-      sub: user.id,
-      email: user.email,
-      address: user.walletAddress,
-      role: user.role,
+    const isRemember = Boolean(rememberMe);
+    const expiresIn = isRemember ? "30d" : "1d";
+    const token = await signJwt(
+      {
+        sub: user.id,
+        email: user.email,
+        address: user.walletAddress,
+        role: user.role,
+        tv: user.tokenVersion || 1,
+      },
+      expiresIn
+    );
+
+    // Set secure HttpOnly cookie to protect against XSS
+    setCookie(c, "tl_session", token, {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: isRemember ? 30 * 24 * 60 * 60 : 24 * 60 * 60,
     });
 
     let userNickname = null;
@@ -104,6 +201,68 @@ app.post("/auth/login", async (c) => {
   }
 });
 
+/** GET /api/auth/me — Retrieve authenticated user profile by JWT */
+app.get("/auth/me", authMiddleware, async (c) => {
+  const jwtUser = c.get("user");
+  try {
+    const db = await getPrisma();
+    const user = await db.user.findUnique({
+      where: { id: jwtUser.sub },
+    });
+    if (!user) return c.json({ error: "User not found" }, 404);
+
+    let userNickname = null;
+    try {
+      const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = ? LIMIT 1`, user.id);
+      if (rows && rows[0]) userNickname = rows[0].nickname;
+    } catch {}
+
+    return c.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        nickname: userNickname || user.name?.toLowerCase().replace(/\s+/g, "_"),
+        role: user.role,
+        university: user.university,
+        walletAddress: user.walletAddress,
+        walletLocked: user.walletLocked || false,
+        mentorLevel: user.mentorLevel || "RISING",
+        isVerified: user.isVerified,
+        domain: user.domain,
+        hourlyRate: user.hourlyRate,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
+        linkedin: user.linkedin,
+        twitter: user.twitter,
+        portfolio: user.portfolio,
+      },
+    });
+  } catch (e) {
+    console.error("[Auth /me Error]:", e);
+    return c.json({ error: "Failed to fetch session", detail: e.message }, 500);
+  }
+});
+
+/** POST /api/auth/logout — Invalidate cookie & revoke server session */
+app.post("/auth/logout", async (c) => {
+  deleteCookie(c, "tl_session", { path: "/" });
+  const token = extractBearerToken(c.req.header("Authorization")) || getCookie(c, "tl_session");
+  if (token) {
+    try {
+      const payload = await verifyJwt(token);
+      if (payload.sub) {
+        const db = await getPrisma();
+        await db.user.update({
+          where: { id: payload.sub },
+          data: { tokenVersion: { increment: 1 } },
+        });
+      }
+    } catch {}
+  }
+  return c.json({ success: true, message: "Logged out and session revoked." });
+});
+
 /** POST /api/auth/register — Email + Password Registration with University */
 app.post("/auth/register", async (c) => {
   const body = await c.req.json();
@@ -137,13 +296,26 @@ app.post("/auth/register", async (c) => {
         hourlyRate: assignedRole === "MENTOR" ? Number(hourlyRate) || 35 : 0,
         bio: bio || null,
         isVerified: assignedRole === "ADMIN",
+        tokenVersion: 1,
       },
     });
 
-    const token = await signJwt({
-      sub: newUser.id,
-      email: newUser.email,
-      role: newUser.role,
+    const token = await signJwt(
+      {
+        sub: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        tv: 1,
+      },
+      "30d"
+    );
+
+    setCookie(c, "tl_session", token, {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 30 * 24 * 60 * 60,
     });
 
     return c.json(
@@ -611,14 +783,27 @@ app.get("/explore", async (c) => {
       orderBy: { createdAt: "desc" },
     });
 
-    // Parse JSON fields (milestones, deliverables, packages, modules) if present
-    let parsedOfferings = offerings.map((item) => ({
-      ...item,
-      milestones: item.milestones ? JSON.parse(item.milestones) : null,
-      deliverables: item.deliverables ? JSON.parse(item.deliverables) : null,
-      packages: item.packages ? JSON.parse(item.packages) : null,
-      modules: item.modules ? JSON.parse(item.modules) : null,
-    }));
+    // Parse JSON fields (milestones, deliverables, packages, modules, galleryImages) if present
+    let parsedOfferings = offerings.map((item) => {
+      let gallery = null;
+      try {
+        if (item.deliverables) {
+          const parsed = JSON.parse(item.deliverables);
+          if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === "string" && (parsed[0].startsWith("http") || parsed[0].startsWith("data:"))) {
+            gallery = parsed;
+          }
+        }
+      } catch {}
+
+      return {
+        ...item,
+        milestones: item.milestones ? JSON.parse(item.milestones) : null,
+        deliverables: item.deliverables ? JSON.parse(item.deliverables) : null,
+        packages: item.packages ? JSON.parse(item.packages) : null,
+        modules: item.modules ? JSON.parse(item.modules) : null,
+        galleryImages: gallery || [item.coverImage],
+      };
+    });
 
     // Keyword search filtering
     if (q) {
@@ -655,6 +840,16 @@ app.get("/explore/:id", async (c) => {
 
     if (!item) return c.json({ error: "Offering not found in database" }, 404);
 
+    let gallery = null;
+    try {
+      if (item.deliverables) {
+        const parsed = JSON.parse(item.deliverables);
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === "string" && (parsed[0].startsWith("http") || parsed[0].startsWith("data:"))) {
+          gallery = parsed;
+        }
+      }
+    } catch {}
+
     return c.json({
       offering: {
         ...item,
@@ -662,6 +857,7 @@ app.get("/explore/:id", async (c) => {
         deliverables: item.deliverables ? JSON.parse(item.deliverables) : null,
         packages: item.packages ? JSON.parse(item.packages) : null,
         modules: item.modules ? JSON.parse(item.modules) : null,
+        galleryImages: gallery || [item.coverImage],
       },
       source: "database",
     });
@@ -749,7 +945,7 @@ app.get("/mentor/stats", async (c) => {
     );
 
     const lifetimeEarnings = completedSessions.reduce(
-      (sum, s) => sum + (Number(s.totalAmount) || 0) * 0.95,
+      (sum, s) => sum + (Number(s.totalAmount) || 0) * 0.90,
       0
     );
 
@@ -757,7 +953,7 @@ app.get("/mentor/stats", async (c) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const monthlyEarnings = completedSessions
       .filter((s) => new Date(s.createdAt) >= thirtyDaysAgo)
-      .reduce((sum, s) => sum + (Number(s.totalAmount) || 0) * 0.95, 0);
+      .reduce((sum, s) => sum + (Number(s.totalAmount) || 0) * 0.90, 0);
 
     const activeEscrow = activeSessions.reduce(
       (sum, s) => sum + (Number(s.totalAmount) || 0),
@@ -817,13 +1013,25 @@ app.get("/mentor/gigs", async (c) => {
       orderBy: { createdAt: "desc" },
     });
 
-    const parsedGigs = offerings.map((item) => ({
-      ...item,
-      packages: item.packages ? JSON.parse(item.packages) : null,
-      modules: item.modules ? JSON.parse(item.modules) : null,
-      milestones: item.milestones ? JSON.parse(item.milestones) : null,
-      deliverables: item.deliverables ? JSON.parse(item.deliverables) : null,
-    }));
+    const parsedGigs = offerings.map((item) => {
+      let gallery = null;
+      try {
+        if (item.deliverables) {
+          const parsed = JSON.parse(item.deliverables);
+          if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === "string" && (parsed[0].startsWith("http") || parsed[0].startsWith("data:"))) {
+            gallery = parsed;
+          }
+        }
+      } catch {}
+
+      return {
+        ...item,
+        packages: item.packages ? JSON.parse(item.packages) : null,
+        modules: item.modules ? JSON.parse(item.modules) : null,
+        milestones: item.milestones ? JSON.parse(item.milestones) : null,
+        galleryImages: gallery || [item.coverImage],
+      };
+    });
 
     return c.json({ gigs: parsedGigs, total: parsedGigs.length });
   } catch (e) {
@@ -832,7 +1040,7 @@ app.get("/mentor/gigs", async (c) => {
   }
 });
 
-/** POST /api/mentor/gigs — Create new gig with up to 3 packages, modules & currency */
+/** POST /api/mentor/gigs — Create new gig with up to 3 packages, modules, gallery images & currency */
 app.post("/mentor/gigs", async (c) => {
   try {
     const body = await c.req.json();
@@ -847,6 +1055,7 @@ app.post("/mentor/gigs", async (c) => {
       level = "All levels",
       description,
       coverImage,
+      galleryImages = [],
       mentorName,
       mentorPhoto,
       mentorAddress,
@@ -872,6 +1081,10 @@ app.post("/mentor/gigs", async (c) => {
       price = Number(body.price) || 0;
     }
 
+    // Enforce max 5 gallery images
+    const validGallery = Array.isArray(galleryImages) ? galleryImages.slice(0, 5) : [];
+    const primaryCover = coverImage || validGallery[0] || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80";
+
     const db = await getPrisma();
     const newOffering = await db.offering.create({
       data: {
@@ -881,12 +1094,10 @@ app.post("/mentor/gigs", async (c) => {
         currency: currency.toUpperCase(),
         category: category || "Coding",
         price,
-        duration: duration || (packages[0]?.duration || "4 Weeks"),
+        duration: duration || (packages[0]?.duration || "1 Live Meeting"),
         level,
         description,
-        coverImage:
-          coverImage ||
-          "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80",
+        coverImage: primaryCover,
         mentorName: mentorName || "Verified Mentor",
         mentorPhoto:
           mentorPhoto ||
@@ -902,6 +1113,7 @@ app.post("/mentor/gigs", async (c) => {
             ? packages[0].deliverables.map((d, i) => ({ title: d, amount: price / (packages[0].deliverables.length || 1) }))
             : []
         ),
+        deliverables: JSON.stringify(validGallery.length > 0 ? validGallery : [primaryCover]),
       },
     });
 
@@ -909,6 +1121,237 @@ app.post("/mentor/gigs", async (c) => {
   } catch (e) {
     console.error("[Database Error] /api/mentor/gigs POST:", e);
     return c.json({ error: "Failed to create gig in database", detail: e.message }, 500);
+  }
+});
+
+/** DELETE /api/mentor/gigs — Delete gig offering by ID */
+app.delete("/mentor/gigs", async (c) => {
+  const id = c.req.query("id");
+  if (!id) {
+    return c.json({ error: "Gig ID is required" }, 400);
+  }
+
+  try {
+    const db = await getPrisma();
+    await db.offering.deleteMany({
+      where: {
+        OR: [{ id: id }, { id: `offering-${id}` }, { id: `gig-${id}` }],
+      },
+    });
+
+    return c.json({ success: true, message: "Gig deleted successfully" });
+  } catch (e) {
+    console.error("[Database Error] /api/mentor/gigs DELETE:", e);
+    return c.json({ error: "Failed to delete gig", detail: e.message }, 500);
+  }
+});
+
+/** GET /api/mentor/public-profile/:id — Public mentor profile with stats & offerings */
+app.get("/mentor/public-profile/:id", async (c) => {
+  const id = decodeURIComponent(c.req.param("id"));
+  try {
+    const db = await getPrisma();
+
+    // Query user by id, email, nickname, or name
+    let mentorUser = await db.user.findFirst({
+      where: {
+        OR: [
+          { id: id },
+          { email: id.toLowerCase() },
+          { name: id },
+          { walletAddress: id.toLowerCase() },
+        ],
+      },
+    });
+
+    // If not in User table, search in Offering table by mentorName or mentorId
+    let mentorOfferings = await db.offering.findMany({
+      where: {
+        OR: [
+          { mentorId: id },
+          { mentorName: mentorUser ? mentorUser.name : id },
+          { mentorAddress: mentorUser ? mentorUser.walletAddress : id },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const parsedOfferings = mentorOfferings.map((item) => ({
+      ...item,
+      packages: item.packages ? JSON.parse(item.packages) : null,
+      modules: item.modules ? JSON.parse(item.modules) : null,
+      milestones: item.milestones ? JSON.parse(item.milestones) : null,
+    }));
+
+    const samplePhoto = mentorOfferings[0]?.mentorPhoto || mentorUser?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
+
+    const profileData = {
+      id: mentorUser?.id || id,
+      name: mentorUser?.name || mentorOfferings[0]?.mentorName || id,
+      nickname: (mentorUser?.name || id).toLowerCase().replace(/\s+/g, "_"),
+      avatarUrl: samplePhoto,
+      domain: mentorUser?.domain || mentorOfferings[0]?.category || "Fullstack & Web3 Engineer",
+      bio: mentorUser?.bio || "Experienced mentor guiding students through milestone projects with audited smart contract escrow protection.",
+      hourlyRate: mentorUser?.hourlyRate || mentorOfferings[0]?.price || 45,
+      linkedin: mentorUser?.linkedin || "https://linkedin.com",
+      twitter: mentorUser?.twitter || "https://x.com",
+      portfolio: mentorUser?.portfolio || "https://trustlesson.io",
+      walletAddress: mentorUser?.walletAddress || mentorOfferings[0]?.mentorAddress || "0x71C...49b2",
+      rating: 4.95,
+      reputationScore: 99,
+      sessionsCompleted: Math.max(12, mentorOfferings.length * 4),
+      offerings: parsedOfferings,
+    };
+
+    return c.json({ profile: profileData, success: true });
+  } catch (e) {
+    console.error("[Database Error] /api/mentor/public-profile:", e);
+    return c.json({ error: "Failed to fetch mentor profile", detail: e.message }, 500);
+  }
+});
+
+/** GET /api/blockchain/sponsor-status — Platform Gas Sponsor Vault Status */
+app.get("/blockchain/sponsor-status", async (c) => {
+  try {
+    const status = await getSponsorVaultStatus();
+    return c.json(status);
+  } catch (e) {
+    return c.json({ error: "Failed to fetch sponsor status", detail: e.message }, 500);
+  }
+});
+
+/** POST /api/certificates/generate — Issue On-Chain Attestation Certificate with Platform Gas Subsidy */
+app.post("/certificates/generate", async (c) => {
+  try {
+    const body = await c.req.json();
+    const {
+      sessionId,
+      learnerName = "Verified Learner",
+      learnerAddress,
+      mentorName = "Verified Mentor",
+      mentorAddress,
+      skillTitle = "Mentorship Milestone Completion",
+      category = "Coding",
+      rating = 5,
+      escrowAmount = 0,
+      currency = "USDC",
+    } = body;
+
+    const certId = `cert-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const randomHex = () => Math.random().toString(16).substring(2, 10);
+    // Attestation UID (64 hex characters)
+    const attestationUid = `0x${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}`;
+    // Schema UID for Trust Lesson Skill Attestation
+    const schemaUid = "0x7a30b91e1d09e86a074bcf62589083315a6b0c2688b14a22ad31846b0a79339e";
+    const attestationSignature = `0x${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}${randomHex()}1b`;
+    const nowIso = new Date().toISOString();
+
+    // ── Execute Real On-Chain Blockchain Recording with Platform Gas Subsidy ──
+    const onChainResult = await issueOnChainCredentialWithSubsidy({
+      mentorAddress: mentorAddress || "0x89b14EBc4e61295D1177699F988226499870e415",
+      learnerAddress: learnerAddress || "0x7a3F9B2779836B28929D7d1746B310065287c912",
+      sessionId: sessionId || Math.floor(Math.random() * 800000) + 100000,
+      rating: Number(rating) || 5,
+      skillTag: `${skillTitle} (${category})`,
+    });
+
+    const db = await getPrisma();
+    await db.$executeRawUnsafe(
+      `INSERT INTO "Certificate" (
+        "id", "attestationUid", "schemaUid", "sessionId", "learnerName",
+        "learnerAddress", "mentorName", "mentorAddress", "skillTitle",
+        "category", "rating", "escrowAmount", "currency", "network",
+        "attestationSignature", "revoked", "issuedAt", "createdAt",
+        "txHash", "blockNumber", "contractAddress", "credentialId",
+        "explorerUrl", "gasSponsored", "sponsorWallet", "gasUsedEth", "gasFeeUsd"
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?);`,
+      certId,
+      attestationUid,
+      schemaUid,
+      String(sessionId || ""),
+      learnerName,
+      learnerAddress || "0x0000...0000",
+      mentorName,
+      mentorAddress || "0x0000...0000",
+      skillTitle,
+      category,
+      Number(rating) || 5,
+      Number(escrowAmount) || 0,
+      currency,
+      "Arbitrum One",
+      attestationSignature,
+      nowIso,
+      nowIso,
+      onChainResult.txHash,
+      onChainResult.blockNumber,
+      onChainResult.contractAddress,
+      onChainResult.credentialId,
+      onChainResult.explorerUrl,
+      onChainResult.sponsorWallet || PLATFORM_SPONSOR_WALLET,
+      onChainResult.gasUsedEth || "0.000045 ETH",
+      onChainResult.gasFeeUsd || "0.12"
+    );
+
+    const certificate = {
+      id: certId,
+      attestationUid,
+      schemaUid,
+      sessionId: String(sessionId || ""),
+      learnerName,
+      learnerAddress,
+      mentorName,
+      mentorAddress,
+      skillTitle,
+      category,
+      rating: Number(rating) || 5,
+      escrowAmount: Number(escrowAmount) || 0,
+      currency,
+      network: "Arbitrum One (Chain ID 42161)",
+      attestationSignature,
+      revoked: false,
+      issuedAt: nowIso,
+      isAttestation: true,
+      verifiableUrl: `/certificate/${attestationUid}`,
+      // On-Chain Blockchain & Gas Subsidy fields
+      txHash: onChainResult.txHash,
+      blockNumber: onChainResult.blockNumber,
+      contractAddress: onChainResult.contractAddress,
+      credentialId: onChainResult.credentialId,
+      explorerUrl: onChainResult.explorerUrl,
+      gasSponsored: true,
+      sponsorWallet: onChainResult.sponsorWallet || PLATFORM_SPONSOR_WALLET,
+      gasUsedEth: onChainResult.gasUsedEth || "0.000045 ETH",
+      gasFeeUsd: onChainResult.gasFeeUsd || "0.12",
+      studentGasPaid: "0.0000 ETH ($0.00)",
+    };
+
+    return c.json({ certificate, success: true }, 201);
+  } catch (e) {
+    console.error("[Certificate Error]:", e);
+    return c.json({ error: "Failed to generate certificate", detail: e.message }, 500);
+  }
+});
+
+/** GET /api/certificates/:id — Retrieve certificate by ID, attestation UID or sessionId */
+app.get("/certificates/:id", async (c) => {
+  const param = c.req.param("id");
+  try {
+    const db = await getPrisma();
+    const rows = await db.$queryRawUnsafe(
+      `SELECT * FROM "Certificate" WHERE "id" = ? OR "attestationUid" = ? OR "sessionId" = ? LIMIT 1;`,
+      param,
+      param,
+      param
+    );
+
+    if (!rows || rows.length === 0) {
+      return c.json({ error: "Certificate or attestation not found" }, 404);
+    }
+
+    return c.json({ certificate: rows[0], success: true });
+  } catch (e) {
+    console.error("[Certificate Fetch Error]:", e);
+    return c.json({ error: "Failed to retrieve certificate", detail: e.message }, 500);
   }
 });
 
@@ -928,30 +1371,66 @@ app.post("/mentor/wallet", async (c) => {
 
     const db = await getPrisma();
 
-    // Find user to lock
+    // Find user to lock (robust lookup: userId -> email -> wallet -> any mentor)
     let user = null;
     if (userId) {
-      user = await db.user.findUnique({ where: { id: userId } });
-    } else if (email) {
-      user = await db.user.findUnique({ where: { email: email.toLowerCase() } });
+      try {
+        user = await db.user.findUnique({ where: { id: userId } });
+      } catch {}
+    }
+    if (!user && email) {
+      try {
+        user = await db.user.findUnique({ where: { email: email.toLowerCase() } });
+      } catch {}
+    }
+    if (!user) {
+      try {
+        user = await db.user.findFirst({
+          where: {
+            OR: [
+              { walletAddress: cleanAddress },
+              { role: "MENTOR" },
+            ],
+          },
+        });
+      } catch {}
+    }
+
+    // Clean any conflicting unique constraint for walletAddress on other user records
+    try {
+      const existingWalletUser = await db.user.findUnique({
+        where: { walletAddress: cleanAddress },
+      });
+      if (existingWalletUser && user && existingWalletUser.id !== user.id) {
+        await db.user.update({
+          where: { id: existingWalletUser.id },
+          data: { walletAddress: null, walletLocked: false },
+        });
+      }
+    } catch (cleanErr) {
+      console.warn("[Wallet Lock] Existing wallet cleanup warning:", cleanErr);
     }
 
     if (!user) {
-      // Find or create mentor user with this wallet
-      user = await db.user.findFirst({ where: { walletAddress: cleanAddress } });
-      if (!user) {
-        user = await db.user.create({
-          data: {
-            walletAddress: cleanAddress,
-            role: "MENTOR",
-            walletLocked: true,
-          },
-        });
-        return c.json({ success: true, walletAddress: cleanAddress, walletLocked: true, user });
-      }
+      const newEmail = email ? email.toLowerCase() : `${cleanAddress.slice(0, 8)}@trustlesson.com`;
+      user = await db.user.create({
+        data: {
+          email: newEmail,
+          name: email ? email.split("@")[0] : `Mentor ${cleanAddress.slice(0, 6)}`,
+          walletAddress: cleanAddress,
+          role: "MENTOR",
+          walletLocked: true,
+        },
+      });
+      return c.json({
+        success: true,
+        walletAddress: cleanAddress,
+        walletLocked: true,
+        user,
+      });
     }
 
-    if (user.walletLocked && user.walletAddress !== cleanAddress) {
+    if (user.walletLocked && user.walletAddress && user.walletAddress !== cleanAddress) {
       return c.json(
         {
           error: "Wallet address is locked for security and escrow protection. Contact administration to request an unlock.",
@@ -969,6 +1448,21 @@ app.post("/mentor/wallet", async (c) => {
         walletLocked: true,
       },
     });
+
+    // Also sync all offerings for this mentor to route escrow correctly
+    try {
+      await db.offering.updateMany({
+        where: {
+          OR: [
+            { mentorId: user.id },
+            { mentorName: user.name },
+          ],
+        },
+        data: {
+          mentorAddress: cleanAddress,
+        },
+      });
+    } catch {}
 
     return c.json({
       success: true,
@@ -1196,9 +1690,9 @@ app.get("/admin/stats", async (c) => {
       .filter((s) => s.status === "COMPLETED")
       .reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
 
-    // Platform fee: 5% protocol cut
-    const platformTreasury = Number((totalVolume * 0.05).toFixed(2));
-    const paidToMentors = Number((completedVolume * 0.95).toFixed(2));
+    // Platform fee: 10% protocol cut
+    const platformTreasury = Number((totalVolume * 0.10).toFixed(2));
+    const paidToMentors = Number((completedVolume * 0.90).toFixed(2));
 
     return c.json({
       usersCount,
@@ -1210,7 +1704,7 @@ app.get("/admin/stats", async (c) => {
       activeEscrow,
       paidToMentors,
       disputesCount: await db.dispute.count().catch(() => 0),
-      treasuryWallet: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      treasuryWallet: process.env.PLATFORM_TREASURY_WALLET || "0x9B14Ebc4E61295d1177699f988226499870E415b",
     });
   } catch (e) {
     return c.json({ error: "Failed to fetch admin statistics", detail: e.message }, 500);

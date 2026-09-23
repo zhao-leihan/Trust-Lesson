@@ -54,7 +54,19 @@ export default function ExploreCard({ item }) {
   const packagesList = item.packages || [];
   const displayPrice = packagesList.length > 0 ? packagesList[0].price : item.price;
   const rating = item.rating || 4.9;
-  const duration = item.duration || (isCourse ? "4 Weeks" : "1 hour");
+  const rawDuration = item.duration || (packagesList.length > 0 ? (packagesList[0].duration || "1 Live Meeting") : isCourse ? "1 Live Meeting" : "1 hour");
+  const formatDuration = (d) => {
+    if (!d) return "1 Live Meeting";
+    const lower = d.toLowerCase();
+    if (lower.includes("meeting") || lower.includes("session")) return d;
+    if (lower.includes("day") || lower.includes("week") || lower.includes("month") || lower.includes("hour")) {
+      const match = d.match(/\d+/);
+      const count = match ? match[0] : "1";
+      return `${count} Live ${Number(count) > 1 ? "Meetings" : "Meeting"}`;
+    }
+    return d;
+  };
+  const duration = formatDuration(rawDuration);
   const category = item.category || "Coding";
   const description = item.description || "Personalized 1-on-1 guidance, milestone deliverables, and code architecture.";
   const level = item.level || "All levels";
@@ -169,15 +181,19 @@ export default function ExploreCard({ item }) {
             </div>
           )}
 
-          {/* ── 3. Mentor Profile with Real Photo Avatar ── */}
-          <div className="flex items-center gap-3 pt-3 border-t border-slate-100 mb-4">
+          {/* ── 3. Mentor Profile with Real Photo Avatar (Clickable to view public profile) ── */}
+          <Link
+            href={`/mentor/${encodeURIComponent(item.mentorId || name || "verified-mentor")}`}
+            className="flex items-center gap-3 pt-3 border-t border-slate-100 mb-4 group/mentor hover:opacity-90 transition-opacity cursor-pointer"
+            title="View Mentor Profile & Credentials"
+          >
             <div className="relative shrink-0">
               {!avatarError ? (
                 <img
                   src={mentorPhoto}
                   alt={name}
                   onError={() => setAvatarError(true)}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-purple-200 shadow-sm"
+                  className="w-10 h-10 rounded-full object-cover border-2 border-purple-200 shadow-sm group-hover/mentor:scale-105 transition-transform"
                   loading="lazy"
                 />
               ) : (
@@ -194,7 +210,7 @@ export default function ExploreCard({ item }) {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-slate-900 text-xs font-bold truncate group-hover:text-purple-700 transition-colors">
+              <p className="text-slate-900 text-xs font-bold truncate group-hover/mentor:text-purple-700 transition-colors">
                 {name}
               </p>
               <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
@@ -208,7 +224,7 @@ export default function ExploreCard({ item }) {
                 </span>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* ── 4. Card Bottom Action ── */}

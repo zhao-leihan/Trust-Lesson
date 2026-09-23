@@ -25,6 +25,7 @@ async function apiFetch(path, options = {}) {
   const token = typeof window !== "undefined" ? localStorage.getItem("tl_jwt") : null;
   const res = await fetch(`${API_URL}/api${path}`, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -45,6 +46,7 @@ export function AuthProvider({ children }) {
   const [portfolios, setPortfolios] = useState([]);
   const [walletAddress, setWalletAddress] = useState(null);
   const [mounted, setMounted] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // ─── Client Mount: Load from localStorage ──────────────────────────────────
   useEffect(() => {
@@ -75,6 +77,8 @@ export function AuthProvider({ children }) {
       if (savedWallet) setWalletAddress(savedWallet);
     } catch (e) {
       console.warn("Error loading from localStorage", e);
+    } finally {
+      setAuthLoading(false);
     }
   }, []);
 
@@ -88,6 +92,14 @@ export function AuthProvider({ children }) {
           const token = localStorage.getItem("tl_jwt");
           if (token) {
             try {
+              const meRes = await apiFetch("/auth/me").catch(() => null);
+              if (meRes?.user) {
+                setUser((prev) => {
+                  const merged = { ...(prev || {}), ...meRes.user };
+                  localStorage.setItem("trust_lesson_user", JSON.stringify(merged));
+                  return merged;
+                });
+              }
               const [sessionsData, gigsData] = await Promise.all([
                 apiFetch("/sessions?role=learner").catch(() => null),
                 apiFetch("/videos").catch(() => null),
@@ -151,22 +163,42 @@ export function AuthProvider({ children }) {
     initDb();
   }, [user?.email, mounted]);
 
-  // ─── Wallet Connection (MetaMask / SIWE) ───────────────────────────────────
-  const connectWallet = async () => {
+  // ─── Wallet Connection (MetaMask / Coinbase / SIWE) ────────────────────────
+  const connectWallet = async (walletType = "any") => {
     let address = null;
 
-    if (typeof window !== "undefined" && window.ethereum) {
-      try {
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-        if (accounts && accounts[0]) address = accounts[0];
-      } catch (err) {
-        console.warn("Wallet connection rejected, using simulated wallet", err);
+    if (typeof window !== "undefined") {
+      let targetProvider = null;
+
+      if (window.ethereum?.providers?.length) {
+        if (walletType === "coinbase") {
+          targetProvider = window.ethereum.providers.find((p) => p.isCoinbaseWallet) || window.coinbaseWalletExtension;
+        } else if (walletType === "metamask") {
+          targetProvider = window.ethereum.providers.find((p) => p.isMetaMask && !p.isCoinbaseWallet);
+        }
+        if (!targetProvider) targetProvider = window.ethereum.providers[0];
+      } else if (walletType === "coinbase" && window.coinbaseWalletExtension) {
+        targetProvider = window.coinbaseWalletExtension;
+      } else if (window.ethereum) {
+        targetProvider = window.ethereum;
+      }
+
+      if (targetProvider) {
+        try {
+          const accounts = await targetProvider.request({ method: "eth_requestAccounts" });
+          if (accounts && accounts[0]) address = accounts[0];
+        } catch (err) {
+          console.warn(`[${walletType}] Wallet connection rejected, using simulated wallet`, err);
+        }
       }
     }
 
     if (!address) {
-      // Dev fallback: simulated wallet
-      address = "0x71C35267243395B796b42f654b423984E0F449A";
+      // Dev fallback: simulated wallet with distinct address per wallet provider
+      address =
+        walletType === "coinbase"
+          ? "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+          : "0x71C35267243395B796b42f654b423984E0F449A";
     }
 
     setWalletAddress(address);
@@ -181,12 +213,16 @@ export function AuthProvider({ children }) {
         });
 
         let signature = "dev-signature";
-        if (typeof window !== "undefined" && window.ethereum) {
-          const message = `Trust Lesson Login\nAddress: ${address}\nNonce: ${nonce}`;
-          signature = await window.ethereum.request({
-            method: "personal_sign",
-            params: [message, address],
-          });
+        if (typeof window !== "undefined" && targetProvider) {
+          try {
+            const message = `Trust Lesson Login\nAddress: ${address}\nNonce: ${nonce}`;
+            signature = await targetProvider.request({
+              method: "personal_sign",
+              params: [message, address],
+            });
+          } catch {
+            signature = "dev-signature";
+          }
         }
 
         const { token, user: apiUser } = await apiFetch("/auth/verify", {
@@ -240,7 +276,7 @@ export function AuthProvider({ children }) {
   }, [courses, mounted]);
 
   // ─── Auth Actions ───────────────────────────────────────────────────────────
-  const login = (userData) => {
+  const login = (userData, remember = true) => {
     const rawRole = (userData.role || "student").toString();
     const roleUpper = rawRole.toUpperCase();
     const roleNormalized = roleUpper === "ADMIN" ? "admin" : roleUpper === "MENTOR" ? "mentor" : "student";
@@ -271,6 +307,14 @@ export function AuthProvider({ children }) {
     setUser(userObj);
     if (typeof window !== "undefined") {
       localStorage.setItem("trust_lesson_user", JSON.stringify(userObj));
+      if (remember) {
+        localStorage.setItem("trust_lesson_remember", "true");
+        if (userObj.email) {
+          localStorage.setItem("trust_lesson_remember_email", userObj.email);
+        }
+      } else {
+        localStorage.removeItem("trust_lesson_remember");
+      }
     }
 
     // Sync profile to API if available
@@ -330,7 +374,11 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("tl_jwt");
+    if (typeof window !== "undefined") {
+      fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+      localStorage.removeItem("tl_jwt");
+      localStorage.removeItem("trust_lesson_user");
+    }
   };
 
   // ─── Session Actions ────────────────────────────────────────────────────────
@@ -374,7 +422,7 @@ export function AuthProvider({ children }) {
           title: newCourse.title,
           category: newCourse.category || "Coding",
           price: Number(newCourse.price) || 0,
-          duration: newCourse.duration || "4 Weeks",
+          duration: newCourse.duration || "1 Live Meeting",
           description: newCourse.description || "Structured milestone-based mentorship bootcamp.",
           coverImage: newCourse.coverImage || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80",
           mentorName: user?.name || "Mentor",
@@ -439,6 +487,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
+        authLoading,
         login,
         logout,
         updateUserProfile,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/src/context/AuthContext";
@@ -14,6 +14,7 @@ import {
   Briefcase,
   ArrowRight,
   Wallet,
+  CheckCircle2,
 } from "lucide-react";
 import { LinkedinIcon, InstagramIcon, TwitterIcon } from "@/src/components/SocialIcons";
 
@@ -30,8 +31,15 @@ const domains = [
 ];
 
 export default function RegisterPage() {
-  const { login, walletAddress, connectWallet } = useAuth();
+  const { login, walletAddress, connectWallet, user, authLoading } = useAuth();
   const router = useRouter();
+
+  // Auto-redirect if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [user, authLoading, router]);
 
   const [step, setStep] = useState(1);
   const [selectedRole, setSelectedRole] = useState("student");
@@ -106,7 +114,12 @@ export default function RegisterPage() {
         localStorage.setItem("tl_jwt", data.token);
       }
 
-      login(data.user);
+      localStorage.setItem("trust_lesson_remember", "true");
+      if (email) {
+        localStorage.setItem("trust_lesson_remember_email", email);
+      }
+
+      login(data.user, true);
       router.push("/dashboard");
     } catch (err) {
       setError(err.message || "Registration failed. Please try again.");

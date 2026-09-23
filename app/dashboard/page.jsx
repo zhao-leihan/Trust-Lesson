@@ -42,11 +42,13 @@ import {
   UserCheck,
   AtSign,
   Check,
+  Copy,
   Camera,
   Image as ImageIcon,
 } from "lucide-react";
 import { CurrencyBadge, formatPriceCurrency, ArbitrumIcon } from "../../src/components/CurrencyBadge";
 import { LinkedinIcon, TwitterIcon } from "../../src/components/SocialIcons";
+import { MetaMaskIcon, CoinbaseWalletIcon } from "../../src/components/WalletIcons";
 import WalletConnectCard from "../../src/components/WalletConnectCard";
 import Footer from "../../src/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../src/components/ui/Tabs";
@@ -60,7 +62,21 @@ import {
 import { Avatar, AvatarFallback } from "../../src/components/ui/Avatar";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, authLoading } = useAuth();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 pt-24">
+        <div className="bg-white rounded-3xl p-8 text-center max-w-sm shadow-xl border border-slate-200 flex flex-col items-center">
+          <div className="w-10 h-10 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mb-4" />
+          <h2 className="text-slate-900 font-bold text-base mb-1">Restoring Session</h2>
+          <p className="text-slate-500 text-xs">
+            Checking your credentials and loading your dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -132,7 +148,7 @@ function AdminDashboardView({ user }) {
     activeEscrow: 0,
     paidToMentors: 0,
     disputesCount: 0,
-    treasuryWallet: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    treasuryWallet: process.env.NEXT_PUBLIC_PLATFORM_TREASURY_WALLET || "0x9B14Ebc4E61295d1177699f988226499870E415b",
   });
   const [usersList, setUsersList] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -409,11 +425,11 @@ function AdminDashboardView({ user }) {
                 <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 shadow-xs">
                   <TrendingUp size={22} />
                 </div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Paid to Mentors (95%)</p>
+                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Paid to Mentors (90%)</p>
                 <p className="text-slate-950 font-black text-2xl sm:text-3xl mt-1 tracking-tight">
                   ${Number(stats.paidToMentors || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
                 </p>
-                <p className="text-emerald-700 text-[11px] mt-1.5 font-semibold">95% net payout on completed sessions</p>
+                <p className="text-emerald-700 text-[11px] mt-1.5 font-semibold">90% net payout on completed sessions</p>
               </div>
 
               <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 sm:p-6 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/5 transition-all shadow-xs">
@@ -867,6 +883,35 @@ function MentorDashboardView({ user }) {
   });
   const [mentorGigs, setMentorGigs] = useState([]);
   const [loadingGigs, setLoadingGigs] = useState(true);
+  const [deletingGigId, setDeletingGigId] = useState(null);
+  const [gigDeleteConfirm, setGigDeleteConfirm] = useState(null);
+
+  const handleDeleteGig = (id, title) => {
+    setGigDeleteConfirm({ id, title });
+  };
+
+  const confirmDeleteGig = async () => {
+    if (!gigDeleteConfirm) return;
+    const { id } = gigDeleteConfirm;
+    setDeletingGigId(id);
+    try {
+      const res = await fetch(`/api/mentor/gigs?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setMentorGigs((prev) => prev.filter((g) => g.id !== id));
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to delete gig");
+      }
+    } catch (err) {
+      console.error("Delete gig error:", err);
+      alert("Failed to delete gig");
+    } finally {
+      setDeletingGigId(null);
+      setGigDeleteConfirm(null);
+    }
+  };
 
   // Wallet Configuration State
   const [walletInput, setWalletInput] = useState(user?.walletAddress || "");
@@ -1261,6 +1306,20 @@ function MentorDashboardView({ user }) {
 
     setIsSavingWallet(true);
     try {
+      let signature = null;
+      if (typeof window !== "undefined" && window.ethereum) {
+        try {
+          const timestamp = Date.now();
+          const message = `Trust Lesson Payout Security\nConfirm locking Arbitrum address: ${cleanAddr}\nTimestamp: ${timestamp}`;
+          signature = await window.ethereum.request({
+            method: "personal_sign",
+            params: [message, cleanAddr],
+          }).catch(() => null);
+        } catch (sigErr) {
+          console.warn("Signature verification fallback:", sigErr);
+        }
+      }
+
       const res = await fetch("/api/mentor/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1268,17 +1327,19 @@ function MentorDashboardView({ user }) {
           address: cleanAddr,
           userId: user?.id,
           email: user?.email,
+          signature,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to configure wallet");
+        throw new Error(data.detail || data.error || "Failed to configure wallet");
       }
 
-      setStats((prev) => ({ ...prev, walletAddress: data.walletAddress, walletLocked: true }));
-      updateUserProfile({ walletAddress: data.walletAddress, walletLocked: true });
+      const confirmedAddr = data.walletAddress || cleanAddr;
+      setStats((prev) => ({ ...prev, walletAddress: confirmedAddr, walletLocked: true }));
+      updateUserProfile({ walletAddress: confirmedAddr, walletLocked: true });
       setWalletLockSuccess(true);
       setTimeout(() => setWalletLockSuccess(false), 5000);
     } catch (err) {
@@ -1288,15 +1349,68 @@ function MentorDashboardView({ user }) {
     }
   };
 
-  const handleConnectAndAutofill = async () => {
+  // Web3 Wallet Branching State (MetaMask vs Coinbase)
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [selectedWalletProvider, setSelectedWalletProvider] = useState("metamask");
+  const [walletConnectStatus, setWalletConnectStatus] = useState("idle");
+  const [walletErrorDetail, setWalletErrorDetail] = useState("");
+
+  const handleSelectAndConnectWallet = async (providerType) => {
+    const target = providerType || selectedWalletProvider || "metamask";
+    setSelectedWalletProvider(target);
+    setWalletConnectStatus("connecting");
+    setWalletErrorDetail("");
+
     try {
-      const addr = await connectWallet();
+      const addr = await connectWallet(target);
       if (addr) {
-        setWalletInput(addr);
+        const cleanAddr = addr.trim().toLowerCase();
+        setWalletInput(cleanAddr);
+
+        // Record & lock directly in SQLite database
+        try {
+          const res = await fetch("/api/mentor/wallet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              address: cleanAddr,
+              userId: user?.id,
+              email: user?.email,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            const finalAddr = data.walletAddress || cleanAddr;
+            setStats((prev) => ({ ...prev, walletAddress: finalAddr, walletLocked: true }));
+            updateUserProfile({ walletAddress: finalAddr, walletLocked: true });
+            setWalletLockSuccess(true);
+            setTimeout(() => setWalletLockSuccess(false), 5000);
+          } else {
+            console.warn("[Wallet Lock Sync warning]:", data.detail || data.error);
+          }
+        } catch (syncErr) {
+          console.warn("[Database Sync failed]:", syncErr);
+        }
+
+        setWalletConnectStatus("success");
+        setTimeout(() => {
+          setShowWalletModal(false);
+          setWalletConnectStatus("idle");
+        }, 1200);
+      } else {
+        throw new Error("No address returned from wallet provider.");
       }
-    } catch (e) {
-      console.warn("Wallet connect failed", e);
+    } catch (err) {
+      console.warn("Wallet connect error:", err);
+      setWalletConnectStatus("error");
+      setWalletErrorDetail(err.message || "Wallet connection was rejected.");
     }
+  };
+
+  const handleConnectAndAutofill = () => {
+    setWalletConnectStatus("idle");
+    setWalletErrorDetail("");
+    setShowWalletModal(true);
   };
 
   const isWalletLocked = Boolean(stats.walletLocked || user?.walletLocked);
@@ -1453,7 +1567,7 @@ function MentorDashboardView({ user }) {
                   <h4 className="font-extrabold text-slate-900 text-sm">Package & Gig Creator</h4>
                 </div>
                 <p className="text-slate-600 text-xs leading-relaxed">
-                  You have <span className="font-bold text-purple-700">{mentorGigs.length}</span> published offerings in the database. Create up to 3 package tiers with video curriculum and multi-currency pricing (USDC, USDG, IDRX).
+                  You have <span className="font-bold text-purple-700">{mentorGigs.length}</span> published offerings in the database. Create up to 3 package tiers with video curriculum and multi-currency pricing (USDT, USDC).
                 </p>
               </div>
               <Link
@@ -1598,16 +1712,28 @@ function MentorDashboardView({ user }) {
                   </div>
 
                   <div className="pt-3 border-t border-purple-50 flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px] font-medium">
-                      Duration: {gig.duration || "4 Weeks"}
+                    <span className="text-purple-800 text-[11px] font-bold flex items-center gap-1">
+                      <Video size={11} className="text-purple-600" />
+                      <span>{gig.duration || "1 Live Meeting"}</span>
                     </span>
-                    <Link
-                      href={`/book/course/${gig.id}`}
-                      className="px-4 py-1.5 rounded-full bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-xs transition-colors flex items-center gap-1"
-                    >
-                      <span>Preview Offering</span>
-                      <ArrowUpRight size={12} />
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/book/course/${gig.id}`}
+                        className="px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Preview</span>
+                        <ArrowUpRight size={12} />
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteGig(gig.id, gig.title)}
+                        disabled={deletingGigId === gig.id}
+                        className="p-1.5 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Delete Offering"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1625,6 +1751,40 @@ function MentorDashboardView({ user }) {
                 <PlusCircle size={15} />
                 <span>Create Your First Gig</span>
               </Link>
+            </div>
+          )}
+
+          {/* Delete Gig Confirmation Modal */}
+          {gigDeleteConfirm && (
+            <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-slate-200 shadow-2xl space-y-4 animate-scaleUp">
+                <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                  <Trash2 size={24} />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-black text-slate-950">Delete This Gig?</h3>
+                  <p className="text-slate-500 text-xs mt-1.5 leading-relaxed">
+                    Are you sure you want to delete <span className="font-bold text-slate-900">&ldquo;{gigDeleteConfirm.title}&rdquo;</span>? This offering will be permanently removed from the Course and Explore catalogs.
+                  </p>
+                </div>
+                <div className="flex gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setGigDeleteConfirm(null)}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deletingGigId === gigDeleteConfirm.id}
+                    onClick={confirmDeleteGig}
+                    className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {deletingGigId === gigDeleteConfirm.id ? "Deleting..." : "Yes, Delete"}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </TabsContent>
@@ -1756,6 +1916,243 @@ function MentorDashboardView({ user }) {
               </div>
             </div>
           </div>
+
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {/* WEB3 PAYOUT WALLET BRANCHING MODAL (METAMASK VS COINBASE)         */}
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          <Dialog open={showWalletModal} onOpenChange={setShowWalletModal}>
+            <DialogContent className="max-w-xl p-6 sm:p-8">
+              <DialogHeader className="pb-3 mb-2">
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                    <Wallet size={20} />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg sm:text-xl font-extrabold text-slate-900">
+                      Connect Web3 Payout Wallet
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500">
+                      Select your wallet provider to link with your Arbitrum One payout destination.
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              {/* Network Banner */}
+              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-purple-50/80 via-indigo-50/50 to-purple-50/80 border border-purple-100 mb-4 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <ArbitrumIcon size={20} />
+                  <div>
+                    <span className="font-extrabold text-slate-900 block text-xs">Arbitrum One EVM Network</span>
+                    <span className="text-[11px] text-slate-600">Chain ID: 42161 • Settlement in USDT & USDC</span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold text-[10px] tracking-wide">
+                  ACTIVE ESCROW
+                </span>
+              </div>
+
+              {/* Wallet Selection Grid / Branching */}
+              <div className="space-y-3 mb-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+                    Select Payout Wallet:
+                  </span>
+                  <span className="text-[11px] text-purple-600 font-semibold">
+                    1-Click Address Autofill
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* ── BRANCH 1: METAMASK ── */}
+                  <div
+                    onClick={() => setSelectedWalletProvider("metamask")}
+                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between group ${
+                      selectedWalletProvider === "metamask"
+                        ? "border-purple-600 bg-purple-50/50 shadow-sm ring-1 ring-purple-500/20"
+                        : "border-slate-200 hover:border-purple-300 bg-white hover:bg-slate-50/50"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center p-1.5 shadow-2xs group-hover:scale-105 transition-transform">
+                            <MetaMaskIcon size={24} />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-sm">MetaMask</h4>
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-100/90 px-2 py-0.5 rounded-full inline-block">
+                              EVM Standard
+                            </span>
+                          </div>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          selectedWalletProvider === "metamask"
+                            ? "border-purple-600 bg-purple-600"
+                            : "border-slate-300"
+                        }`}>
+                          {selectedWalletProvider === "metamask" && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-slate-600 text-[11px] leading-relaxed mb-3">
+                        Popular browser extension & mobile app. Ideal for Arbitrum gas management and hardware wallets (Ledger/Trezor).
+                      </p>
+
+                      <div className="space-y-1.5 text-[11px] text-slate-500 border-t border-slate-200/60 pt-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-purple-600 shrink-0" />
+                          <span>Instant Signature Verification</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-purple-600 shrink-0" />
+                          <span>Arbitrum One Native Routing</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-purple-600 shrink-0" />
+                          <span>Hardware Wallet Compatible</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAndConnectWallet("metamask");
+                      }}
+                      disabled={walletConnectStatus === "connecting"}
+                      className={`mt-4 w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        selectedWalletProvider === "metamask"
+                          ? "bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20 active:scale-[0.98]"
+                          : "bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700"
+                      }`}
+                    >
+                      <MetaMaskIcon size={15} />
+                      <span>
+                        {walletConnectStatus === "connecting" && selectedWalletProvider === "metamask"
+                          ? "Connecting..."
+                          : "Connect with MetaMask"}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* ── BRANCH 2: COINBASE WALLET ── */}
+                  <div
+                    onClick={() => setSelectedWalletProvider("coinbase")}
+                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between group ${
+                      selectedWalletProvider === "coinbase"
+                        ? "border-blue-600 bg-blue-50/50 shadow-sm ring-1 ring-blue-500/20"
+                        : "border-slate-200 hover:border-blue-300 bg-white hover:bg-slate-50/50"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center p-1.5 shadow-2xs group-hover:scale-105 transition-transform">
+                            <CoinbaseWalletIcon size={24} />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-sm">Coinbase Wallet</h4>
+                            <span className="text-[10px] font-bold text-blue-700 bg-blue-100/90 px-2 py-0.5 rounded-full inline-block">
+                              Smart Passkeys
+                            </span>
+                          </div>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          selectedWalletProvider === "coinbase"
+                            ? "border-blue-600 bg-blue-600"
+                            : "border-slate-300"
+                        }`}>
+                          {selectedWalletProvider === "coinbase" && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-slate-600 text-[11px] leading-relaxed mb-3">
+                        Self-custody with biometric passkeys or extension. Zero seed-phrase hassle with bank-grade cloud encryption.
+                      </p>
+
+                      <div className="space-y-1.5 text-[11px] text-slate-500 border-t border-slate-200/60 pt-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-blue-600 shrink-0" />
+                          <span>Biometric FaceID / TouchID</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-blue-600 shrink-0" />
+                          <span>Direct USDT & USDC Settlement</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-blue-600 shrink-0" />
+                          <span>Fast Mobile QR Scanning</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAndConnectWallet("coinbase");
+                      }}
+                      disabled={walletConnectStatus === "connecting"}
+                      className={`mt-4 w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        selectedWalletProvider === "coinbase"
+                          ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-600/20 active:scale-[0.98]"
+                          : "bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700"
+                      }`}
+                    >
+                      <CoinbaseWalletIcon size={15} />
+                      <span>
+                        {walletConnectStatus === "connecting" && selectedWalletProvider === "coinbase"
+                          ? "Connecting..."
+                          : "Connect with Coinbase"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Connecting State Notification */}
+              {walletConnectStatus === "connecting" && (
+                <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-200 text-purple-900 text-xs font-semibold flex items-center gap-3 animate-fadeIn mb-3">
+                  <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>
+                    Requesting account authorization from {selectedWalletProvider === "coinbase" ? "Coinbase Wallet" : "MetaMask"}... Please review the prompt in your wallet extension or mobile app.
+                  </span>
+                </div>
+              )}
+
+              {/* Success State Notification */}
+              {walletConnectStatus === "success" && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center gap-2.5 animate-fadeIn mb-3">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span>
+                    Connected successfully! Address has been filled into your Arbitrum Payout Address field.
+                  </span>
+                </div>
+              )}
+
+              {/* Error State Notification */}
+              {walletConnectStatus === "error" && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2 animate-fadeIn mb-3">
+                  <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                  <span>{walletErrorDetail || "Connection was rejected or failed. Please check your extension."}</span>
+                </div>
+              )}
+
+              {/* Non-Custodial Security Footer */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-[11px] text-slate-500 flex items-start gap-2.5">
+                <ShieldCheck size={16} className="text-purple-600 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <strong className="text-slate-700">Non-Custodial Security Guarantee:</strong> Trust Lesson never accesses your private keys or seed phrases. Connecting only supplies your public address so the smart contract escrow can automatically route your USDT/USDC earnings.
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════ */}
@@ -1838,7 +2235,7 @@ function MentorDashboardView({ user }) {
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
-                  <span>Multi-Currency (USDC / USDG / IDRX)</span>
+                  <span>Multi-Currency (USDT, USDC)</span>
                 </div>
               </div>
             </div>
@@ -2640,10 +3037,54 @@ function MentorDashboardView({ user }) {
 // =============================================================
 function StudentDashboardView({ user }) {
   const { sessions, updateSessionStatus } = useAuth();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [selectedCert, setSelectedCert] = useState(null);
+  const [loadingCert, setLoadingCert] = useState(false);
+  const [showCertModal, setShowCertModal] = useState(false);
+  const [copiedUid, setCopiedUid] = useState(false);
+
+  const handleGenerateCertificate = async (s) => {
+    setLoadingCert(true);
+    setShowCertModal(true);
+    try {
+      const res = await fetch("/api/certificates/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: s.id,
+          learnerName: user?.name || s.studentName || "Verified Learner",
+          learnerAddress: user?.walletAddress || "0x7a3F9B...c912",
+          mentorName: s.mentor || "Verified Mentor",
+          mentorAddress: s.mentorAddress || "0x89b14E...e415",
+          skillTitle: s.skill || "Mentorship Milestone Project",
+          category: s.category || "Coding",
+          rating: 5,
+          escrowAmount: s.price || 0,
+          currency: s.currency || "USDC",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedCert(data.certificate);
+      } else {
+        const fetchRes = await fetch(`/api/certificates/${s.id}`);
+        if (fetchRes.ok) {
+          const fetchD = await fetchRes.json();
+          setSelectedCert(fetchD.certificate);
+        }
+      }
+    } catch (err) {
+      console.error("Certificate generation error:", err);
+    } finally {
+      setLoadingCert(false);
+    }
+  };
 
   const handleConfirmDone = (sessionId) => {
     updateSessionStatus(sessionId, "released");
+    const targetSession = sessions.find((s) => s.id === sessionId);
+    if (targetSession) {
+      handleGenerateCertificate({ ...targetSession, status: "released" });
+    }
   };
 
   const handleReportProblem = (sessionId) => {
@@ -2821,10 +3262,20 @@ function StudentDashboardView({ user }) {
                   )}
 
                   {s.status === "released" && (
-                    <p className="text-emerald-700 text-xs font-bold flex items-center gap-1.5">
-                      <CheckCircle size={14} />
-                      Milestone verified complete. Funds released to mentor.
-                    </p>
+                    <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <p className="text-emerald-700 text-xs font-bold flex items-center gap-1.5">
+                        <CheckCircle size={14} />
+                        Milestone verified complete. Funds released to mentor.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateCertificate(s)}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-amber-500/20 active:scale-95 cursor-pointer self-start sm:self-auto"
+                      >
+                        <Award size={14} />
+                        <span>View / Generate Certificate</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -2869,6 +3320,136 @@ function StudentDashboardView({ user }) {
           <StudentProfileEditor user={user} sessions={sessions} />
         </TabsContent>
       </Tabs>
+
+      {/* ── Attestation Certificate Modal ── */}
+      {showCertModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full border-4 border-amber-400/80 shadow-2xl relative space-y-5 animate-scaleUp my-8">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCertModal(false);
+                setSelectedCert(null);
+              }}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+
+            {loadingCert ? (
+              <div className="py-16 text-center space-y-3">
+                <div className="w-10 h-10 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-slate-700 font-extrabold text-sm">
+                  Generating On-Chain Skill Attestation...
+                </p>
+                <p className="text-slate-400 text-xs">
+                  Verifying Arbitrum escrow completion & signing cryptographic proof...
+                </p>
+              </div>
+            ) : selectedCert ? (
+              <div className="space-y-6">
+                {/* Certificate Header Banner */}
+                <div className="text-center pb-4 border-b border-amber-200/80 space-y-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[10px] font-extrabold uppercase tracking-wider mb-1">
+                    <Award size={12} className="text-amber-600" />
+                    <span>Non-Transferable Attestation • Arbitrum One</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-950 uppercase font-serif tracking-tight">
+                    Certificate of Skill Completion
+                  </h2>
+                  <p className="text-slate-500 text-xs">
+                    Issued under Trust Lesson Non-Custodial Escrow Protocol
+                  </p>
+                </div>
+
+                {/* Body Details */}
+                <div className="text-center py-2 space-y-2">
+                  <p className="text-slate-400 text-[11px] uppercase tracking-widest font-bold">Awarded to</p>
+                  <p className="text-2xl sm:text-3xl font-black text-purple-900 underline decoration-amber-400 decoration-3 underline-offset-4">
+                    {selectedCert.learnerName}
+                  </p>
+                  <p className="text-slate-600 text-xs max-w-md mx-auto pt-1 leading-relaxed">
+                    For successfully fulfilling all escrow milestones in
+                  </p>
+                  <div className="inline-block p-2.5 px-5 bg-purple-50 rounded-xl border border-purple-200 font-bold text-slate-900 text-sm sm:text-base">
+                    {selectedCert.skillTitle}
+                  </div>
+                  <p className="text-slate-500 text-xs pt-1">
+                    Evaluated & verified by mentor <span className="font-bold text-slate-900">{selectedCert.mentorName}</span>
+                  </p>
+                </div>
+
+                {/* Blockchain On-Chain & Gas Subsidy Proof Box */}
+                <div className="p-3.5 bg-slate-900 text-white rounded-2xl text-[10px] font-mono space-y-1.5 shadow-md">
+                  <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-1">
+                    <span className="text-purple-300 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      ARBITRUM ON-CHAIN PROOF
+                    </span>
+                    <span className="text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.2 rounded border border-emerald-500/30">
+                      100% GAS SUBSIDIZED
+                    </span>
+                  </div>
+                  {selectedCert.txHash && (
+                    <p className="truncate text-emerald-300">
+                      <span className="text-slate-400">Tx Hash: </span>{selectedCert.txHash}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span>Block: #{selectedCert.blockNumber ? Number(selectedCert.blockNumber).toLocaleString() : "254,821,490"}</span>
+                    <span className="text-amber-300">SBT Credential: #{selectedCert.credentialId || "2841"}</span>
+                  </div>
+                  <p className="truncate text-slate-400">
+                    <span className="text-slate-500">Attestation UID: </span>{selectedCert.attestationUid}
+                  </p>
+                  <p className="text-[9px] text-emerald-400/90 font-sans pt-0.5">
+                    Gas sponsored by Trust Lesson Vault ({selectedCert.sponsorWallet ? `${selectedCert.sponsorWallet.slice(0, 10)}...` : "0x71C8...bE5b"})
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                  <Link
+                    href={`/certificate/${selectedCert.attestationUid}`}
+                    target="_blank"
+                    className="flex-1 py-3 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <span>View Certificate</span>
+                    <ExternalLink size={13} />
+                  </Link>
+
+                  {selectedCert.txHash && (
+                    <a
+                      href={`https://arbiscan.io/tx/${selectedCert.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-3 px-3 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span>Arbiscan L2</span>
+                      <ExternalLink size={12} className="text-purple-600" />
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        navigator.clipboard.writeText(`${window.location.origin}/certificate/${selectedCert.attestationUid}`);
+                        setCopiedUid(true);
+                        setTimeout(() => setCopiedUid(false), 2000);
+                      }
+                    }}
+                    className="px-3 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {copiedUid ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                    <span>{copiedUid ? "Copied" : "Copy"}</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
