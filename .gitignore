@@ -10,11 +10,14 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
-# Environment & Database
+# Environment, Secrets & Local Reports
 .env
-.env*.local
-*.local
+.env*
 !.env.local.example
+*.local
+Report.md
+report.md
+REPORT.md
 prisma/*.db
 prisma/*.db-journal
 *.db

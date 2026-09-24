@@ -148,7 +148,7 @@ function AdminDashboardView({ user }) {
     activeEscrow: 0,
     paidToMentors: 0,
     disputesCount: 0,
-    treasuryWallet: process.env.NEXT_PUBLIC_PLATFORM_TREASURY_WALLET || "0x9B14Ebc4E61295d1177699f988226499870E415b",
+    treasuryWallet: process.env.NEXT_PUBLIC_PLATFORM_TREASURY_WALLET || "",
   });
   const [usersList, setUsersList] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);

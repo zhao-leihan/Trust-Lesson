@@ -272,7 +272,7 @@ export default function CertificatePage() {
                 </span>
               </div>
 
-              {cert.txHash && (
+              {cert.txHash ? (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pt-0.5">
                   <span className="text-slate-400">Transaction Hash:</span>
                   <a
@@ -284,6 +284,13 @@ export default function CertificatePage() {
                     <span>{cert.txHash}</span>
                     <ExternalLink size={12} className="shrink-0" />
                   </a>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pt-0.5">
+                  <span className="text-amber-400 font-bold">Staging Status:</span>
+                  <span className="text-amber-200 text-[10px]">
+                    Recorded in local registry • Live broadcast ready with funded sponsor key
+                  </span>
                 </div>
               )}
 
@@ -317,7 +324,7 @@ export default function CertificatePage() {
                 <div className="truncate">
                   <span className="text-slate-400">Gas Relayer Vault: </span>
                   <span className="text-emerald-300">
-                    {cert.sponsorWallet || process.env.NEXT_PUBLIC_PLATFORM_SPONSOR_WALLET || "0x71C8A9A4DbF2356B24a9fC3672dD59Fa74f4bE5b"}
+                    {cert.sponsorWallet || process.env.NEXT_PUBLIC_PLATFORM_SPONSOR_WALLET || "Platform Relayer Vault"}
                   </span>
                 </div>
               </div>
