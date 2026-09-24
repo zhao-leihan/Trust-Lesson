@@ -142,8 +142,8 @@ Trust-Lesson/
 
 ## 👥 Leadership & Team
 
-- **Rayhan Young** — *Founder & Product Architect*
-- **0xAnakMommy** — *Lead Blockchain & Fullstack Developer*
+- **Rayhan Young** — *CTO*
+- **Janetiloy** — *CMO*
 
 ---
 
