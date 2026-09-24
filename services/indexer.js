@@ -23,8 +23,11 @@ const VIDEO_EVENTS = [
   "event VideoPurchased(uint256 indexed videoId, address learner)",
 ];
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_ESCROW_CONTRACT;
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://arb1.arbitrum.io/rpc";
+import { getActiveNetwork } from "../lib/networkConfig.js";
+
+const net = getActiveNetwork();
+const CONTRACT_ADDRESS = net.contracts.escrowRouter;
+const RPC_URL = net.rpcUrl;
 
 /**
  * Start the indexer.

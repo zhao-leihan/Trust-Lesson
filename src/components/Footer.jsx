@@ -99,13 +99,13 @@ export default function Footer() {
             </h4>
             <div className="space-y-2 text-xs">
               <p className="text-slate-300">
-                Founder: <span className="font-bold text-white">Rayhan Young</span>
+                CTO: <span className="font-bold text-white">Rayhan Young (@0xAnakMommy)</span>
               </p>
               <p className="text-slate-300">
-                Developer: <span className="font-bold text-emerald-400">0xAnakMommy</span>
+                CMO: <span className="font-bold text-purple-300">Janetiloy (@Janetiloy)</span>
               </p>
             </div>
-
+            
             {/* Playful mini mascot peek */}
             <div className="pt-2 flex items-center gap-2.5">
               <img
@@ -123,7 +123,7 @@ export default function Footer() {
         {/* Bottom Copyright & Security Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <p className="text-xs text-slate-500">
-            © 2026 Trust Lesson. Built by <span className="text-slate-300 font-bold">Rayhan Young</span> & <span className="text-slate-300 font-bold">0xAnakMommy</span>. All rights reserved.
+            © 2026 Trust Lesson. Built by <span className="text-slate-300 font-bold">Rayhan Young</span> & <span className="text-slate-300 font-bold">Janetiloy</span>. All rights reserved.
           </p>
 
           <div className="flex items-center gap-3">

@@ -5,21 +5,25 @@ import Footer from "../../src/components/Footer";
 const team = [
   {
     name: "Rayhan Young",
-    role: "Founder",
-    tagline: "Visionary & Product Architect",
-    avatar: "RY",
-    badge: "Founder",
-    bio: "Pioneering decentralized peer-to-peer education, milestone escrow architecture, and tamper-proof on-chain mentor credentials.",
-    color: "bg-gradient-to-tr from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25",
+    handle: "@0xAnakMommy",
+    role: "Chief Technology Officer (CTO)",
+    tagline: "CTO & Protocol Architect",
+    badge: "CTO",
+    image: "/team/Ray.jpeg",
+    bio: "Pioneering Arbitrum smart contract escrow vaults, decentralized milestone settlement, and secure on-chain reputation attestation.",
+    glowColor: "from-purple-600/20 to-indigo-600/20",
+    badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
   },
   {
-    name: "0xAnakMommy",
-    role: "Developer",
-    tagline: "Smart Contract & Fullstack Lead",
-    avatar: "0x",
-    badge: "Developer",
-    bio: "Architecting Arbitrum escrow vaults, decentralized state management, and seamless real-time Web3 platform interfaces.",
-    color: "bg-gradient-to-tr from-emerald-500 to-cyan-600 text-white shadow-lg shadow-emerald-500/25",
+    name: "Janetiloy",
+    handle: "@Janetiloy",
+    role: "Chief Marketing Officer (CMO)",
+    tagline: "CMO & Global Growth Lead",
+    badge: "CMO",
+    image: "/team/janet.jpeg",
+    bio: "Spearheading international brand strategy, mentor community engagement, creator partnerships, and global Web3 education growth.",
+    glowColor: "from-pink-500/20 to-rose-600/20",
+    badgeColor: "bg-rose-50 text-rose-700 border-rose-200",
   },
 ];
 
@@ -128,42 +132,53 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Leadership Team */}
-      <section className="py-24 max-w-4xl mx-auto px-6 text-center">
+      {/* Our Team Section */}
+      <section id="team" className="py-24 max-w-5xl mx-auto px-6 text-center">
         <Reveal direction="up" className="mb-14">
+          <span className="text-xs font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-3.5 py-1.5 rounded-full inline-block mb-3 border border-purple-200">
+            Our Team
+          </span>
           <h2 className="text-slate-900 font-extrabold text-3xl sm:text-4xl">
-            Meet the Founders
+            Meet Our Leadership Team
           </h2>
-          <p className="text-slate-500 text-sm sm:text-base mt-2">
-            The cross-functional team driving Trust Lesson forward.
+          <p className="text-slate-500 text-sm sm:text-base mt-2 max-w-xl mx-auto">
+            The visionary leaders driving Trust Lesson forward to build transparent, decentralized education.
           </p>
         </Reveal>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-w-3xl mx-auto">
           {team.map((t, idx) => (
             <Reveal key={t.name} delay={idx * 150} direction="up" className="flex-1">
-              <div className="bg-white rounded-3xl p-8 flex flex-col items-center text-center gap-4 border border-slate-200/80 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+              <div className="bg-white rounded-3xl p-8 flex flex-col items-center text-center gap-4 border border-slate-200/80 shadow-md hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 relative overflow-hidden group">
                 {/* Background decorative glow */}
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform" />
+                <div className={`absolute -top-12 -right-12 w-40 h-40 bg-gradient-to-br ${t.glowColor} rounded-full blur-2xl group-hover:scale-125 transition-transform`} />
 
-                <div
-                  className={`w-20 h-20 rounded-2xl ${t.color} flex items-center justify-center font-extrabold text-2xl tracking-wider`}
-                >
-                  {t.avatar}
+                {/* Profile Photo with Badge */}
+                <div className="relative mb-2">
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl overflow-hidden ring-4 ring-purple-100 shadow-xl group-hover:ring-purple-300 transition-all duration-300 bg-slate-100 mx-auto">
+                    <img
+                      src={t.image}
+                      alt={t.name}
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md border-2 border-white flex items-center gap-1 shrink-0 whitespace-nowrap">
+                    <Sparkles size={10} className="text-yellow-300" />
+                    <span>{t.badge}</span>
+                  </div>
                 </div>
 
                 <div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider mb-2 bg-purple-50 text-purple-700 border border-purple-200">
-                    <Sparkles size={11} />
-                    <span>{t.badge}</span>
+                  <h3 className="text-slate-900 font-extrabold text-xl sm:text-2xl">{t.name}</h3>
+                  <p className="text-purple-600 font-bold text-xs sm:text-sm mt-1">{t.role}</p>
+                  <div className="mt-2 flex justify-center">
+                    <span className="text-slate-500 font-mono text-xs font-semibold bg-slate-100 hover:bg-slate-200 px-3 py-0.5 rounded-full border border-slate-200 transition-colors">
+                      {t.handle}
+                    </span>
                   </div>
-                  <h3 className="text-slate-900 font-extrabold text-xl">{t.name}</h3>
-                  <p className="text-indigo-600 text-xs font-bold mt-0.5">
-                    {t.tagline}
-                  </p>
                 </div>
 
-                <p className="text-slate-600 text-xs sm:text-sm leading-relaxed max-w-xs">
+                <p className="text-slate-600 text-xs sm:text-sm leading-relaxed max-w-xs mt-1">
                   {t.bio}
                 </p>
               </div>
