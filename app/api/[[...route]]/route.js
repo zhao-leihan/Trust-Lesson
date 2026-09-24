@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth";
 import { getCloudflareUploadUrl, getSignedPlaybackUrl } from "@/lib/cloudflare";
 import { uploadToIpfs, uploadJsonToIpfs } from "@/lib/ipfs";
 import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, PLATFORM_SPONSOR_WALLET } from "@/lib/gasSponsor";
+import { getActiveNetwork } from "@/lib/networkConfig";
 
 export const runtime = "nodejs";
 
@@ -529,7 +530,7 @@ app.post("/sessions", authMiddleware, async (c) => {
   }
 
   // Return unsigned tx calldata for createSession on EscrowRouter
-  const contractAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT || "";
+  const contractAddress = getActiveNetwork().contracts.escrowRouter;
   const txData = {
     to: contractAddress,
     // ABI-encoded calldata would go here in production
@@ -1248,8 +1249,8 @@ app.post("/certificates/generate", async (c) => {
 
     // ── Execute Real On-Chain Blockchain Recording with Platform Gas Subsidy ──
     const onChainResult = await issueOnChainCredentialWithSubsidy({
-      mentorAddress: mentorAddress || "0x89b14EBc4e61295D1177699F988226499870e415",
-      learnerAddress: learnerAddress || "0x7a3F9B2779836B28929D7d1746B310065287c912",
+      mentorAddress: mentorAddress || "",
+      learnerAddress: learnerAddress || "",
       sessionId: sessionId || Math.floor(Math.random() * 800000) + 100000,
       rating: Number(rating) || 5,
       skillTag: `${skillTitle} (${category})`,
@@ -1704,7 +1705,7 @@ app.get("/admin/stats", async (c) => {
       activeEscrow,
       paidToMentors,
       disputesCount: await db.dispute.count().catch(() => 0),
-      treasuryWallet: process.env.PLATFORM_TREASURY_WALLET || "0x9B14Ebc4E61295d1177699f988226499870E415b",
+      treasuryWallet: process.env.PLATFORM_TREASURY_WALLET || "",
     });
   } catch (e) {
     return c.json({ error: "Failed to fetch admin statistics", detail: e.message }, 500);

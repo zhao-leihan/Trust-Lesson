@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 import { CurrencyBadge, formatPriceCurrency, UsdcIcon, UsdtIcon, ArbitrumIcon } from "@/src/components/CurrencyBadge";
+import { getActiveNetwork } from "@/lib/networkConfig";
 
 function GoogleMeetIcon({ className = "w-6 h-6" }) {
   return (
@@ -178,15 +179,15 @@ export default function BookingPage() {
     : item.price;
   const platformFee = Number((basePrice * 0.10).toFixed(2));
   const grandTotal = basePrice + platformFee;
-  const escrowVaultAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT || "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9";
+  const activeNet = getActiveNetwork();
+  const escrowVaultAddress = activeNet.contracts.escrowRouter;
   const transakApiKey = process.env.NEXT_PUBLIC_TRANSAK_API_KEY || "4fcd6904-706b-4aa4-bd68-2495b452e805";
   const destinationWallet = (walletAddress && walletAddress.startsWith("0x") && walletAddress.length === 42)
     ? walletAddress
     : escrowVaultAddress;
   const safeTransakAmount = Math.max(30, Math.round(grandTotal));
-  const transakTesterUrl = `https://global-stg.transak.com/?apiKey=${transakApiKey}&environment=STAGING&cryptoCurrencyCode=${currency === "USDT" ? "USDT" : "USDC"}&network=arbitrum&walletAddress=${destinationWallet}&fiatAmount=${safeTransakAmount}&fiatCurrency=USD&themeColor=7c3aed&disableWalletAddressForm=true`;
+  const transakTesterUrl = `https://global-stg.transak.com/?apiKey=${transakApiKey}&environment=${activeNet.transakEnv}&cryptoCurrencyCode=${currency === "USDT" ? "USDT" : "USDC"}&network=arbitrum&walletAddress=${destinationWallet}&fiatAmount=${safeTransakAmount}&fiatCurrency=USD&themeColor=7c3aed&disableWalletAddressForm=true`;
 
-  const paymentMethods = [
     {
       id: "crypto",
       label: `${currency} (Web3 Connected Wallet)`,
@@ -197,15 +198,8 @@ export default function BookingPage() {
     {
       id: "transak",
       label: `Buy ${currency} via Transak (Credit Card / Apple Pay)`,
-      sub: `Fiat-to-crypto on-ramp directly to your Arbitrum wallet via Visa, Mastercard, or Bank Transfer`,
+      sub: `Fiat-to-crypto on-ramp directly to your Arbitrum wallet via Visa, Mastercard, or Apple Pay`,
       Icon: CreditCard,
-      isWeb3: false,
-    },
-    {
-      id: "direct",
-      label: `Direct Transfer / Exchange Deposit (${currency})`,
-      sub: `Transfer directly from Indodax, Tokocrypto, Binance, Bybit, or Hardware Wallet to Escrow Vault`,
-      Icon: Building2,
       isWeb3: false,
     },
   ];
@@ -733,60 +727,6 @@ export default function BookingPage() {
                       <span className="text-[11px] leading-snug">
                         Ready for checkout. Click <strong className="text-blue-950 font-bold">&quot;Proceed to Transak Payment&quot;</strong> in the summary panel on the right to open the payment widget.
                       </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Method 3: Direct Transfer / Exchange Deposit */}
-                {paymentMethod === "direct" && (
-                  <div className="mt-3 p-4 bg-purple-50/70 rounded-2xl border border-purple-200/90 space-y-3">
-                    <div className="flex items-center justify-between border-b border-purple-100 pb-2">
-                      <span className="text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
-                        <Building2 size={15} className="text-purple-600" />
-                        <span>Direct Transfer / Exchange Deposit</span>
-                      </span>
-                      <span className="text-[10px] text-purple-700 font-bold bg-purple-100 px-2 py-0.5 rounded-full">
-                        Arbitrum One L2
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        Transfer <strong className="text-purple-900 font-bold">{formatPriceCurrency(grandTotal, currency)}</strong> directly from <span className="font-semibold text-slate-800">Indodax, Tokocrypto, Binance, Bybit</span>, or any crypto wallet:
-                      </p>
-
-                      <div className="p-3 bg-white rounded-xl border border-purple-200 flex items-center justify-between gap-2 shadow-xs">
-                        <div className="min-w-0">
-                          <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-bold">Escrow Vault Contract</span>
-                          <span className="font-mono text-[11px] text-slate-800 truncate block font-semibold">
-                            {escrowVaultAddress}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (typeof window !== "undefined") {
-                              navigator.clipboard.writeText(escrowVaultAddress);
-                              setCopiedVault(true);
-                              setTimeout(() => setCopiedVault(false), 2000);
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold shrink-0 flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          {copiedVault ? <Check size={12} className="text-emerald-300" /> : <Copy size={12} />}
-                          <span>{copiedVault ? "Copied!" : "Copy"}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-purple-100 text-[11px] text-slate-500 space-y-1">
-                      <div className="flex items-center gap-1 text-emerald-700 font-semibold">
-                        <CheckCircle2 size={12} />
-                        <span>Select Network: Arbitrum One (L2)</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400">
-                        Compatible with withdrawals from Indodax, Tokocrypto, Pintu, Binance, Bybit, KuCoin, OKX, and hardware wallets.
-                      </p>
                     </div>
                   </div>
                 )}
