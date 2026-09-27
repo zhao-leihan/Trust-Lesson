@@ -193,6 +193,29 @@ export async function updateLocalSessionStatus(sessionId, status) {
   return target;
 }
 
+export async function clearAllLocalSessions() {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem("tl_db_sessions");
+      localStorage.removeItem("trust_lesson_sessions");
+    } catch {}
+  }
+
+  const db = await openDB();
+  if (!db) return true;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORES.SESSIONS, "readwrite");
+      tx.objectStore(STORES.SESSIONS).clear();
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
 // -------------------------------------------------------------
 // PORTFOLIO CRUD
 // -------------------------------------------------------------

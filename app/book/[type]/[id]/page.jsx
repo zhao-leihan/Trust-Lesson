@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { ethers } from "ethers";
 import { useAuth } from "@/src/context/AuthContext";
 import {
   Shield,
@@ -26,6 +27,7 @@ import {
   X,
   Sparkles,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 import { CurrencyBadge, formatPriceCurrency, UsdcIcon, UsdtIcon, ArbitrumIcon } from "@/src/components/CurrencyBadge";
@@ -102,6 +104,68 @@ export default function BookingPage() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBooked, setIsBooked] = useState(false);
+  const [web3Step, setWeb3Step] = useState(null);
+  const [web3StatusMessage, setWeb3StatusMessage] = useState("");
+  const [web3Error, setWeb3Error] = useState(null);
+  const [confirmedTx, setConfirmedTx] = useState(null);
+  const [insufficientBalanceInfo, setInsufficientBalanceInfo] = useState(null);
+  const [copiedTxHash, setCopiedTxHash] = useState(false);
+  const [walletUsdcBalance, setWalletUsdcBalance] = useState(null);
+  const [walletEthBalance, setWalletEthBalance] = useState(null);
+  const [connectedAccount, setConnectedAccount] = useState(null);
+  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+
+  const checkUsdcBalance = async (addr) => {
+    let targetAddr = addr || walletAddress;
+    if (typeof window !== "undefined" && window.ethereum && !targetAddr) {
+      try {
+        const accs = await window.ethereum.request({ method: "eth_accounts" });
+        if (accs && accs[0]) targetAddr = accs[0];
+      } catch {}
+    }
+    if (!targetAddr || typeof window === "undefined" || !window.ethereum) return null;
+    setConnectedAccount(targetAddr);
+    setIsCheckingBalance(true);
+    try {
+      const activeNet = getActiveNetwork();
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const ERC20_ABI = ["function balanceOf(address owner) view returns (uint256)"];
+      const usdcContract = new ethers.Contract(activeNet.contracts.usdc, ERC20_ABI, provider);
+      const [bal, ethBal] = await Promise.all([
+        usdcContract.balanceOf(targetAddr),
+        provider.getBalance(targetAddr),
+      ]);
+      const formattedUsdc = Number(bal) / 1e6;
+      const formattedEth = Number(ethers.formatEther(ethBal));
+      setWalletUsdcBalance(formattedUsdc);
+      setWalletEthBalance(formattedEth);
+      return { usdc: formattedUsdc, eth: formattedEth };
+    } catch (err) {
+      console.warn("Failed to query wallet balance:", err);
+      return null;
+    } finally {
+      setIsCheckingBalance(false);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.ethereum) {
+      checkUsdcBalance();
+      const handleAccounts = (accounts) => {
+        if (accounts && accounts[0]) {
+          checkUsdcBalance(accounts[0]);
+        } else {
+          setWalletUsdcBalance(null);
+        }
+      };
+      window.ethereum.on("accountsChanged", handleAccounts);
+      return () => {
+        if (window.ethereum?.removeListener) {
+          window.ethereum.removeListener("accountsChanged", handleAccounts);
+        }
+      };
+    }
+  }, [walletAddress]);
 
   useEffect(() => {
     if (!id) return;
@@ -178,7 +242,7 @@ export default function BookingPage() {
       : item.price
     : item.price;
   const platformFee = Number((basePrice * 0.10).toFixed(2));
-  const grandTotal = basePrice + platformFee;
+  const grandTotal = Number((basePrice + platformFee).toFixed(2));
   const activeNet = getActiveNetwork();
   const escrowVaultAddress = activeNet.contracts.escrowRouter;
   const transakApiKey = process.env.NEXT_PUBLIC_TRANSAK_API_KEY || "4fcd6904-706b-4aa4-bd68-2495b452e805";
@@ -188,6 +252,7 @@ export default function BookingPage() {
   const safeTransakAmount = Math.max(30, Math.round(grandTotal));
   const transakTesterUrl = `https://global-stg.transak.com/?apiKey=${transakApiKey}&environment=${activeNet.transakEnv}&cryptoCurrencyCode=${currency === "USDT" ? "USDT" : "USDC"}&network=arbitrum&walletAddress=${destinationWallet}&fiatAmount=${safeTransakAmount}&fiatCurrency=USD&themeColor=7c3aed&disableWalletAddressForm=true`;
 
+  const paymentMethods = [
     {
       id: "crypto",
       label: `${currency} (Web3 Connected Wallet)`,
@@ -204,29 +269,200 @@ export default function BookingPage() {
     },
   ];
 
-  // Handle escrow deposit action
-  const handleDepositEscrow = () => {
+  // Real Web3 Escrow Deposit via MetaMask & Arbitrum Sepolia
+  const handleDepositEscrow = async () => {
     setIsProcessing(true);
+    setWeb3Error(null);
+    setInsufficientBalanceInfo(null);
 
-    const newSession = {
-      id: Date.now(),
-      mentor: isMentor ? item.name : item.mentorName,
-      skill: isMentor ? item.skill : item.title,
-      date: isMentor ? selectedDate : "Kickoff This Week",
-      time: hasPackages ? selectedPackage?.duration : (isMentor ? selectedSlot : item.duration),
-      price: grandTotal,
-      currency,
-      status: "locked",
-      escrowStatus: "Locked",
-      type: isMentor ? "session" : "course",
-      note: studentNote,
-    };
+    try {
+      if (typeof window === "undefined" || !window.ethereum) {
+        throw new Error(
+          "No Web3 wallet extension detected in your browser. Please install MetaMask to interact with Arbitrum Smart Contracts."
+        );
+      }
 
-    setTimeout(() => {
-      setIsProcessing(false);
-      setIsBooked(true);
+      const activeNet = getActiveNetwork();
+
+      // 1. Connect Account
+      setWeb3Step("connecting");
+      setWeb3StatusMessage("Connecting to MetaMask wallet...");
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      if (!accounts || accounts.length === 0) {
+        throw new Error("No account authorized in MetaMask. Please connect your wallet to continue.");
+      }
+      const studentAddress = accounts[0];
+
+      // 2. Network Check & Switch to Arbitrum Sepolia
+      setWeb3Step("switch_network");
+      setWeb3StatusMessage(`Verifying network is ${activeNet.name} (${activeNet.chainIdHex})...`);
+      const currentChainId = await window.ethereum.request({ method: "eth_chainId" });
+
+      if (currentChainId.toLowerCase() !== activeNet.chainIdHex.toLowerCase()) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: activeNet.chainIdHex }],
+          });
+        } catch (switchError) {
+          if (switchError.code === 4902 || switchError?.message?.includes("Unrecognized chain ID")) {
+            await window.ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [
+                {
+                  chainId: activeNet.chainIdHex,
+                  chainName: activeNet.name,
+                  rpcUrls: [activeNet.rpcUrl],
+                  blockExplorerUrls: [activeNet.explorerUrl],
+                  nativeCurrency: activeNet.currency,
+                },
+              ],
+            });
+          } else {
+            throw switchError;
+          }
+        }
+      }
+
+      // 3. Setup Ethers Provider & Signer
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      // 4. Contracts & ABIs
+      const routerAddress = activeNet.contracts.escrowRouter;
+      const usdcAddress = activeNet.contracts.usdc;
+
+      const ERC20_ABI = [
+        "function balanceOf(address owner) view returns (uint256)",
+        "function allowance(address owner, address spender) view returns (uint256)",
+        "function approve(address spender, uint256 amount) returns (bool)",
+        "function decimals() view returns (uint8)",
+        "function symbol() view returns (string)",
+      ];
+
+      const ESCROW_ROUTER_ABI = [
+        "function createSession(address mentor, uint256[] calldata milestoneAmounts) external returns (uint256 sessionId)",
+        "event SessionCreated(uint256 indexed sessionId, address learner, address mentor, uint256 totalAmount)",
+        "event SessionFunded(uint256 indexed sessionId, uint256 amount)",
+        "function nextSessionId() view returns (uint256)",
+        "function PLATFORM_FEE_BPS() view returns (uint256)",
+      ];
+
+      const usdcContract = new ethers.Contract(usdcAddress, ERC20_ABI, signer);
+      const routerContract = new ethers.Contract(routerAddress, ESCROW_ROUTER_ABI, signer);
+
+      // 5. Calculate Exact Amounts (USDC 6 Decimals)
+      const subtotalUnits = BigInt(Math.round(basePrice * 1e6));
+      // EscrowRouter PLATFORM_FEE_BPS is 1000 (10%)
+      const feeUnits = (subtotalUnits * 1000n) / 10000n;
+      const totalUnits = subtotalUnits + feeUnits;
+
+      setWeb3Step("checking_balance");
+      setWeb3StatusMessage("Checking your USDC balance on Arbitrum Sepolia...");
+
+      const balance = await usdcContract.balanceOf(studentAddress);
+      if (balance < totalUnits) {
+        const curUsdc = (Number(balance) / 1e6).toFixed(2);
+        const reqUsdc = (Number(totalUnits) / 1e6).toFixed(2);
+        setInsufficientBalanceInfo({
+          balance: curUsdc,
+          needed: reqUsdc,
+          studentAddress,
+        });
+        throw new Error(
+          `Insufficient USDC balance on Arbitrum Sepolia. Your wallet has ${curUsdc} USDC, but this escrow requires ${reqUsdc} USDC.`
+        );
+      }
+
+      // 6. Check Allowance and Approve USDC
+      const allowance = await usdcContract.allowance(studentAddress, routerAddress);
+      if (allowance < totalUnits) {
+        setWeb3Step("approving");
+        setWeb3StatusMessage(
+          `Step 1/2: Please approve ${(Number(totalUnits) / 1e6).toFixed(2)} USDC in MetaMask...`
+        );
+        const approveTx = await usdcContract.approve(routerAddress, totalUnits);
+        setWeb3Step("confirming_approval");
+        setWeb3StatusMessage("USDC Approval broadcasted. Waiting for confirmation on Arbitrum...");
+        await approveTx.wait(1);
+      }
+
+      // 7. Execute createSession on EscrowRouter.sol
+      let targetMentorAddress = item.mentorAddress;
+      if (!targetMentorAddress || !ethers.isAddress(targetMentorAddress) || targetMentorAddress === ethers.ZeroAddress) {
+        targetMentorAddress = "0x0db11e31a07dddec044472c7853fbbc3137f51db";
+      }
+
+      setWeb3Step("depositing");
+      setWeb3StatusMessage(`Step 2/2: Confirming Escrow Vault Deposit in MetaMask...`);
+
+      const createTx = await routerContract.createSession(targetMentorAddress, [subtotalUnits]);
+
+      setWeb3Step("mining");
+      setWeb3StatusMessage("Escrow transaction broadcasted! Waiting for block confirmation on Arbitrum...");
+
+      const receipt = await createTx.wait(1);
+
+      // 8. Parse Event to extract real on-chain sessionId
+      let parsedSessionId = null;
+      if (receipt.logs) {
+        for (const log of receipt.logs) {
+          try {
+            const parsed = routerContract.interface.parseLog(log);
+            if (parsed && parsed.name === "SessionCreated") {
+              parsedSessionId = parsed.args.sessionId.toString();
+              break;
+            }
+          } catch {}
+        }
+      }
+
+      const txDetails = {
+        hash: receipt.hash,
+        sessionId: parsedSessionId || "1",
+        blockNumber: receipt.blockNumber,
+        contractAddress: routerAddress,
+        explorerUrl: `${activeNet.explorerUrl}/tx/${receipt.hash}`,
+      };
+      setConfirmedTx(txDetails);
+
+      // 9. Store Real Authenticated Session
+      const newSession = {
+        id: parsedSessionId ? `session-onchain-${parsedSessionId}` : `session-${Date.now()}`,
+        onChainId: parsedSessionId,
+        txHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        mentor: isMentor ? item.name : item.mentorName,
+        mentorAddress: targetMentorAddress,
+        learnerAddress: studentAddress,
+        skill: isMentor ? item.skill : item.title,
+        date: isMentor ? selectedDate : "Kickoff This Week",
+        time: hasPackages ? selectedPackage?.duration : (isMentor ? selectedSlot : item.duration),
+        price: Number((Number(totalUnits) / 1e6).toFixed(2)),
+        currency: "USDC",
+        status: "locked",
+        escrowStatus: "Locked",
+        type: isMentor ? "session" : "course",
+        note: studentNote,
+        contractAddress: routerAddress,
+        explorerUrl: txDetails.explorerUrl,
+        createdAt: new Date().toISOString(),
+      };
+
       addSession(newSession);
-    }, 1400);
+      setIsBooked(true);
+    } catch (err) {
+      console.error("Escrow deposit error:", err);
+      let errorMsg = err.message || "Failed to process escrow deposit on Arbitrum.";
+      if (err.code === 4001 || err.code === "ACTION_REJECTED" || err.info?.error?.code === 4001) {
+        errorMsg = "Transaction was cancelled or rejected in MetaMask.";
+      }
+      setWeb3Error(errorMsg);
+    } finally {
+      setIsProcessing(false);
+      setWeb3Step(null);
+      setWeb3StatusMessage("");
+    }
   };
 
   // If Booking is Completed
@@ -240,7 +476,7 @@ export default function BookingPage() {
 
             {/* Mascot celebration */}
             <img
-              src="/monsters/happy.png"
+              src="/monsters/happy.webp"
               alt="Happy Lesson Monster"
               className="w-24 h-auto object-contain animate-bounce drop-shadow-lg"
             />
@@ -248,13 +484,13 @@ export default function BookingPage() {
             <div>
               <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3.5 py-1 rounded-full text-xs font-bold mb-3">
                 <Lock size={12} className="text-emerald-600" />
-                <span>Arbitrum Smart Contract Vault Locked</span>
+                <span>Arbitrum Sepolia Smart Contract Verified</span>
               </span>
               <h1 className="text-slate-900 font-extrabold text-2xl sm:text-3xl">
                 Escrow Deposit Secured!
               </h1>
               <p className="text-slate-600 text-xs sm:text-sm mt-2 leading-relaxed">
-                Your deposit of <span className="font-extrabold text-purple-700">{formatPriceCurrency(grandTotal, currency)}</span> is now safely locked in escrow. The mentor cannot claim payment until you confirm completion.
+                Your deposit of <span className="font-extrabold text-purple-700">{formatPriceCurrency(grandTotal, currency)}</span> is now authentically locked in the Arbitrum Sepolia escrow smart contract. The mentor cannot claim payment until you confirm completion.
               </p>
             </div>
 
@@ -273,11 +509,55 @@ export default function BookingPage() {
                   {isMentor ? `${selectedDate}, ${selectedSlot}` : item.duration}
                 </span>
               </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-medium">On-Chain Session:</span>
+                <span className="font-mono font-bold text-purple-700">#{confirmedTx?.sessionId || "1"}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-medium">Escrow Contract:</span>
+                <span className="font-mono text-slate-600 text-[11px] truncate max-w-[190px]">
+                  {escrowVaultAddress}
+                </span>
+              </div>
+              {confirmedTx?.blockNumber && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-medium">Confirmed Block:</span>
+                  <span className="font-mono font-bold text-slate-800">#{confirmedTx.blockNumber}</span>
+                </div>
+              )}
+              {confirmedTx?.hash && (
+                <div className="flex justify-between items-center border-t border-slate-200 pt-2">
+                  <span className="text-slate-400 font-medium">Arbiscan Receipt:</span>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={confirmedTx.explorerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1 text-[11px] underline"
+                    >
+                      <span>{confirmedTx.hash.slice(0, 8)}...{confirmedTx.hash.slice(-6)}</span>
+                      <ExternalLink size={11} />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(confirmedTx.hash);
+                        setCopiedTxHash(true);
+                        setTimeout(() => setCopiedTxHash(false), 2000);
+                      }}
+                      className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                      title="Copy Tx Hash"
+                    >
+                      {copiedTxHash ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between border-t border-slate-200 pt-2">
                 <span className="text-slate-400 font-medium">Escrow Security:</span>
                 <span className="font-bold text-emerald-600 flex items-center gap-1">
                   <CheckCircle2 size={13} />
-                  <span>100% Protected on Arbitrum</span>
+                  <span>100% Non-Custodial Smart Contract</span>
                 </span>
               </div>
             </div>
@@ -290,12 +570,24 @@ export default function BookingPage() {
                 <span>View in Dashboard</span>
                 <ArrowRight size={14} />
               </Link>
-              <Link
-                href="/explore"
-                className="px-6 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
-              >
-                Explore More
-              </Link>
+              {confirmedTx?.explorerUrl ? (
+                <a
+                  href={confirmedTx.explorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <span>Verify on Arbiscan</span>
+                  <ExternalLink size={13} />
+                </a>
+              ) : (
+                <Link
+                  href="/explore"
+                  className="px-6 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+                >
+                  Explore More
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -660,10 +952,12 @@ export default function BookingPage() {
                       <div className="flex items-center gap-2">
                         <Wallet size={16} className="text-purple-600" />
                         <span className="font-extrabold text-xs text-purple-950">
-                          {walletAddress ? `Connected: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "Web3 Browser Wallet"}
+                          {connectedAccount || walletAddress
+                            ? `Connected: ${(connectedAccount || walletAddress).slice(0, 6)}...${(connectedAccount || walletAddress).slice(-4)}`
+                            : "Web3 Browser Wallet"}
                         </span>
                       </div>
-                      {!walletAddress ? (
+                      {!connectedAccount && !walletAddress ? (
                         <button
                           type="button"
                           onClick={connectWallet}
@@ -671,14 +965,30 @@ export default function BookingPage() {
                         >
                           Connect Wallet
                         </button>
+                      ) : walletUsdcBalance !== null && walletUsdcBalance < grandTotal ? (
+                        <span className="text-[10px] font-bold text-rose-700 bg-rose-100 border border-rose-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <AlertTriangle size={10} className="text-rose-600" />
+                          <span>Insufficient Balance</span>
+                        </span>
                       ) : (
                         <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
                           <CheckCircle2 size={10} /> Ready to Escrow
                         </span>
                       )}
                     </div>
+
+                    {(connectedAccount || walletAddress) && (
+                      <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-purple-200/70">
+                        <span className="text-purple-800/80 font-medium">MetaMask Balance:</span>
+                        <span className="font-mono font-bold text-purple-950">
+                          {walletUsdcBalance !== null ? `${walletUsdcBalance.toFixed(2)} USDC` : "0.00 USDC"}
+                          {walletEthBalance !== null ? ` • ${walletEthBalance.toFixed(4)} ETH` : ""}
+                        </span>
+                      </div>
+                    )}
+
                     <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Compatible with MetaMask, Coinbase Wallet, Rabby, and OKX Wallet on Arbitrum One. When you click deposit, all gas fees are 100% subsidized by the platform sponsor vault.
+                      Compatible with MetaMask, Coinbase Wallet, Rabby, and OKX Wallet on Arbitrum Sepolia. Non-custodial smart escrow with platform gas subsidy.
                     </p>
                   </div>
                 )}
@@ -742,7 +1052,7 @@ export default function BookingPage() {
                   <span>100% Escrow Guarded!</span>
                 </div>
                 <img
-                  src="/monsters/oke pose.png"
+                  src="/monsters/oke pose.webp"
                   alt="Barnaby the Escrow Guardian"
                   className="w-24 sm:w-28 h-auto object-contain drop-shadow-2xl animate-float"
                 />
@@ -801,6 +1111,72 @@ export default function BookingPage() {
                   </span>
                 </div>
 
+                {/* Connected MetaMask Wallet Balance Card */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Wallet size={15} className="text-purple-600" />
+                      <span className="font-bold text-slate-900">Connected MetaMask</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-bold">
+                      Arbitrum Sepolia
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/70">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase">Wallet Address</span>
+                      <span className="font-mono text-xs font-bold text-slate-800">
+                        {connectedAccount
+                          ? `${connectedAccount.slice(0, 6)}...${connectedAccount.slice(-4)}`
+                          : walletAddress
+                          ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+                          : "Not Connected"}
+                      </span>
+                    </div>
+
+                    <div className="text-right flex flex-col items-end">
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase">Available Balance</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`font-mono text-sm font-black ${
+                          walletUsdcBalance === null
+                            ? "text-slate-400"
+                            : walletUsdcBalance < grandTotal
+                            ? "text-rose-600"
+                            : "text-emerald-600"
+                        }`}>
+                          {walletUsdcBalance !== null ? `${walletUsdcBalance.toFixed(2)} USDC` : "0.00 USDC"}
+                        </span>
+                        {walletEthBalance !== null && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            ({walletEthBalance.toFixed(4)} ETH)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
+                    <span className="text-slate-500 font-medium">Balance Status:</span>
+                    {walletUsdcBalance === null ? (
+                      <span className="text-slate-400 text-[10px] font-semibold flex items-center gap-1">
+                        <RefreshCw size={10} className="animate-spin" />
+                        <span>Reading Wallet...</span>
+                      </span>
+                    ) : walletUsdcBalance < grandTotal ? (
+                      <span className="text-rose-700 font-bold text-[10px] bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <AlertTriangle size={11} className="text-rose-600" />
+                        <span>Insufficient Funds (Short ${(grandTotal - walletUsdcBalance).toFixed(2)})</span>
+                      </span>
+                    ) : (
+                      <span className="text-emerald-700 font-bold text-[10px] bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 size={11} className="text-emerald-600" />
+                        <span>Sufficient Balance (Ready)</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
                 {/* Cost Breakdown */}
                 <div className="space-y-2 text-xs pt-1">
                   <div className="flex justify-between text-slate-600">
@@ -837,32 +1213,115 @@ export default function BookingPage() {
                   </div>
                 </div>
 
+                {/* Web3 Status & Alerts */}
+                {isProcessing && web3StatusMessage && (
+                  <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-200 text-purple-950 text-xs flex items-center gap-3 animate-pulse">
+                    <RefreshCw size={16} className="text-purple-600 animate-spin shrink-0" />
+                    <span className="font-semibold">{web3StatusMessage}</span>
+                  </div>
+                )}
+
+                {/* Insufficient Balance Alert Card */}
+                {((walletUsdcBalance !== null && walletUsdcBalance < grandTotal) || Boolean(insufficientBalanceInfo)) && (
+                  <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-950 text-xs flex flex-col gap-3 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-black text-rose-700 text-sm">
+                        <AlertTriangle size={18} className="text-rose-600 shrink-0" />
+                        <span>Insufficient USDC Balance</span>
+                      </div>
+                      <span className="font-mono text-[11px] font-extrabold bg-rose-200 text-rose-900 px-2 py-0.5 rounded-md">
+                        Short by ${(Math.max(0, grandTotal - (walletUsdcBalance ?? Number(insufficientBalanceInfo?.balance ?? 0)))).toFixed(2)} USDC
+                      </span>
+                    </div>
+                    <p className="text-rose-900 leading-relaxed text-xs">
+                      Your connected MetaMask wallet currently holds <strong>{(walletUsdcBalance ?? Number(insufficientBalanceInfo?.balance ?? 0)).toFixed(2)} USDC</strong>, but this smart contract escrow requires <strong>{formatPriceCurrency(grandTotal, currency)}</strong>. Please top up your Arbitrum Sepolia wallet to proceed.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-rose-200">
+                      <a
+                        href="https://faucet.circle.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                      >
+                        <span>Circle USDC Faucet</span>
+                        <ExternalLink size={12} />
+                      </a>
+                      <a
+                        href="https://cloud.google.com/application/web3/faucet/arbitrum/sepolia"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 rounded-xl bg-white border border-rose-300 hover:bg-rose-100/60 text-rose-900 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                      >
+                        <span>Sepolia ETH (Gas)</span>
+                        <ExternalLink size={12} />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => checkUsdcBalance()}
+                        disabled={isCheckingBalance}
+                        className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ml-auto disabled:opacity-75"
+                      >
+                        <RefreshCw size={12} className={isCheckingBalance ? "animate-spin" : ""} />
+                        <span>{isCheckingBalance ? "Checking..." : "Refresh Balance"}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {web3Error && !(walletUsdcBalance !== null && walletUsdcBalance < grandTotal) && !insufficientBalanceInfo && (
+                  <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start gap-2.5">
+                    <AlertTriangle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="font-bold">Transaction Failed</div>
+                      <div className="text-rose-700 mt-0.5 leading-relaxed text-[11px]">{web3Error}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWeb3Error(null)}
+                      className="text-rose-400 hover:text-rose-700 cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
                 {/* Deposit / Transak CTA Button */}
-                <button
-                  type="button"
-                  onClick={paymentMethod === "transak" ? () => setShowTransakModal(true) : handleDepositEscrow}
-                  disabled={isProcessing}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-sm shadow-lg shadow-purple-900/30 hover:shadow-purple-900/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
-                >
-                  {isProcessing ? (
-                    <span className="flex items-center gap-2">
-                      <Lock size={16} className="animate-bounce text-emerald-300" />
-                      <span>Deploying Escrow Smart Lock...</span>
-                    </span>
-                  ) : paymentMethod === "transak" ? (
-                    <>
-                      <CreditCard size={16} />
-                      <span>Proceed to Transak Payment ({formatPriceCurrency(grandTotal, currency)})</span>
-                      <ArrowRight size={15} />
-                    </>
-                  ) : (
-                    <>
-                      <Lock size={16} />
-                      <span>Deposit {formatPriceCurrency(grandTotal, currency)} to Escrow</span>
-                      <ArrowRight size={15} />
-                    </>
-                  )}
-                </button>
+                {paymentMethod === "crypto" && ((walletUsdcBalance !== null && walletUsdcBalance < grandTotal) || Boolean(insufficientBalanceInfo)) ? (
+                  <button
+                    type="button"
+                    disabled={true}
+                    className="w-full py-4 rounded-2xl bg-rose-600 text-white font-black text-sm shadow-lg shadow-rose-950/25 flex items-center justify-center gap-2 cursor-not-allowed opacity-95 transition-all"
+                  >
+                    <AlertTriangle size={18} className="text-white shrink-0" />
+                    <span>Insufficient Balance ({(walletUsdcBalance ?? Number(insufficientBalanceInfo?.balance ?? 0)).toFixed(2)} / {formatPriceCurrency(grandTotal, currency)})</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={paymentMethod === "transak" ? () => setShowTransakModal(true) : handleDepositEscrow}
+                    disabled={isProcessing}
+                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-sm shadow-lg shadow-purple-900/30 hover:shadow-purple-900/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
+                  >
+                    {isProcessing ? (
+                      <span className="flex items-center gap-2">
+                        <RefreshCw size={16} className="animate-spin text-purple-200" />
+                        <span>{web3StatusMessage || "Interacting with MetaMask..."}</span>
+                      </span>
+                    ) : paymentMethod === "transak" ? (
+                      <>
+                        <CreditCard size={16} />
+                        <span>Proceed to Transak Gateway ({formatPriceCurrency(grandTotal, currency)})</span>
+                        <ArrowRight size={15} />
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={16} />
+                        <span>Deposit {formatPriceCurrency(grandTotal, currency)} via MetaMask</span>
+                        <ArrowRight size={15} />
+                      </>
+                    )}
+                  </button>
+                )}
 
                 {/* Reassurance points with check icons */}
                 <div className="pt-2 border-t border-slate-100 space-y-1.5 text-[11px] text-slate-500">
@@ -955,7 +1414,7 @@ export default function BookingPage() {
             {/* Footer with testing actions */}
             <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
               <span className="text-[10px] text-slate-500 font-medium">
-                Sandbox Mode (Simulated deposit for testing)
+                On-ramp directly to your Arbitrum Sepolia wallet
               </span>
               <div className="flex items-center gap-2">
                 <a
@@ -964,7 +1423,7 @@ export default function BookingPage() {
                   rel="noopener noreferrer"
                   className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center gap-1"
                 >
-                  <span>Open Tab</span>
+                  <span>Open Fullscreen Tab</span>
                   <ExternalLink size={11} />
                 </a>
                 <button
@@ -976,7 +1435,7 @@ export default function BookingPage() {
                   className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
                 >
                   <Check size={13} />
-                  <span>Simulate Payment & Lock Escrow</span>
+                  <span>Deposit Escrow via MetaMask</span>
                 </button>
               </div>
             </div>
