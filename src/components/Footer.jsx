@@ -15,7 +15,7 @@ export default function Footer() {
           <div className="lg:col-span-2 space-y-4">
             <Link href="/" className="inline-block group">
               <img
-                src="/logo-full-white.png"
+                src="/logo-full-white.webp"
                 alt="Trust Lesson"
                 className="h-10 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-md"
               />
@@ -109,7 +109,7 @@ export default function Footer() {
             {/* Playful mini mascot peek */}
             <div className="pt-2 flex items-center gap-2.5">
               <img
-                src="/monsters/star.png"
+                src="/monsters/star.webp"
                 alt="Lesson Monster Star"
                 className="w-10 h-10 object-contain drop-shadow animate-float"
               />

@@ -43,9 +43,9 @@ Dokumen ini adalah panduan lengkap untuk AI Agent yang akan mengimplementasikan 
 
 ---
 
-## 3. Smart Contract (Arbitrum)
+## 3. Smart Contract Architecture (Arbitrum Sepolia V2 Live)
 
-### 3.1 EscrowRouter
+### 3.1 EscrowRouter V2 (`0x094E4b351272fA45613D7D093B7f3a3C20AeE795`)
 **State Machine:**
 ```
 0: CREATED → 1: FUNDED → 2: IN_SESSION → 3: COMPLETED
@@ -53,26 +53,38 @@ Dokumen ini adalah panduan lengkap untuk AI Agent yang akan mengimplementasikan 
 ```
 
 **Key Functions:**
-- `createSession(mentor, milestones[], token)` → Learner deposit USDC
-- `confirmMilestone(sessionId, index)` → Release dana spesifik
-- `raiseDispute(sessionId, evidenceHash)` → Freeze dana
-- `resolveDispute(sessionId, releasePercent)` → Jury/Arbitrator call
+- `createSession(mentor, milestones[])` → Learner deposit USDC + 10% protocol fee
+- `createSessionWithSkill(mentor, milestones[], skillTag)` → Session dengan tagging ke SkillGraph
+- `confirmMilestone(sessionId, index)` → Release dana milestone langsung ke mentor
+- `raiseDispute(sessionId, evidenceHash)` → Freeze sisa dana & lempar ke DisputeCouncil
+- `resolveDispute(sessionId, releasePercent)` → Dieksekusi otomatis oleh DisputeCouncil setelah kuorum juri
 
-### 3.2 MentorStaking
-- `stake(amount)` → Mentor lock USDC, dapat "Verified" badge
-- `slash(address, amount)` → Potong stake kalau kalah dispute
+### 3.2 VerifiableCredential V2 (`0x50fA8e6c56B97484D2571b2C220d3EDbBAe6847D`)
+- Dual-party issuance (`issueCompositeCredential`) menerbitkan kredensial untuk learner dan mentor sekaligus
+- EIP-712 typed signature digest untuk verifikasi off-chain tanpa gas
+- Format ekspor W3C JSON-LD portable (`/certificate/[id]`)
+
+### 3.3 SkillGraph (`0x99303483484cc2c9393138574969f15C415A3016`)
+- Graf kompetensi on-chain berlevel (Level 1, 2, 3)
+- Validasi prasyarat (*prerequisite gating*, misal: Solidity Basics sebelum Solidity Security)
+- Auto-update progress saat credential diterbitkan
+
+### 3.4 DisputeCouncil 3-of-5 (`0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006`)
+- Multi-sig jury panel (5 juri, kuorum 3-of-5)
+- Batas waktu penyelesaian 72 jam, auto-resolusi 50/50 jika juri melewati batas waktu
+- Bukti IPFS publik (`evidenceIpfsCid`) tercatat on-chain
+- Hook interface untuk eskalasi ke Kleros Court & UMA Optimistic Oracle
+
+### 3.5 MentorStaking (`0xbbD3dA628360c63f36c9E6D2A955e33ADc5281Dd`)
+- `stake(amount)` → Mentor lock minimal 100 USDC, dapat badge "Verified"
+- `slash(address, amount, recipient)` → Dipotong otomatis oleh EscrowRouter jika kalah dispute
 - `unstake()` → Timelock 7 hari
 
-### 3.3 ReputationRegistry
-- `issueCredential(mentor, sessionId, rating)` → SBT (Soulbound Token) non-transferable
-- `getReputation(address)` → Array credentials untuk export
+### 3.6 VideoAccess (`0xb7d6EE04514AB9A210fDa4A3006c230EEEc40023`)
+- `registerVideo(contentHash, price)` → Simpan hash on-chain, video streaming HLS di Cloudflare
+- `purchaseAccess(videoId)` → Bayar USDC via smart contract, akses dibuka permanen
 
-### 3.4 VideoAccess (Hybrid Storage)
-- `registerVideo(contentHash, price)` → Simpan hash on-chain, video di Cloudflare
-- `purchaseAccess(videoId)` → Bayar USDC, dapat akses
-- `hasAccess(learner, videoId)` → Check on-chain
-
-**Deployment:** Arbitrum One (Chain ID 42161), USDC native contract: `0xaf88d065e77c8cC2239327C5EDb3A432268e5831`
+**Live Network:** Arbitrum Sepolia (`Chain ID: 421614`), USDC: `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d`
 
 ---
 
@@ -383,56 +395,52 @@ Nonce: ${nonce}` })
 
 ---
 
-## 10. Deployment Checklist
+## 10. Deployment Checklist & Live Status
 
-**Smart Contract:**
-- [ ] Deploy ke Arbitrum One
-- [ ] Verify source code di Arbiscan
-- [ ] Set initial platform fee (5%)
-- [ ] Whitelist USDC contract
+**Smart Contract (Arbitrum Sepolia Testnet — Live):**
+- [x] Deploy ke Arbitrum Sepolia (`EscrowRouter`: `0x14BBB05C74fBcD2E122E197FD244b54dFb171587`)
+- [x] Set platform fee ke 10% (`PLATFORM_FEE_BPS = 1000`)
+- [x] Hubungkan permissions dengan `ReputationRegistry` (`0xE04Ca75db5020D3F2C48b0a921CB93419BE53A0E`) & `MentorStaking` (`0x6d34056576d76835CC3e0bB8F372C2EB4A7D324b`)
+- [x] Arbitrum Sepolia USDC Integration (`0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d`)
+- [ ] Deploy & Verify ke Arbitrum One Mainnet
 
 **Backend:**
-- [ ] Deploy ke Railway/Render/Fly.io
-- [ ] Setup PostgreSQL (Neon/Supabase)
-- [ ] Setup Redis untuk session cache (optional)
-- [ ] Setup Cloudflare Stream account
-- [ ] Setup IPFS pinning (Pinata/Web3.Storage)
+- [x] Hono edge API router di Next.js App Router (`app/api/[[...route]]/route.js`)
+- [x] Prisma ORM setup & SQLite development database
+- [x] Gas Paymaster Relayer engine (`lib/gasSponsor.js`)
+- [x] Multi-chain switcher engine (`lib/networkConfig.js`)
 
 **Frontend:**
-- [ ] Ganti semua mockup data dengan API calls
-- [ ] Setup wagmi config ke Arbitrum One
-- [ ] Deploy ke Vercel
+- [x] Real Web3 MetaMask integration (tanpa mockup/timer palsu)
+- [x] Live balance query (USDC & ETH) dari MetaMask
+- [x] Pre-flight insufficient balance warning banner & dynamic button state
+- [x] 100% English Web UI across all views
 
 ---
 
-## 11. TODO untuk AI Agent
+## 11. TODO & Milestone Status
 
-### Phase 1: Cleanup (Wajib Pertama)
-- [ ] Hapus semua file `mockData.ts`, `dummyData.json`, atau constant data di frontend
-- [ ] Hapus semua `setTimeout` simulasi loading
-- [ ] Hapus comment `// TODO: connect to backend`
+### Phase 1: Cleanup & No Mockups
+- [x] Eliminasi timer dummy/palsu pada booking checkout
+- [x] Transaksi real Web3 MetaMask dengan Arbitrum Sepolia
+- [x] Purge database dari session mockup lama
 
 ### Phase 2: Smart Contracts
-- [ ] Implement EscrowRouter.sol dengan state machine lengkap
-- [ ] Implement MentorStaking.sol dengan slashing
-- [ ] Implement VideoAccess.sol untuk hybrid storage
-- [ ] Deploy ke Arbitrum Sepolia untuk testing
+- [x] Implementasi EscrowRouter.sol dengan 10% Protocol Cut (1,000 BPS)
+- [x] Implementasi MentorStaking.sol dengan slashing
+- [x] Implementasi VideoAccess.sol untuk hybrid access gating
+- [x] Implementasi ReputationRegistry.sol untuk Soulbound Token (SBT)
+- [x] Deploy resmi ke Arbitrum Sepolia
 
-### Phase 3: Backend
-- [ ] Setup Hono/Fastify project dengan Prisma
-- [ ] Implement semua endpoint di section 5
-- [ ] Setup indexer untuk sync events
-- [ ] Implement SIWE auth
+### Phase 3: Backend & Database
+- [x] Setup Hono API router terpadu
+- [x] Prisma schema untuk Users, Sessions, Milestones, Videos, Portfolios
+- [x] Gas Paymaster relayer untuk penerbitan sertifikat gasless
 
 ### Phase 4: Integration
-- [ ] Frontend: ganti mockup dengan React Query mutations
-- [ ] Frontend: setup WebSocket listener untuk real-time escrow updates
-- [ ] Frontend: video player integrasi dengan Cloudflare Stream
-
-### Phase 5: SaaS Features
-- [ ] Subscription model: recurring payment via Superfluid atau Stripe crypto
-- [ ] Revenue share: platform fee 5% auto-split saat release escrow
-- [ ] Analytics dashboard untuk mentor (earnings, session count)
+- [x] Booking page real Web3 deposit pipeline (`approve` + `createSession`)
+- [x] Live balance detection & faucet shortcuts (Circle USDC & Sepolia ETH)
+- [x] Arbiscan transaction receipt confirmation modal
 
 ---
 

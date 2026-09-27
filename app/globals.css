@@ -9,7 +9,7 @@
   --color-navy: #0F172A;
   --color-lavender: #F1F5F9;
 
-  --font-sans: "Outfit", "Poppins", system-ui, sans-serif;
+  --font-sans: var(--font-outfit), var(--font-poppins), system-ui, -apple-system, sans-serif;
 
   --radius-card: 28px;
   --radius-card-sm: 20px;

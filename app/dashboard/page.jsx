@@ -1429,15 +1429,15 @@ function MentorDashboardView({ user }) {
         <div className="flex items-center gap-4">
           <Avatar className="w-14 h-14 rounded-full ring-2 ring-purple-300 shadow-xs shrink-0 overflow-hidden">
             {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-full" />
+              <img src={user.avatarUrl} alt={user.name} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
             ) : (
-              <img src="/mentor-profile.png" alt={user.name || "Mentor"} className="w-full h-full object-cover rounded-full" />
+              <img src="/mentor-profile.webp" alt={user.name || "Mentor"} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
             )}
           </Avatar>
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="px-3 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5">
-                <img src="/mentor-profile.png" alt="Mentor" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                <img src="/mentor-profile.webp" alt="Mentor" width={14} height={14} decoding="async" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
                 <span>Verified Mentor</span>
               </span>
               <span className="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-1">
@@ -3036,7 +3036,8 @@ function MentorDashboardView({ user }) {
 // STUDENT DASHBOARD VIEW (With Radix UI Tabs)
 // =============================================================
 function StudentDashboardView({ user }) {
-  const { sessions, updateSessionStatus } = useAuth();
+  const { sessions, updateSessionStatus, clearAllSessions } = useAuth();
+  const [activeTab, setActiveTab] = useState("overview");
   const [selectedCert, setSelectedCert] = useState(null);
   const [loadingCert, setLoadingCert] = useState(false);
   const [showCertModal, setShowCertModal] = useState(false);
@@ -3102,15 +3103,15 @@ function StudentDashboardView({ user }) {
         <div className="flex items-center gap-4">
           <Avatar className="w-14 h-14 rounded-full ring-2 ring-emerald-200 shadow-xs shrink-0 overflow-hidden">
             {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-full" />
+              <img src={user.avatarUrl} alt={user.name} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
             ) : (
-              <img src="/student-profile.png" alt={user.name || "Student"} className="w-full h-full object-cover rounded-full" />
+              <img src="/student-profile.webp" alt={user.name || "Student"} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
             )}
           </Avatar>
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="px-3 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs flex items-center gap-1.5">
-                <img src="/student-profile.png" alt="Student" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                <img src="/student-profile.webp" alt="Student" width={14} height={14} decoding="async" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
                 <span>Student Workspace</span>
               </span>
               {user.university && (
@@ -3205,6 +3206,17 @@ function StudentDashboardView({ user }) {
                 Review deliverables and authorize milestone escrow releases.
               </p>
             </div>
+            {sessions.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAllSessions}
+                className="px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                title="Wipe test session history"
+              >
+                <Trash2 size={13} />
+                <span>Clear All Bookings</span>
+              </button>
+            )}
           </div>
 
           {sessions.length > 0 ? (
@@ -3225,6 +3237,28 @@ function StudentDashboardView({ user }) {
                         </span>
                       </div>
                       <h3 className="font-extrabold text-slate-900 text-base">{s.skill}</h3>
+                      {s.txHash && (
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1">
+                          <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-[10px] flex items-center gap-1">
+                            <CheckCircle2 size={11} className="text-emerald-600" />
+                            Arbitrum Verified
+                          </span>
+                          <a
+                            href={s.explorerUrl || `https://sepolia.arbiscan.io/tx/${s.txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-purple-600 hover:text-purple-800 underline flex items-center gap-1 font-bold"
+                          >
+                            <span>{s.txHash.slice(0, 10)}...{s.txHash.slice(-6)}</span>
+                            <ExternalLink size={10} />
+                          </a>
+                          {s.onChainId && (
+                            <span className="bg-purple-100 text-purple-800 font-mono text-[10px] px-1.5 py-0.5 rounded font-bold">
+                              Session #{s.onChainId}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3">

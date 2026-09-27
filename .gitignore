@@ -42,3 +42,6 @@ cache_hardhat/
 *.njsproj
 *.sln
 *.sw?
+
+# Exclude docs as requested
+docs/

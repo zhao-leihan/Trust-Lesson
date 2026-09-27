@@ -180,7 +180,7 @@ export default function ExplorePage() {
             {/* Left Mascot (Student reading book) with Floating & Entrance Animation */}
             <div className="hidden lg:flex flex-col items-center justify-center w-56 xl:w-64 shrink-0 animate-fadeInUp">
               <img
-                src="/monsters/knowledge.png"
+                src="/monsters/knowledge.webp"
                 alt="Knowledge Scholar Monster"
                 className="w-full max-w-[220px] h-auto object-contain drop-shadow-xl animate-float hover:scale-105 transition-transform duration-300"
               />
@@ -238,7 +238,7 @@ export default function ExplorePage() {
             {/* Right Mascot (Mentor with laptop) with Floating & Entrance Animation */}
             <div className="hidden lg:flex flex-col items-center justify-center w-56 xl:w-64 shrink-0 animate-fadeInUp">
               <img
-                src="/monsters/mentor.png"
+                src="/monsters/mentor.webp"
                 alt="Mentor Monster"
                 className="w-full max-w-[220px] h-auto object-contain drop-shadow-xl animate-float-slow hover:scale-105 transition-transform duration-300"
               />
@@ -329,7 +329,7 @@ export default function ExplorePage() {
             /* Clean Empty State */
             <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-xs max-w-lg mx-auto space-y-4">
               <img
-                src="/monsters/hello.png"
+                src="/monsters/hello.webp"
                 alt="Lesson Monster"
                 className="w-20 h-auto mx-auto object-contain drop-shadow-md animate-wiggle"
               />

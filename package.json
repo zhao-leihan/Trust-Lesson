@@ -12,12 +12,16 @@
     "test:contracts": "hardhat test",
     "deploy:contracts": "hardhat run scripts/deploy.cjs",
     "deploy:sepolia": "hardhat run scripts/deploy.cjs --network arbitrumSepolia",
+    "deploy:v2:sepolia": "hardhat run scripts/deployV2.cjs --network arbitrumSepolia",
     "deploy:mainnet": "hardhat run scripts/deploy.cjs --network arbitrumOne",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "indexer": "node services/indexer.js"
+    "indexer": "node services/indexer.js",
+    "indexer:ponder": "ponder dev",
+    "convert:webp": "node scripts/convertToWebp.js",
+    "convert:webp:update": "node scripts/convertToWebp.js --update-code"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

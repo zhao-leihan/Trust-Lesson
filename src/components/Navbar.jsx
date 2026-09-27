@@ -10,6 +10,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "./ui/Avatar";
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/explore", label: "Course" },
+  { to: "/leaderboard", label: "Leaderboard" },
   { to: "/how-to-use", label: "How to Use" },
   { to: "/about", label: "About" },
 ];
@@ -45,12 +46,13 @@ export default function Navbar() {
     return null;
   }
 
-  // ── Conditional Theme: White on Home & About, Light/Purple on Explore, Course, Book & Dashboard ──
+  // ── Conditional Theme: White on Home & About, Light/Purple on Explore, Course, Leaderboard, Book & Dashboard ──
   const isWhiteTheme = pathname === "/" || pathname === "/about";
   const isLightPage =
     pathname === "/explore" ||
     pathname === "/course" ||
     pathname === "/how-to-use" ||
+    pathname.startsWith("/leaderboard") ||
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/book") ||
     pathname.startsWith("/mentor") ||
@@ -68,7 +70,7 @@ export default function Navbar() {
     : "bg-slate-950/90 backdrop-blur-xl border-b border-purple-900/30";
 
   // Logo source
-  const logoSrc = isWhiteTheme ? "/logo-full-white.png" : "/logo-full.png";
+  const logoSrc = isWhiteTheme ? "/logo-full-white.webp" : "/logo-full.webp";
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-2.5 sm:py-3 ${headerBgClass}`}>
@@ -78,6 +80,10 @@ export default function Navbar() {
           <img
             src={logoSrc}
             alt="Trust Lesson"
+            width={168}
+            height={48}
+            fetchPriority="high"
+            decoding="async"
             className="h-10 sm:h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-sm"
           />
         </Link>
@@ -131,10 +137,10 @@ export default function Navbar() {
                       src={
                         user.avatarUrl ||
                         (user.role === "mentor" || user.roleType === "MENTOR"
-                          ? "/mentor-profile.png"
+                          ? "/mentor-profile.webp"
                           : user.role === "admin" || user.roleType === "ADMIN"
-                          ? "/admin-profile.png"
-                          : "/student-profile.png")
+                          ? "/admin-profile.webp"
+                          : "/student-profile.webp")
                       }
                       alt={user.name || "User Profile"}
                       className="object-cover"
@@ -148,10 +154,10 @@ export default function Navbar() {
                     <img
                       src={
                         user.role === "admin" || user.roleType === "ADMIN"
-                          ? "/admin-profile.png"
+                          ? "/admin-profile.webp"
                           : user.role === "mentor" || user.roleType === "MENTOR"
-                          ? "/mentor-profile.png"
-                          : "/student-profile.png"
+                          ? "/mentor-profile.webp"
+                          : "/student-profile.webp"
                       }
                       alt="Role"
                       className="w-full h-full object-cover"
@@ -209,10 +215,10 @@ export default function Navbar() {
                     src={
                       user.avatarUrl ||
                       (user.role === "mentor" || user.roleType === "MENTOR"
-                        ? "/mentor-profile.png"
+                        ? "/mentor-profile.webp"
                         : user.role === "admin" || user.roleType === "ADMIN"
-                        ? "/admin-profile.png"
-                        : "/student-profile.png")
+                        ? "/admin-profile.webp"
+                        : "/student-profile.webp")
                     }
                     alt={user.name || "User Profile"}
                     className="object-cover"
@@ -226,10 +232,10 @@ export default function Navbar() {
                   <img
                     src={
                       user.role === "admin" || user.roleType === "ADMIN"
-                        ? "/admin-profile.png"
+                        ? "/admin-profile.webp"
                         : user.role === "mentor" || user.roleType === "MENTOR"
-                        ? "/mentor-profile.png"
-                        : "/student-profile.png"
+                        ? "/mentor-profile.webp"
+                        : "/student-profile.webp"
                     }
                     alt="Role"
                     className="w-full h-full object-cover"
@@ -266,10 +272,10 @@ export default function Navbar() {
                     src={
                       user.avatarUrl ||
                       (user.role === "mentor" || user.roleType === "MENTOR"
-                        ? "/mentor-profile.png"
+                        ? "/mentor-profile.webp"
                         : user.role === "admin" || user.roleType === "ADMIN"
-                        ? "/admin-profile.png"
-                        : "/student-profile.png")
+                        ? "/admin-profile.webp"
+                        : "/student-profile.webp")
                     }
                     alt={user.name || "User Profile"}
                     className="object-cover"
@@ -282,11 +288,11 @@ export default function Navbar() {
                   <p className="text-white font-bold text-sm leading-tight">{user.name}</p>
                   <p className="text-purple-300/80 text-xs capitalize flex items-center gap-1.5 mt-0.5">
                     {user.role === "admin" || user.roleType === "ADMIN" ? (
-                      <img src="/admin-profile.png" alt="Admin" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                      <img src="/admin-profile.webp" alt="Admin" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
                     ) : user.role === "mentor" || user.roleType === "MENTOR" ? (
-                      <img src="/mentor-profile.png" alt="Mentor" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                      <img src="/mentor-profile.webp" alt="Mentor" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
                     ) : (
-                      <img src="/student-profile.png" alt="Student" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                      <img src="/student-profile.webp" alt="Student" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
                     )}
                     {user.role === "admin" || user.roleType === "ADMIN"
                       ? "Admin"

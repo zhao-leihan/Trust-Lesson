@@ -65,11 +65,11 @@ export default function HowToUsePage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-purple-500 selection:text-white overflow-x-hidden">
       {/* ── 1. HERO SECTION WITH BACKGROUND-GIGS.PNG & ANIMATED REVEAL ── */}
       <section className="relative pt-28 sm:pt-36 pb-20 sm:pb-28 overflow-hidden bg-white border-b border-purple-100">
-        {/* Visual Hero Backdrop using background-gigs.png with smooth entrance */}
+        {/* Visual Hero Backdrop using background-gigs.webp with smooth entrance */}
         <div
           className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-40 pointer-events-none transition-transform duration-1000 ease-out"
           style={{
-            backgroundImage: `url('/background-gigs.png')`,
+            backgroundImage: `url('/background-gigs.webp')`,
           }}
         />
 
@@ -183,7 +183,7 @@ export default function HowToUsePage() {
       <section id="student-flow" className="py-20 px-4 sm:px-6 max-w-6xl mx-auto w-full relative z-10">
         <Reveal direction="up" className="text-center space-y-3 mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black uppercase tracking-wider">
-            <img src="/student-profile.png" alt="Student" className="w-4 h-4 rounded-full object-cover" />
+            <img src="/student-profile.webp" alt="Student" className="w-4 h-4 rounded-full object-cover" />
             <span>Learner & Student Guide</span>
           </div>
           <h2 className="text-2xl sm:text-4xl font-black text-slate-950">
@@ -326,7 +326,7 @@ export default function HowToUsePage() {
         <div className="max-w-6xl mx-auto w-full space-y-12">
           <Reveal direction="up" className="text-center space-y-3">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-purple-100 border border-purple-200 text-purple-800 text-xs font-black uppercase tracking-wider">
-              <img src="/mentor-profile.png" alt="Mentor" className="w-4 h-4 rounded-full object-cover" />
+              <img src="/mentor-profile.webp" alt="Mentor" className="w-4 h-4 rounded-full object-cover" />
               <span>Mentor & Teacher Guide</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-black text-slate-950">
@@ -487,14 +487,14 @@ export default function HowToUsePage() {
 
           {/* Core Feature Grid with Official 3D Monsters Payment Graphic */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Visual Graphic: monsters/Payment.png with gentle float animation */}
+            {/* Visual Graphic: monsters/Payment.webp with gentle float animation */}
             <div className="lg:col-span-5 flex flex-col items-center">
               <Reveal direction="right" delay={150}>
                 <div className="relative group">
                   <div className="absolute -inset-2 bg-gradient-to-r from-purple-200 to-emerald-200 rounded-3xl blur-xl opacity-60 group-hover:opacity-90 transition duration-500" />
                   <div className="relative rounded-3xl overflow-hidden bg-white border-2 border-purple-200 p-2 shadow-xl hover:shadow-2xl transition-all duration-300">
                     <img
-                      src="/monsters/Payment.png"
+                      src="/monsters/Payment.webp"
                       alt="Trust Monsters holding USDC and USDT stablecoins"
                       className="w-full h-auto object-contain rounded-2xl animate-float-slow transform group-hover:scale-[1.03] transition-transform duration-500 drop-shadow-md"
                     />
