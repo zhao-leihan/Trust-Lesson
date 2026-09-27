@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -27,15 +27,26 @@ model User {
   stakeAmount   Float     @default(0)
   isVerified    Boolean   @default(false)
   walletLocked  Boolean   @default(false)
-  mentorLevel   String    @default("RISING") // "RISING" | "PRO" | "MASTER"
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  mentorLevel       String    @default("RISING") // "RISING" | "PRO" | "MASTER"
+  tokenVersion      Int       @default(1)
+  birthDate         String?
+  domicileCountry   String?
+  educationHistory  String?
+  learningInterests String?
+  skills            String?
+  languages         String?
+  videoIntroUrl     String?
+  verificationType  String?
+  availability      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   sessionsAsLearner Session[]      @relation("LearnerSessions")
   sessionsAsMentor  Session[]      @relation("MentorSessions")
   videos            Video[]
   disputes          Dispute[]
   videoPurchases    VideoPurchase[]
+  certificates      Certificate[]
 }
 
 model Offering {
@@ -158,4 +169,38 @@ model AuthNonce {
   nonce     String
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model Certificate {
+  id                   String   @id @default(uuid())
+  attestationUid       String?  @unique
+  schemaUid            String?
+  sessionId            String?
+  learnerName          String?
+  learnerAddress       String?
+  mentorName           String?
+  mentorAddress        String?
+  skillTitle           String?
+  category             String?
+  rating               Int      @default(5)
+  escrowAmount         Float    @default(0)
+  currency             String   @default("USDC")
+  network              String   @default("Arbitrum Sepolia")
+  attestationSignature String?
+  revoked              Boolean  @default(false)
+  issuedAt             String?
+  createdAt            DateTime @default(now())
+  txHash               String?
+  blockNumber          Int?
+  contractAddress      String?
+  credentialId         String?
+  explorerUrl          String?
+  gasSponsored         Boolean  @default(true)
+  sponsorWallet        String?
+  gasUsedEth           String?
+  gasFeeUsd            String?
+  metadataCid          String?
+  ipfsUrl              String?
+
+  learner              User?    @relation(fields: [learnerAddress], references: [walletAddress])
 }

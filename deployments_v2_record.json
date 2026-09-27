@@ -1,0 +1,16 @@
+{
+  "network": "arbitrumSepolia",
+  "timestamp": "2026-09-26T13:49:51.824Z",
+  "deployer": "0xf2cE5319aeB733fd2279a830260316358A036098",
+  "initialBalanceEth": "0.009774859039981933",
+  "finalBalanceEth": "0.009478054095907949",
+  "totalSpentEth": "0.000296804944073984",
+  "contracts": {
+    "MentorStaking": "0xbbD3dA628360c63f36c9E6D2A955e33ADc5281Dd",
+    "VideoAccess": "0xb7d6EE04514AB9A210fDa4A3006c230EEEc40023",
+    "EscrowRouter": "0x094E4b351272fA45613D7D093B7f3a3C20AeE795",
+    "SkillGraph": "0x99303483484cc2c9393138574969f15C415A3016",
+    "VerifiableCredential": "0x50fA8e6c56B97484D2571b2C220d3EDbBAe6847D",
+    "DisputeCouncil": "0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006"
+  }
+}

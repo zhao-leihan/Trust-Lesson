@@ -8,6 +8,7 @@ import {
   getLocalSessions,
   saveLocalSession,
   updateLocalSessionStatus,
+  clearAllLocalSessions,
   getLocalPortfolio,
   saveLocalPortfolioItem,
   deleteLocalPortfolioItem,
@@ -67,8 +68,18 @@ export function AuthProvider({ children }) {
         setUser(parsed);
       }
 
-      const savedSessions = localStorage.getItem("trust_lesson_sessions");
-      if (savedSessions) setSessions(JSON.parse(savedSessions));
+      // Reset any old dummy/mockup sessions as requested by user
+      const hasReset = localStorage.getItem("tl_sessions_purged_v2");
+      if (!hasReset) {
+        localStorage.removeItem("trust_lesson_sessions");
+        localStorage.removeItem("tl_db_sessions");
+        clearAllLocalSessions();
+        localStorage.setItem("tl_sessions_purged_v2", "true");
+        setSessions([]);
+      } else {
+        const savedSessions = localStorage.getItem("trust_lesson_sessions");
+        if (savedSessions) setSessions(JSON.parse(savedSessions));
+      }
 
       const savedCourses = localStorage.getItem("trust_lesson_courses");
       if (savedCourses) setCourses(JSON.parse(savedCourses));
@@ -390,6 +401,13 @@ export function AuthProvider({ children }) {
       console.warn("Session save error", e);
     }
 
+    // Persist in localStorage
+    try {
+      const current = JSON.parse(localStorage.getItem("trust_lesson_sessions") || "[]");
+      const updated = [session, ...current.filter((s) => s.id !== session.id)];
+      localStorage.setItem("trust_lesson_sessions", JSON.stringify(updated));
+    } catch {}
+
     // Sync to API
     if (USE_API && session.mentorAddress) {
       apiFetch("/sessions", {
@@ -400,7 +418,16 @@ export function AuthProvider({ children }) {
           note: session.note,
           milestones: session.milestones || [],
         }),
-      }).catch((e) => console.warn("[API] Session create failed:", e.message));
+      })
+        .then((res) => {
+          if (res?.session?.id && session.txHash) {
+            apiFetch(`/sessions/${res.session.id}/confirm-tx`, {
+              method: "POST",
+              body: JSON.stringify({ txHash: session.txHash }),
+            }).catch(() => {});
+          }
+        })
+        .catch((e) => console.warn("[API] Session create failed:", e.message));
     }
   };
 
@@ -461,6 +488,21 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const clearAllSessions = async () => {
+    setSessions([]);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("trust_lesson_sessions");
+        localStorage.removeItem("tl_db_sessions");
+      } catch {}
+    }
+    try {
+      await clearAllLocalSessions();
+    } catch (e) {
+      console.warn("Error clearing local sessions", e);
+    }
+  };
+
   // ─── Portfolio Actions ──────────────────────────────────────────────────────
   const addPortfolioItem = async (item) => {
     const itemWithMentor = { ...item, mentorEmail: user?.email || "" };
@@ -493,9 +535,10 @@ export function AuthProvider({ children }) {
         updateUserProfile,
         sessions,
         addSession,
+        updateSessionStatus,
+        clearAllSessions,
         courses,
         addCourse,
-        updateSessionStatus,
         walletAddress,
         connectWallet,
         disconnectWallet,

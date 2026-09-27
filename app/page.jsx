@@ -18,28 +18,28 @@ import Footer from "../src/components/Footer";
 
 const monsterCards = [
   {
-    image: "/monsters/mentor.png",
+    image: "/monsters/mentor.webp",
     name: "Archie the Mentor",
     tag: "1-on-1 Live Pairing",
     title: "Learn directly from senior practitioners",
     desc: "Book live code reviews, portfolio teardowns, and executive mock interviews with experts who actively work in industry.",
   },
   {
-    image: "/monsters/knowledge.png",
+    image: "/monsters/knowledge.webp",
     name: "Pixel the Scholar",
     tag: "Milestone Gigs",
     title: "Step-by-step escrow roadmaps",
     desc: "Your funds are deposited into smart escrow and released milestone-by-milestone only when code audits and objectives pass.",
   },
   {
-    image: "/monsters/star.png",
+    image: "/monsters/star.webp",
     name: "Nova the Achiever",
     tag: "On-Chain Credentials",
     title: "Reputation that travels anywhere",
     desc: "Every completed session generates an on-chain verifiable credential that belongs to you and proves your verified skill gains.",
   },
   {
-    image: "/monsters/oke pose.png",
+    image: "/monsters/oke pose.webp",
     name: "Barnaby the Guardian",
     tag: "Escrow Protection",
     title: "100% dispute-safe payments",
@@ -49,22 +49,22 @@ const monsterCards = [
 
 const monsterMoments = [
   {
-    image: "/monsters/hello.png",
+    image: "/monsters/hello.webp",
     bubble: "Hi there! Ready to build your dream app today?",
     author: "Frontend Guild",
   },
   {
-    image: "/monsters/cool-pose.png",
+    image: "/monsters/cool-pose.webp",
     bubble: "Just passed my system design interview with 5 stars!",
     author: "Career Accelerator",
   },
   {
-    image: "/monsters/suprized.png",
+    image: "/monsters/suprized.webp",
     bubble: "Whoa, platform fee is only 5%? Mentors keep the rest!",
     author: "Mentor Network",
   },
   {
-    image: "/monsters/happy.png",
+    image: "/monsters/happy.webp",
     bubble: "My escrow payment unlocked right after our pairing session!",
     author: "Verified Student",
   },
@@ -75,10 +75,10 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-slate-900 overflow-hidden">
       {/* HERO SECTION */}
       <section className="relative min-h-screen flex flex-col justify-between pt-28 pb-16 px-6 sm:px-12 lg:px-16 overflow-hidden bg-slate-950">
-        {/* Background Image: landing-page.png */}
+        {/* Background Image: landing-page.webp */}
         <div
           className="absolute inset-0 bg-cover bg-center md:bg-right-top bg-no-repeat pointer-events-none"
-          style={{ backgroundImage: "url('/landing-page.png')" }}
+          style={{ backgroundImage: "url('/landing-page.webp')" }}
         />
 
         {/* Gradient Overlay on Left to guarantee crisp text legibility */}
@@ -327,7 +327,7 @@ export default function LandingPage() {
             {/* Cool Pose Monster Mascot */}
             <div className="flex-shrink-0 relative z-10">
               <img
-                src="/monsters/cool-pose.png"
+                src="/monsters/cool-pose.webp"
                 alt="Cool Lesson Monster"
                 className="w-48 sm:w-60 h-auto object-contain drop-shadow-[0_20px_25px_rgba(0,0,0,0.5)] animate-float"
               />
