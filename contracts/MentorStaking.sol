@@ -13,20 +13,24 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract MentorStaking is ReentrancyGuard, Ownable {
     IERC20 public immutable usdc;
 
-    uint256 public constant MIN_STAKE = 100 * 10 ** 6;  // 100 USDC
+    uint256 public constant MIN_STAKE = 100 * 10 ** 6;    // 100 USDC (PRO tier threshold)
+    uint256 public constant MASTER_STAKE = 300 * 10 ** 6; // 300 USDC (MASTER tier threshold)
     uint256 public constant UNSTAKE_DELAY = 7 days;
+
+    enum Tier { NONE, PRO, MASTER }
 
     struct StakeInfo {
         uint256 amount;          // current stake
         uint256 unstakeRequestAt; // timestamp of unstake request (0 if none)
         bool isVerified;         // true when stake >= MIN_STAKE
+        Tier tier;               // on-chain verified tier
     }
 
     mapping(address => StakeInfo) public stakes;
     address public escrowRouter; // only EscrowRouter can slash
 
-    event Staked(address indexed mentor, uint256 amount);
-    event SlashApplied(address indexed mentor, uint256 amount, address recipient);
+    event Staked(address indexed mentor, uint256 amount, Tier tier);
+    event SlashApplied(address indexed mentor, uint256 amount, address recipient, Tier newTier);
     event UnstakeRequested(address indexed mentor, uint256 availableAt);
     event Unstaked(address indexed mentor, uint256 amount);
 
@@ -40,25 +44,33 @@ contract MentorStaking is ReentrancyGuard, Ownable {
         usdc = IERC20(_usdc);
     }
 
-    /** @notice Mentor stakes USDC to get verified status. */
+    function _calculateTier(uint256 amount) internal pure returns (Tier) {
+        if (amount >= MASTER_STAKE) return Tier.MASTER;
+        if (amount >= MIN_STAKE) return Tier.PRO;
+        return Tier.NONE;
+    }
+
+    /** @notice Mentor stakes USDC to get verified status and on-chain tier. */
     function stake(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be > 0");
         StakeInfo storage s = stakes[msg.sender];
         s.amount += amount;
         s.isVerified = s.amount >= MIN_STAKE;
+        s.tier = _calculateTier(s.amount);
 
         bool ok = usdc.transferFrom(msg.sender, address(this), amount);
         if (!ok) revert TransferFailed();
 
-        emit Staked(msg.sender, amount);
+        emit Staked(msg.sender, amount, s.tier);
     }
 
-    /** @notice Request to unstake. Starts 7-day timelock. */
+    /** @notice Request to unstake. Starts 7-day timelock and resets tier/verified status immediately. */
     function requestUnstake() external {
         StakeInfo storage s = stakes[msg.sender];
         require(s.amount > 0, "Nothing to unstake");
         s.unstakeRequestAt = block.timestamp;
         s.isVerified = false; // lose verified status immediately
+        s.tier = Tier.NONE;   // lose tier privileges immediately
         emit UnstakeRequested(msg.sender, block.timestamp + UNSTAKE_DELAY);
     }
 
@@ -71,6 +83,7 @@ contract MentorStaking is ReentrancyGuard, Ownable {
         uint256 amount = s.amount;
         s.amount = 0;
         s.unstakeRequestAt = 0;
+        s.tier = Tier.NONE;
 
         bool ok = usdc.transfer(msg.sender, amount);
         if (!ok) revert TransferFailed();
@@ -85,16 +98,27 @@ contract MentorStaking is ReentrancyGuard, Ownable {
         uint256 slashable = amount < s.amount ? amount : s.amount;
         s.amount -= slashable;
         s.isVerified = s.amount >= MIN_STAKE;
+        s.tier = _calculateTier(s.amount);
 
         bool ok = usdc.transfer(recipient, slashable);
         if (!ok) revert TransferFailed();
 
-        emit SlashApplied(mentor, slashable, recipient);
+        emit SlashApplied(mentor, slashable, recipient, s.tier);
     }
 
     /** @notice Check if a mentor is verified. */
     function isVerified(address mentor) external view returns (bool) {
         return stakes[mentor].isVerified;
+    }
+
+    /** @notice Get on-chain tier for mentor. */
+    function getTier(address mentor) external view returns (Tier) {
+        return stakes[mentor].tier;
+    }
+
+    /** @notice Get current stake amount for mentor. */
+    function getStakeAmount(address mentor) external view returns (uint256) {
+        return stakes[mentor].amount;
     }
 
     /** @notice Set the EscrowRouter contract address. */

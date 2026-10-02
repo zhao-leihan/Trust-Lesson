@@ -95,7 +95,7 @@ async function main() {
     deployer.address,
   ];
   const DisputeCouncilFactory = await hre.ethers.getContractFactory("DisputeCouncil");
-  const disputeCouncil = await trackDeployment("DisputeCouncil", DisputeCouncilFactory.deploy(deployedContracts.EscrowRouter, jurors));
+  const disputeCouncil = await trackDeployment("DisputeCouncil", DisputeCouncilFactory.deploy(deployedContracts.EscrowRouter, deployedContracts.MentorStaking, jurors));
 
   // ─── Step 5: Wire Permissions ──────────────────────────────────
   console.log("\n🔗 Step 5: Wiring Inter-Contract Authorizations...");

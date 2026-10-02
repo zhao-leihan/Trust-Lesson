@@ -1427,19 +1427,25 @@ function MentorDashboardView({ user }) {
       {/* ── Top Bar Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-purple-100 relative z-10">
         <div className="flex items-center gap-4">
-          <Avatar className="w-14 h-14 rounded-full ring-2 ring-purple-300 shadow-xs shrink-0 overflow-hidden">
-            {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
-            ) : (
-              <img src="/mentor-profile.webp" alt={user.name || "Mentor"} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
-            )}
-          </Avatar>
+          {/* Avatar with Verified Green Border & Checkmark Badge */}
+          <div className="relative shrink-0">
+            <Avatar className="w-14 h-14 rounded-full border-2 border-emerald-500 ring-2 ring-emerald-400/50 shadow-xs shrink-0 overflow-hidden">
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
+              ) : (
+                <img src="/mentor-profile.webp" alt={user.name || "Mentor"} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
+              )}
+            </Avatar>
+            <div
+              className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs"
+              title="Verified Mentor"
+            >
+              <CheckCircle2 size={13} className="fill-emerald-500 text-white" />
+            </div>
+          </div>
+
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="px-3 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5">
-                <img src="/mentor-profile.webp" alt="Mentor" width={14} height={14} decoding="async" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
-                <span>Verified Mentor</span>
-              </span>
               <span className="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-1">
                 <Sparkles size={11} /> Level: {stats.mentorLevel}
               </span>
@@ -1452,9 +1458,23 @@ function MentorDashboardView({ user }) {
                   <Unlock size={11} /> Wallet Setup Pending
                 </span>
               )}
+              <Link
+                href={`/mentor/${encodeURIComponent(user.id || user.name || "me")}`}
+                className="px-2.5 py-0.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                title="View your public mentor profile page"
+              >
+                <ExternalLink size={11} /> View Public Profile
+              </Link>
             </div>
             <h1 className="text-slate-950 font-black text-2xl sm:text-3xl tracking-tight flex items-center gap-2 flex-wrap">
-              <span>{user.name}</span>
+              <Link
+                href={`/mentor/${encodeURIComponent(user.id || user.name || "me")}`}
+                className="hover:text-purple-700 hover:underline transition-colors cursor-pointer flex items-center gap-2"
+                title="Click to view public mentor profile"
+              >
+                <span>{user.name}</span>
+                <CheckCircle2 size={20} className="fill-emerald-500 text-white" />
+              </Link>
               {user.nickname && (
                 <span className="text-purple-600 text-sm sm:text-base font-bold bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200 font-mono">
                   @{user.nickname.replace(/^@/, "")}
@@ -2323,7 +2343,7 @@ function MentorDashboardView({ user }) {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-purple-50">
               <div className="flex items-center gap-4">
                 <div className="relative group shrink-0">
-                  <Avatar className="w-16 h-16 rounded-full ring-2 ring-purple-200 shadow-xs overflow-hidden">
+                  <Avatar className="w-16 h-16 rounded-full border-2 border-emerald-500 ring-2 ring-emerald-400/50 shadow-xs overflow-hidden">
                     {user.avatarUrl ? (
                       <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-full" />
                     ) : (
@@ -2350,13 +2370,19 @@ function MentorDashboardView({ user }) {
 
                 <div>
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 className="font-black text-slate-950 text-xl tracking-tight">{user.name}</h3>
+                    <h3 className="font-black text-slate-950 text-xl tracking-tight flex items-center gap-1.5">
+                      <Link
+                        href={`/mentor/${encodeURIComponent(user.id || user.name || "me")}`}
+                        className="hover:text-purple-700 hover:underline transition-colors"
+                        title="View Public Profile"
+                      >
+                        {user.name}
+                      </Link>
+                      <CheckCircle2 size={18} className="fill-emerald-500 text-white" />
+                    </h3>
                     <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-extrabold font-mono border border-purple-200 flex items-center gap-1">
                       <AtSign size={11} />
                       {(user.nickname || user.name?.toLowerCase().replace(/\s+/g, "_") || "mentor").replace(/^@/, "")}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 flex items-center gap-1">
-                      <CheckCircle2 size={10} /> Verified Mentor
                     </span>
                   </div>
                   <p className="text-slate-500 text-xs font-medium">
