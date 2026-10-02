@@ -108,13 +108,22 @@ export default function MentorPublicProfilePage() {
       <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 flex-1">
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Back Button */}
-          <Link
-            href="/explore"
-            className="inline-flex items-center gap-2 text-slate-500 hover:text-purple-700 text-xs font-bold transition-colors group"
-          >
-            <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-            <span>Back to Explore Catalog</span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-2 text-slate-500 hover:text-purple-700 text-xs font-bold transition-colors cursor-pointer group"
+            >
+              <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+              <span>Back</span>
+            </button>
+            <span className="text-slate-300">•</span>
+            <Link
+              href="/leaderboard"
+              className="text-xs font-bold text-purple-700 hover:underline"
+            >
+              Protocol Leaderboard
+            </Link>
+          </div>
 
           {/* Hero Profile Header Card */}
           <div className="bg-white rounded-3xl p-6 sm:p-10 border-2 border-purple-100 shadow-xl shadow-purple-950/5 relative overflow-hidden">
@@ -123,22 +132,27 @@ export default function MentorPublicProfilePage() {
 
             <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-8 border-b border-purple-50">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                {/* Avatar with Verified Ring */}
+                {/* Avatar with Verified Green Ring and Checkmark */}
                 <div className="relative shrink-0">
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden shadow-lg border-3 border-purple-200 bg-slate-900">
+                  <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden shadow-lg bg-slate-900 ${
+                    mentor.isVerified
+                      ? "border-3 border-emerald-500 ring-4 ring-emerald-400/30 shadow-emerald-500/20"
+                      : "border-3 border-purple-200"
+                  }`}>
                     <img
                       src={mentor.avatarUrl}
                       alt={mentor.name}
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div
-                    className="absolute -bottom-2 -right-2 bg-emerald-600 text-white p-1.5 rounded-xl border-2 border-white shadow-md flex items-center gap-1 text-[10px] font-black"
-                    title="Arbitrum Escrow Verified Mentor"
-                  >
-                    <CheckCircle2 size={13} />
-                    <span>Verified</span>
-                  </div>
+                  {mentor.isVerified && (
+                    <div
+                      className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-md"
+                      title="Arbitrum Escrow Verified Mentor"
+                    >
+                      <CheckCircle2 size={18} className="fill-emerald-500 text-white" />
+                    </div>
+                  )}
                 </div>
 
                 {/* Details */}
@@ -147,13 +161,25 @@ export default function MentorPublicProfilePage() {
                     <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800">
                       {mentor.domain || "Mentor & Educator"}
                     </span>
-                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <Shield size={11} /> 100% Escrow Backed
-                    </span>
+                    {mentor.mentorLevel && (
+                      <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        Level: {mentor.mentorLevel}
+                      </span>
+                    )}
+                    {mentor.stakeAmount > 0 && (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <Shield size={11} /> ${mentor.stakeAmount} USDC Collateral
+                      </span>
+                    )}
                   </div>
 
-                  <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                    {mentor.name}
+                  <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <span>{mentor.name}</span>
+                    {mentor.isVerified && (
+                      <span title="Verified Mentor on Arbitrum">
+                        <CheckCircle2 size={22} className="fill-emerald-500 text-white inline-block" />
+                      </span>
+                    )}
                   </h1>
                   <p className="text-slate-400 text-xs font-mono font-medium">
                     @{mentor.nickname || mentor.name.toLowerCase().replace(/\s+/g, "_")}
@@ -166,7 +192,7 @@ export default function MentorPublicProfilePage() {
               </div>
 
               {/* Action / Rate Summary Card */}
-              <div className="bg-purple-50/70 p-4 sm:p-5 rounded-2xl border border-purple-100 self-stretch md:self-auto flex flex-col justify-between shrink-0 space-y-3">
+              <div className="bg-purple-50/70 p-4 sm:p-5 rounded-2xl border border-purple-100 self-stretch md:self-auto flex flex-col justify-between shrink-0 space-y-3 min-w-[240px]">
                 <div>
                   <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
                     Starting Hourly Rate
@@ -180,15 +206,24 @@ export default function MentorPublicProfilePage() {
                   </div>
                 </div>
 
-                {mentor.offerings && mentor.offerings.length > 0 && (
-                  <a
-                    href="#offerings"
-                    className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-purple-600/20 active:scale-95"
+                <div className="space-y-2">
+                  <Link
+                    href={`/book?mentor=${encodeURIComponent(mentor.id)}&price=${mentor.hourlyRate}`}
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-purple-600/20 active:scale-95"
                   >
-                    <span>Browse Offerings ({mentor.offerings.length})</span>
+                    <span>Book 1-on-1 Mentorship</span>
                     <ArrowRight size={13} />
-                  </a>
-                )}
+                  </Link>
+
+                  {mentor.offerings && mentor.offerings.length > 0 && (
+                    <a
+                      href="#offerings"
+                      className="w-full py-2 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-[11px] flex items-center justify-center gap-1 transition-all"
+                    >
+                      <span>Browse Packages ({mentor.offerings.length})</span>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 

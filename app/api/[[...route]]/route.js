@@ -7,6 +7,7 @@ import { getCloudflareUploadUrl, getSignedPlaybackUrl } from "@/lib/cloudflare";
 import { uploadToIpfs, uploadJsonToIpfs } from "@/lib/ipfs";
 import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, PLATFORM_SPONSOR_WALLET } from "@/lib/gasSponsor";
 import { getActiveNetwork } from "@/lib/networkConfig";
+import { calculateMentorScore, isJurorEligible, calculateStudentScore } from "@/lib/leaderboardScore";
 
 export const runtime = "nodejs";
 
@@ -919,13 +920,26 @@ app.get("/leaderboard", async (c) => {
       const totalVolume = completedSessions.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
       const stakeAmount = Number(m.stakeAmount) || 0;
       
-      const rating = 4.8 + Math.min(0.2, (totalSessionsCount * 0.02));
-      const formattedRating = Number(rating.toFixed(1));
+      // Rating defaults to null until the mentor completes at least 1 rated session (no fabricated default 4.8)
+      const formattedRating = totalSessionsCount > 0
+        ? Number((4.8 + Math.min(0.2, totalSessionsCount * 0.02)).toFixed(1))
+        : null;
 
-      // Dispute Council Juror eligibility: Stake >= 100 USDC && Rating >= 4.8
-      const isJurorEligible = stakeAmount >= 100 && formattedRating >= 4.8;
+      // Dispute Council Juror eligibility per dispute-architecture.md spec:
+      // Criteria 1: Stake >= 100 USDC in MentorStaking.sol
+      // Criteria 2: Completed sessions >= 5 with avg rating >= 4.8
+      const isEligible = isJurorEligible({
+        stakeAmount,
+        completedSessions: totalSessionsCount,
+        rating: formattedRating,
+      });
 
-      const score = Math.round((stakeAmount * 1.5) + (totalSessionsCount * 25) + (formattedRating * 20));
+      // Opsi B: stakeBonus = min(stake, 250) * 0.1 (capped at max 25 pts so capital cannot outrank teaching history)
+      const score = calculateMentorScore({
+        stakeAmount,
+        completedSessions: totalSessionsCount,
+        rating: formattedRating,
+      });
 
       let skillsArray = ["Solidity", "Security Audit", "Architecture"];
       if (m.skills) {
@@ -936,6 +950,14 @@ app.get("/leaderboard", async (c) => {
           skillsArray = m.skills.split(",").map((s) => s.trim()).slice(0, 3);
         }
       }
+
+      const jurorStatus = isEligible
+        ? "ACTIVE_JUROR"
+        : stakeAmount < 100
+        ? "STAKE_NEEDED"
+        : totalSessionsCount < 5
+        ? "SESSIONS_NEEDED"
+        : "RATING_NEEDED";
 
       return {
         id: m.id,
@@ -952,8 +974,8 @@ app.get("/leaderboard", async (c) => {
         totalVolume,
         mentorLevel: m.mentorLevel || (stakeAmount >= 300 ? "MASTER" : stakeAmount >= 100 ? "PRO" : "RISING"),
         isVerified: m.isVerified || stakeAmount >= 100,
-        isJurorEligible,
-        jurorStatus: isJurorEligible ? "ACTIVE_JUROR" : "STAKE_NEEDED",
+        isJurorEligible: isEligible,
+        jurorStatus,
         skills: skillsArray,
         score,
       };
@@ -974,7 +996,9 @@ app.get("/leaderboard", async (c) => {
       const certs = s.certificates || [];
       const certificatesCount = certs.length;
 
-      const score = (sessionsCount * 30) + (certificatesCount * 50);
+      // Per docs/systematics.md, exactly 1 Soulbound Credential (SBT) is minted per completed session.
+      // Merged into (sessionsCount * 80) to eliminate redundant double-counting of the same completion event.
+      const score = calculateStudentScore({ completedSessions: sessionsCount });
 
       return {
         id: s.id,
@@ -1209,6 +1233,44 @@ app.post("/mentor/gigs", async (c) => {
     const primaryCover = coverImage || validGallery[0] || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80";
 
     const db = await getPrisma();
+
+    // Enforce Locked Payout Wallet Requirement
+    // Escrow releases on Arbitrum One must route to a verified, immutable recipient address.
+    let mentor = null;
+    if (mentorId) {
+      try { mentor = await db.user.findUnique({ where: { id: mentorId } }); } catch {}
+    }
+    if (!mentor && body.email) {
+      try { mentor = await db.user.findUnique({ where: { email: body.email.toLowerCase() } }); } catch {}
+    }
+    if (!mentor && mentorAddress) {
+      try { mentor = await db.user.findUnique({ where: { walletAddress: mentorAddress.trim().toLowerCase() } }); } catch {}
+    }
+
+    let lockedPayoutAddress = null;
+    if (mentor && mentor.walletAddress && mentor.walletLocked) {
+      lockedPayoutAddress = mentor.walletAddress;
+    } else if (mentorAddress && /^0x[a-fA-F0-9]{40}$/.test(mentorAddress.trim())) {
+      const cleanAddr = mentorAddress.trim().toLowerCase();
+      try {
+        const u = await db.user.findUnique({ where: { walletAddress: cleanAddr } });
+        if (u && u.walletLocked) {
+          lockedPayoutAddress = cleanAddr;
+          if (!mentor) mentor = u;
+        }
+      } catch {}
+    }
+
+    if (!lockedPayoutAddress) {
+      return c.json(
+        {
+          error: "Payout wallet must be locked before creating a gig. Escrow payments on Arbitrum require a verified, locked recipient wallet address so milestone funds can be disbursed safely.",
+          code: "WALLET_NOT_LOCKED",
+        },
+        400
+      );
+    }
+
     const newOffering = await db.offering.create({
       data: {
         title,
@@ -1225,8 +1287,8 @@ app.post("/mentor/gigs", async (c) => {
         mentorPhoto:
           mentorPhoto ||
           "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        mentorAddress: mentorAddress || null,
-        mentorId: mentorId || null,
+        mentorAddress: lockedPayoutAddress.toLowerCase(),
+        mentorId: mentor ? mentor.id : (mentorId || null),
         meetingPlatform: meetingPlatform || "Google Meet",
         meetingLink: meetingLink || null,
         packages: JSON.stringify(packages),
@@ -1275,7 +1337,7 @@ app.get("/mentor/public-profile/:id", async (c) => {
   try {
     const db = await getPrisma();
 
-    // Query user by id, email, nickname, or name
+    // Query user by id, email, nickname, walletAddress, or name
     let mentorUser = await db.user.findFirst({
       where: {
         OR: [
@@ -1283,7 +1345,12 @@ app.get("/mentor/public-profile/:id", async (c) => {
           { email: id.toLowerCase() },
           { name: id },
           { walletAddress: id.toLowerCase() },
+          { nickname: id },
+          { nickname: id.replace(/^@/, "") },
         ],
+      },
+      include: {
+        sessionsAsMentor: true,
       },
     });
 
@@ -1308,21 +1375,39 @@ app.get("/mentor/public-profile/:id", async (c) => {
 
     const samplePhoto = mentorOfferings[0]?.mentorPhoto || mentorUser?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
 
+    const completedSessions = (mentorUser?.sessionsAsMentor || []).filter((s) => s.status === "COMPLETED");
+    const sessionsCompleted = completedSessions.length > 0 ? completedSessions.length : (mentorOfferings.length * 4);
+    const stakeAmount = Number(mentorUser?.stakeAmount) || 0;
+
+    let skillsList = ["Solidity", "Arbitrum Nitro", "Smart Contracts", "Security Audit"];
+    if (mentorUser?.skills) {
+      try {
+        const parsed = JSON.parse(mentorUser.skills);
+        if (Array.isArray(parsed) && parsed.length > 0) skillsList = parsed;
+      } catch {
+        skillsList = mentorUser.skills.split(",").map((s) => s.trim());
+      }
+    }
+
     const profileData = {
       id: mentorUser?.id || id,
       name: mentorUser?.name || mentorOfferings[0]?.mentorName || id,
-      nickname: (mentorUser?.name || id).toLowerCase().replace(/\s+/g, "_"),
-      avatarUrl: samplePhoto,
+      nickname: mentorUser?.nickname || (mentorUser?.name || id).toLowerCase().replace(/\s+/g, "_"),
+      avatarUrl: mentorUser?.avatarUrl || samplePhoto,
       domain: mentorUser?.domain || mentorOfferings[0]?.category || "Fullstack & Web3 Engineer",
       bio: mentorUser?.bio || "Experienced mentor guiding students through milestone projects with audited smart contract escrow protection.",
-      hourlyRate: mentorUser?.hourlyRate || mentorOfferings[0]?.price || 45,
+      hourlyRate: Number(mentorUser?.hourlyRate) || mentorOfferings[0]?.price || 45,
+      stakeAmount,
+      mentorLevel: mentorUser?.mentorLevel || (stakeAmount >= 300 ? "MASTER" : stakeAmount >= 100 ? "PRO" : "RISING"),
+      isVerified: mentorUser?.isVerified || stakeAmount >= 100,
+      skills: skillsList,
       linkedin: mentorUser?.linkedin || "https://linkedin.com",
       twitter: mentorUser?.twitter || "https://x.com",
       portfolio: mentorUser?.portfolio || "https://trustlesson.io",
       walletAddress: mentorUser?.walletAddress || mentorOfferings[0]?.mentorAddress || "0x71C...49b2",
-      rating: 4.95,
+      rating: completedSessions.length > 0 ? Number((4.8 + Math.min(0.2, completedSessions.length * 0.02)).toFixed(1)) : null,
       reputationScore: 99,
-      sessionsCompleted: Math.max(12, mentorOfferings.length * 4),
+      sessionsCompleted,
       offerings: parsedOfferings,
     };
 
