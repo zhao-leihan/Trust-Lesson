@@ -8,10 +8,17 @@ pragma solidity ^0.8.20;
  * to the MentorStaking implementation.
  */
 interface IMentorStaking {
+    enum Tier { NONE, PRO, MASTER }
+
     /**
      * @notice Check if a mentor has sufficient stake and is verified.
      */
     function isVerified(address mentor) external view returns (bool);
+
+    /**
+     * @notice Get the on-chain tier for a mentor.
+     */
+    function getTier(address mentor) external view returns (Tier);
 
     /**
      * @notice Get the current stake amount for a mentor (USDC, 6 decimals).
