@@ -81,7 +81,7 @@ async function main() {
     deployer.address,
   ];
   const DisputeCouncil = await hre.ethers.getContractFactory("DisputeCouncil");
-  const disputeCouncil = await DisputeCouncil.deploy(escrowRouterAddress, jurors);
+  const disputeCouncil = await DisputeCouncil.deploy(escrowRouterAddress, stakingAddress, jurors);
   await disputeCouncil.waitForDeployment();
   const disputeCouncilAddress = await disputeCouncil.getAddress();
   console.log(`   DisputeCouncil    : ${disputeCouncilAddress}`);

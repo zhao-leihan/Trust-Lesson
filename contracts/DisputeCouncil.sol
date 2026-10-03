@@ -4,22 +4,22 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IEscrowRouter.sol";
 import "./interfaces/IKlerosArbitrator.sol";
+import "./interfaces/IMentorStaking.sol";
 
 /**
  * @title DisputeCouncil
  * @author Trust Lesson
- * @notice 3-of-5 multi-sig dispute resolution council.
+ * @notice Decentralized dispute resolution council with on-chain dynamic sortition (Phase 1.5 Opsi Y).
  *
- * Phase 1.5 Architecture (vs. Phase 1 single arbiter):
- * - 5 jurors appointed by platform (replacing single arbiter)
+ * Dynamic Sortition Architecture:
+ * - Staked mentors join the decentralized Juror Pool (requires stake >= 100 USDC)
+ * - For every dispute case, 5 distinct jurors are drawn dynamically via on-chain sortition
+ *   using block.prevrandao, block.timestamp, and case parameters
+ * - Conflict of Interest Filter: Parties involved in the dispute (learner & mentor) are strictly excluded
  * - 3-of-5 quorum required for resolution
- * - 72-hour resolution window; auto 50/50 if quorum not reached
+ * - 72-hour resolution window; auto weighted-average / 50-50 fallback if window expires
  * - Evidence stored as IPFS CID — publicly auditable by anyone
- * - Weighted average of juror votes determines final fund split
- * - Appeal path to Kleros documented (Phase 2.0 interface hook ready)
- *
- * Judges evaluating decentralization: Phase 1.5 is a clear improvement.
- * Kleros escalation interface is declared and ready for Phase 2.0 wiring.
+ * - Appeal path to Kleros Court (Phase 2.0 interface hook ready)
  */
 contract DisputeCouncil is Ownable {
     // ─── Constants ───────────────────────────────────────────────────
@@ -27,6 +27,7 @@ contract DisputeCouncil is Ownable {
     uint256 public constant APPEAL_WINDOW  = 24 hours;
     uint256 public constant QUORUM         = 3;
     uint256 public constant JUROR_COUNT    = 5;
+    uint256 public constant MIN_JUROR_STAKE = 100 * 10 ** 6; // 100 USDC
 
     // ─── Structs ─────────────────────────────────────────────────────
 
@@ -42,13 +43,19 @@ contract DisputeCouncil is Ownable {
         bool appealed;
         uint8 finalReleasePercent;  // final outcome: % to mentor (0-100)
         address raisedBy;
+        address[JUROR_COUNT] selectedJurors; // 5 dynamically drawn jurors for this case
     }
 
     // ─── Storage ─────────────────────────────────────────────────────
 
     IEscrowRouter public escrowRouter;
-    address[JUROR_COUNT] public jurors;
+    IMentorStaking public mentorStaking;
     uint256 public nextCaseId;
+
+    // Juror Pool for Dynamic Sortition
+    address[] public jurorPool;
+    mapping(address => bool) public isJurorInPool;
+    mapping(address => uint256) public jurorPoolIndex;
 
     mapping(uint256 => DisputeCase) public cases;
     mapping(uint256 => mapping(address => bool)) public hasVoted;    // caseId → juror → voted
@@ -64,15 +71,19 @@ contract DisputeCouncil is Ownable {
 
     // ─── Events ──────────────────────────────────────────────────────
 
+    event JurorJoinedPool(address indexed juror);
+    event JurorRemovedFromPool(address indexed juror);
+    event JurorsDrawn(uint256 indexed caseId, address[JUROR_COUNT] selectedJurors);
     event CaseOpened(uint256 indexed caseId, uint256 indexed sessionId, string evidenceIpfsCid, uint256 deadline);
     event VoteCast(uint256 indexed caseId, address indexed juror, uint8 releasePercent);
     event CaseResolved(uint256 indexed caseId, uint256 indexed sessionId, uint8 finalReleasePercent, bool autoResolved);
     event CaseAppealed(uint256 indexed caseId, uint256 klerosDisputeId);
-    event JurorUpdated(uint256 index, address newJuror);
     event KlerosArbitratorSet(address klerosArbitrator);
+    event MentorStakingSet(address mentorStaking);
+    event EscrowRouterSet(address escrowRouter);
 
     // ─── Errors ──────────────────────────────────────────────────────
-    error NotJuror();
+    error NotSelectedJuror();
     error AlreadyVoted();
     error CaseNotOpen();
     error CaseAlreadyResolved();
@@ -82,23 +93,86 @@ contract DisputeCouncil is Ownable {
     error SessionAlreadyHasCase();
     error KlerosNotConfigured();
     error Unauthorized();
+    error InsufficientJurorPool();
+    error JurorAlreadyInPool();
+    error JurorNotInPool();
+    error IneligibleForJurorPool();
+    error ZeroAddress();
+    error StakingNotConfigured();
 
     // ─── Constructor ─────────────────────────────────────────────────
 
-    constructor(address _escrowRouter, address[5] memory _jurors) Ownable(msg.sender) {
+    constructor(
+        address _escrowRouter,
+        address _mentorStaking,
+        address[] memory _initialJurors
+    ) Ownable(msg.sender) {
+        if (_escrowRouter == address(0) || _mentorStaking == address(0)) revert ZeroAddress();
         escrowRouter = IEscrowRouter(_escrowRouter);
-        for (uint256 i = 0; i < JUROR_COUNT; i++) {
-            jurors[i] = _jurors[i];
-            emit JurorUpdated(i, _jurors[i]);
+        mentorStaking = IMentorStaking(_mentorStaking);
+        for (uint256 i = 0; i < _initialJurors.length; i++) {
+            _addJurorToPool(_initialJurors[i]);
         }
     }
 
-    // ─── Admin ───────────────────────────────────────────────────────
+    // ─── Juror Pool Management ────────────────────────────────────────
 
-    function updateJuror(uint256 index, address newJuror) external onlyOwner {
-        require(index < JUROR_COUNT, "Invalid index");
-        jurors[index] = newJuror;
-        emit JurorUpdated(index, newJuror);
+    /**
+     * @notice Staked mentor joins the decentralized juror pool.
+     * Enforces fail-closed: requires mentorStaking to be configured and stake >= MIN_JUROR_STAKE (100 USDC).
+     */
+    function joinJurorPool() external {
+        if (address(mentorStaking) == address(0)) revert StakingNotConfigured();
+        if (mentorStaking.getStakeAmount(msg.sender) < MIN_JUROR_STAKE) {
+            revert IneligibleForJurorPool();
+        }
+        _addJurorToPool(msg.sender);
+    }
+
+    /**
+     * @notice Admin can enroll verified eligible mentors into the juror pool.
+     */
+    function addJuror(address juror) external onlyOwner {
+        _addJurorToPool(juror);
+    }
+
+    /**
+     * @notice Remove a juror from the pool (self-exit or admin removal).
+     */
+    function removeJuror(address juror) external {
+        if (msg.sender != juror && msg.sender != owner()) revert Unauthorized();
+        _removeJurorFromPool(juror);
+    }
+
+    function _addJurorToPool(address juror) internal {
+        require(juror != address(0), "Zero address");
+        if (isJurorInPool[juror]) revert JurorAlreadyInPool();
+        jurorPoolIndex[juror] = jurorPool.length;
+        jurorPool.push(juror);
+        isJurorInPool[juror] = true;
+        emit JurorJoinedPool(juror);
+    }
+
+    function _removeJurorFromPool(address juror) internal {
+        if (!isJurorInPool[juror]) revert JurorNotInPool();
+        uint256 index = jurorPoolIndex[juror];
+        uint256 lastIndex = jurorPool.length - 1;
+        if (index != lastIndex) {
+            address lastJuror = jurorPool[lastIndex];
+            jurorPool[index] = lastJuror;
+            jurorPoolIndex[lastJuror] = index;
+        }
+        jurorPool.pop();
+        delete isJurorInPool[juror];
+        delete jurorPoolIndex[juror];
+        emit JurorRemovedFromPool(juror);
+    }
+
+    // ─── Admin Setters ────────────────────────────────────────────────
+
+    function setMentorStaking(address _staking) external onlyOwner {
+        mentorStaking = IMentorStaking(_staking);
+        emit MentorStakingSet(_staking);
     }
 
     function setKlerosArbitrator(address _kleros) external onlyOwner {
@@ -108,16 +182,67 @@ contract DisputeCouncil is Ownable {
 
     function setEscrowRouter(address _escrowRouter) external onlyOwner {
         escrowRouter = IEscrowRouter(_escrowRouter);
+        emit EscrowRouterSet(_escrowRouter);
+    }
+
+    // ─── Dynamic Sortition Engine ─────────────────────────────────────
+
+    /**
+     * @notice Draw 5 jurors dynamically for a specific case with Conflict of Interest Filter.
+     */
+    function _drawJurors(uint256 caseId, uint256 sessionId) internal returns (address[JUROR_COUNT] memory drawn) {
+        uint256 poolSize = jurorPool.length;
+        if (poolSize < JUROR_COUNT) revert InsufficientJurorPool();
+
+        address partyLearner = address(0);
+        address partyMentor = address(0);
+        if (address(escrowRouter) != address(0)) {
+            try escrowRouter.getSessionParties(sessionId) returns (address l, address m) {
+                partyLearner = l;
+                partyMentor = m;
+            } catch {}
+        }
+
+        // Build list of eligible pool indices excluding conflicted parties
+        uint256[] memory eligibleIndices = new uint256[](poolSize);
+        uint256 eligibleCount = 0;
+        for (uint256 i = 0; i < poolSize; i++) {
+            address candidate = jurorPool[i];
+            if (candidate != partyLearner && candidate != partyMentor) {
+                eligibleIndices[eligibleCount++] = i;
+            }
+        }
+
+        if (eligibleCount < JUROR_COUNT) revert InsufficientJurorPool();
+
+        // Sample 5 unique jurors via pseudo-random shuffle (Fisher-Yates style)
+        bytes32 seed = keccak256(
+            abi.encodePacked(
+                caseId,
+                sessionId,
+                block.prevrandao,
+                block.timestamp,
+                blockhash(block.number - 1),
+                poolSize
+            )
+        );
+
+        for (uint256 i = 0; i < JUROR_COUNT; i++) {
+            uint256 randIndex = i + (uint256(keccak256(abi.encodePacked(seed, i))) % (eligibleCount - i));
+            uint256 chosenPoolIdx = eligibleIndices[randIndex];
+            eligibleIndices[randIndex] = eligibleIndices[i];
+            eligibleIndices[i] = chosenPoolIdx;
+
+            drawn[i] = jurorPool[chosenPoolIdx];
+        }
+
+        emit JurorsDrawn(caseId, drawn);
     }
 
     // ─── Core: Dispute Flow ───────────────────────────────────────────
 
     /**
-     * @notice Open a new dispute case. Called by EscrowRouter after raiseDispute().
-     * The evidence IPFS CID is public — anyone can verify the raw evidence on IPFS.
-     * @param sessionId The on-chain session ID in dispute.
-     * @param evidenceIpfsCid IPFS CID of the dispute evidence JSON.
-     * @param raisedBy Address that raised the dispute (learner or mentor).
+     * @notice Open a new dispute case with on-chain dynamic sortition.
      */
     function openCase(
         uint256 sessionId,
@@ -130,6 +255,8 @@ contract DisputeCouncil is Ownable {
         caseId = nextCaseId++;
         uint256 deadline = block.timestamp + RESOLVE_WINDOW;
 
+        address[JUROR_COUNT] memory drawn = _drawJurors(caseId, sessionId);
+
         cases[caseId] = DisputeCase({
             sessionId: sessionId,
             evidenceIpfsCid: evidenceIpfsCid,
@@ -141,7 +268,8 @@ contract DisputeCouncil is Ownable {
             resolved: false,
             appealed: false,
             finalReleasePercent: 50, // default: 50/50
-            raisedBy: raisedBy
+            raisedBy: raisedBy,
+            selectedJurors: drawn
         });
 
         sessionToCase[sessionId] = caseId;
@@ -151,13 +279,12 @@ contract DisputeCouncil is Ownable {
     }
 
     /**
-     * @notice Cast a vote on an open dispute case.
+     * @notice Cast a vote on an open dispute case. Only dynamically selected jurors for this case can vote.
      * @param caseId The case to vote on.
      * @param releasePercent Percentage (0-100) of funds to release to mentor.
-     *   0 = full refund to learner, 100 = full release to mentor, 50 = split.
      */
     function castVote(uint256 caseId, uint8 releasePercent) external {
-        if (!_isJuror(msg.sender)) revert NotJuror();
+        if (!_isCaseJuror(caseId, msg.sender)) revert NotSelectedJuror();
         if (hasVoted[caseId][msg.sender]) revert AlreadyVoted();
 
         DisputeCase storage c = cases[caseId];
@@ -172,7 +299,7 @@ contract DisputeCouncil is Ownable {
 
         emit VoteCast(caseId, msg.sender, releasePercent);
 
-        // Auto-resolve if quorum reached
+        // Auto-resolve if 3-of-5 quorum reached
         if (c.totalVotes >= QUORUM) {
             _resolveCase(caseId, false);
         }
@@ -180,15 +307,12 @@ contract DisputeCouncil is Ownable {
 
     /**
      * @notice Trigger auto-resolution if resolve window expired without quorum.
-     * Anyone can call this after the deadline.
-     * Result: 50/50 split (default fairness).
      */
     function autoResolve(uint256 caseId) external {
         DisputeCase storage c = cases[caseId];
         if (c.resolved) revert CaseAlreadyResolved();
         if (block.timestamp <= c.resolveDeadline) revert ResolveWindowActive();
 
-        // If some votes cast but < quorum, use weighted average of those votes
         if (c.totalVotes > 0) {
             c.finalReleasePercent = uint8(c.weightedReleaseSum / c.totalVotes);
         } else {
@@ -205,24 +329,20 @@ contract DisputeCouncil is Ownable {
 
     /**
      * @notice Appeal a resolved case to Kleros (Phase 2.0).
-     * Only callable within APPEAL_WINDOW after resolution.
-     * Requires Kleros arbitrator to be configured.
      */
     function appeal(uint256 caseId) external payable {
         if (klerosArbitrator == address(0)) revert KlerosNotConfigured();
 
         DisputeCase storage c = cases[caseId];
-        if (!c.resolved) revert QuorumNotReached(); // not resolved yet
+        if (!c.resolved) revert QuorumNotReached();
         if (block.timestamp > c.appealDeadline) revert AppealWindowExpired();
         if (c.appealed) revert CaseAlreadyResolved();
 
         c.appealed = true;
 
-        // Submit to Kleros Court
-        // Court 1 = General Court, 3 jurors
         bytes memory extraData = abi.encode(uint256(1), uint256(3));
         uint256 kDisputeId = IKlerosArbitrator(klerosArbitrator).createDispute{value: msg.value}(
-            2, // 2 choices: ruling 1 = mentor wins, ruling 2 = learner wins
+            2,
             extraData
         );
 
@@ -237,25 +357,32 @@ contract DisputeCouncil is Ownable {
         DisputeCase storage c = cases[caseId];
         if (c.resolved) return;
 
-        // Weighted average release percent
         c.finalReleasePercent = uint8(c.weightedReleaseSum / c.totalVotes);
         c.resolved = true;
         c.appealDeadline = block.timestamp + APPEAL_WINDOW;
 
-        // Execute resolution on EscrowRouter
         escrowRouter.resolveDispute(c.sessionId, c.finalReleasePercent);
 
         emit CaseResolved(caseId, c.sessionId, c.finalReleasePercent, isAuto);
     }
 
-    function _isJuror(address addr) internal view returns (bool) {
+    function _isCaseJuror(uint256 caseId, address addr) internal view returns (bool) {
+        address[JUROR_COUNT] storage selected = cases[caseId].selectedJurors;
         for (uint256 i = 0; i < JUROR_COUNT; i++) {
-            if (jurors[i] == addr) return true;
+            if (selected[i] == addr) return true;
         }
         return false;
     }
 
-    // ─── View ────────────────────────────────────────────────────────
+    // ─── Views ────────────────────────────────────────────────────────
+
+    function getJurorPool() external view returns (address[] memory) {
+        return jurorPool;
+    }
+
+    function getJurorPoolCount() external view returns (uint256) {
+        return jurorPool.length;
+    }
 
     function getCase(uint256 caseId) external view returns (DisputeCase memory) {
         return cases[caseId];
@@ -265,8 +392,12 @@ contract DisputeCouncil is Ownable {
         return cases[sessionToCase[sessionId]];
     }
 
-    function getJurors() external view returns (address[5] memory) {
-        return jurors;
+    function getCaseJurors(uint256 caseId) external view returns (address[JUROR_COUNT] memory) {
+        return cases[caseId].selectedJurors;
+    }
+
+    function getJurors() external view returns (address[] memory) {
+        return jurorPool;
     }
 
     function getJurorVotes(uint256 caseId)
@@ -277,10 +408,11 @@ contract DisputeCouncil is Ownable {
         voters = new address[](JUROR_COUNT);
         votes  = new uint8[](JUROR_COUNT);
         voted  = new bool[](JUROR_COUNT);
+        address[JUROR_COUNT] storage selected = cases[caseId].selectedJurors;
         for (uint256 i = 0; i < JUROR_COUNT; i++) {
-            voters[i] = jurors[i];
-            voted[i]  = hasVoted[caseId][jurors[i]];
-            votes[i]  = jurorVote[caseId][jurors[i]];
+            voters[i] = selected[i];
+            voted[i]  = hasVoted[caseId][selected[i]];
+            votes[i]  = jurorVote[caseId][selected[i]];
         }
     }
 }

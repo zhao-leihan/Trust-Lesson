@@ -69,16 +69,20 @@ Dokumen ini adalah panduan lengkap untuk AI Agent yang akan mengimplementasikan 
 - Validasi prasyarat (*prerequisite gating*, misal: Solidity Basics sebelum Solidity Security)
 - Auto-update progress saat credential diterbitkan
 
-### 3.4 DisputeCouncil 3-of-5 (`0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006`)
-- Multi-sig jury panel (5 juri, kuorum 3-of-5)
+### 3.4 DisputeCouncil (`0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006`)
+- Dynamic On-Chain Sortition Engine: Memilih 5 juri secara acak dari `jurorPool` per kasus menggunakan `block.prevrandao` & `caseId`
+- Conflict of Interest Filter: Murid dan mentor yang bersengketa otomatis di-exclude dari panel juri
+- Multi-sig jury panel (5 juri terpilih, kuorum 3-of-5)
 - Batas waktu penyelesaian 72 jam, auto-resolusi 50/50 jika juri melewati batas waktu
 - Bukti IPFS publik (`evidenceIpfsCid`) tercatat on-chain
-- Hook interface untuk eskalasi ke Kleros Court & UMA Optimistic Oracle
+- Hook interface untuk eskalasi ke Kleros Court & UMA Optimistic Oracle (Phase 2.0)
 
 ### 3.5 MentorStaking (`0xbbD3dA628360c63f36c9E6D2A955e33ADc5281Dd`)
-- `stake(amount)` → Mentor lock minimal 100 USDC, dapat badge "Verified"
-- `slash(address, amount, recipient)` → Dipotong otomatis oleh EscrowRouter jika kalah dispute
-- `unstake()` → Timelock 7 hari
+- On-chain Tier Enum: `enum Tier { NONE, PRO, MASTER }` terverifikasi di level smart contract
+- `stake(amount)` → Lock minimal 100 USDC (PRO Tier & Verified badge), 300 USDC (MASTER Tier)
+- `slash(address, amount, recipient)` → Dipotong otomatis oleh EscrowRouter jika kalah dispute, tier diturunkan otomatis
+- `requestUnstake()` → Reset tier/verified seketika, mengaktifkan timelock unbonding 7 hari
+- `unstake()` → Tarik kembali pokok stake setelah masa timelock selesai
 
 ### 3.6 VideoAccess (`0xb7d6EE04514AB9A210fDa4A3006c230EEEc40023`)
 - `registerVideo(contentHash, price)` → Simpan hash on-chain, video streaming HLS di Cloudflare
