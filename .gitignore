@@ -45,3 +45,10 @@ cache_hardhat/
 
 # Exclude docs as requested
 docs/
+
+# Exclude tests as requested
+test/
+test_backup_safe/
+
+# Archives
+*.zip
