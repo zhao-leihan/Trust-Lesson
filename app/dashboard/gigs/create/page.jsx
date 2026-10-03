@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/src/context/AuthContext";
@@ -12,6 +12,7 @@ import {
   UsdtIcon,
   ArbitrumIcon,
 } from "@/src/components/CurrencyBadge";
+import { MetaMaskIcon, CoinbaseWalletIcon } from "@/src/components/WalletIcons";
 import Footer from "@/src/components/Footer";
 import ExploreCard from "@/src/components/ExploreCard";
 import {
@@ -32,6 +33,7 @@ import {
   Radio,
   FileText,
   Shield,
+  ShieldCheck,
   Upload,
   ExternalLink,
   Check,
@@ -39,6 +41,10 @@ import {
   Info,
   DollarSign,
   Monitor,
+  Lock,
+  Unlock,
+  AlertTriangle,
+  Wallet,
 } from "lucide-react";
 
 // Curated high quality presets for mentors to choose quickly
@@ -132,10 +138,146 @@ const STEPS = [
 
 export default function CreateGigPage() {
   const router = useRouter();
-  const { user, walletAddress } = useAuth();
+  const { user, walletAddress, connectWallet, updateUserProfile } = useAuth();
 
   // Wizard Step State (1 to 4)
   const [currentStep, setCurrentStep] = useState(1);
+
+  // ─── Mandatory Payout Wallet Lock State ──────────────────────────────
+  const [isWalletLocked, setIsWalletLocked] = useState(Boolean(user?.walletLocked));
+  const [lockedAddress, setLockedAddress] = useState(user?.walletAddress || "");
+  const [checkingWalletLock, setCheckingWalletLock] = useState(true);
+  const [inputAddress, setInputAddress] = useState(user?.walletAddress || walletAddress || "");
+  const [isLockingWallet, setIsLockingWallet] = useState(false);
+  const [walletLockError, setWalletLockError] = useState("");
+  const [walletLockSuccess, setWalletLockSuccess] = useState(false);
+
+  // Check live lock status from database
+  useEffect(() => {
+    let isMounted = true;
+    async function checkLockStatus() {
+      if (!user) {
+        if (isMounted) setCheckingWalletLock(false);
+        return;
+      }
+      try {
+        const q = new URLSearchParams();
+        if (user.id) q.set("mentorId", user.id);
+        if (user.email) q.set("email", user.email);
+        const res = await fetch(`/api/mentor/stats?${q.toString()}`);
+        if (res.ok) {
+          const stats = await res.json();
+          if (isMounted) {
+            if (stats.walletLocked && stats.walletAddress) {
+              setIsWalletLocked(true);
+              setLockedAddress(stats.walletAddress);
+              setInputAddress(stats.walletAddress);
+            } else if (user.walletLocked && user.walletAddress) {
+              setIsWalletLocked(true);
+              setLockedAddress(user.walletAddress);
+              setInputAddress(user.walletAddress);
+            } else {
+              setIsWalletLocked(false);
+              if (walletAddress || user.walletAddress) {
+                setInputAddress(walletAddress || user.walletAddress);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to check wallet lock status:", e);
+        if (isMounted && user.walletLocked && user.walletAddress) {
+          setIsWalletLocked(true);
+          setLockedAddress(user.walletAddress);
+        }
+      } finally {
+        if (isMounted) setCheckingWalletLock(false);
+      }
+    }
+    checkLockStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, [user, walletAddress]);
+
+  // Lock Wallet Handler
+  const handleLockWallet = async (addrToLock) => {
+    setWalletLockError("");
+    const cleanAddr = (addrToLock || inputAddress || walletAddress || "").trim().toLowerCase();
+
+    if (!cleanAddr) {
+      setWalletLockError("Please connect your wallet or enter an Arbitrum 0x address.");
+      return false;
+    }
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(cleanAddr)) {
+      setWalletLockError("Invalid Arbitrum wallet address. Must be 0x followed by 40 hex characters.");
+      return false;
+    }
+
+    setIsLockingWallet(true);
+    try {
+      let signature = null;
+      if (typeof window !== "undefined" && window.ethereum) {
+        try {
+          const timestamp = Date.now();
+          const message = `Trust Lesson Escrow Payout Binding\nLocking Arbitrum payout address: ${cleanAddr}\nTimestamp: ${timestamp}`;
+          signature = await window.ethereum.request({
+            method: "personal_sign",
+            params: [message, cleanAddr],
+          }).catch(() => null);
+        } catch {}
+      }
+
+      const res = await fetch("/api/mentor/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: cleanAddr,
+          userId: user?.id,
+          email: user?.email,
+          signature,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || "Failed to lock wallet");
+      }
+
+      const confirmedAddr = data.walletAddress || cleanAddr;
+      setIsWalletLocked(true);
+      setLockedAddress(confirmedAddr);
+      setInputAddress(confirmedAddr);
+      if (updateUserProfile) {
+        updateUserProfile({ walletAddress: confirmedAddr, walletLocked: true });
+      }
+      setWalletLockSuccess(true);
+      setStepErrorMsg("");
+      setTimeout(() => setWalletLockSuccess(false), 5000);
+      return true;
+    } catch (err) {
+      setWalletLockError(err.message || "Failed to lock payout wallet.");
+      return false;
+    } finally {
+      setIsLockingWallet(false);
+    }
+  };
+
+  const handleConnectAndQuickLock = async (provider = "metamask") => {
+    setWalletLockError("");
+    try {
+      if (connectWallet) {
+        const addr = await connectWallet(provider);
+        if (addr) {
+          setInputAddress(addr);
+          await handleLockWallet(addr);
+        }
+      }
+    } catch (err) {
+      setWalletLockError(err.message || "Failed to connect wallet.");
+    }
+  };
 
   // Model & Currency State (Milestone Gig model only; USDC & USDT settlement)
   const modelType = "GIG";
@@ -354,6 +496,11 @@ export default function CreateGigPage() {
     setStepErrorMsg("");
 
     if (currentStep === 1) {
+      if (!isWalletLocked || !lockedAddress) {
+        setStepErrorMsg("Payout Wallet Required: You must lock your Arbitrum payout wallet above before proceeding. Escrow contracts need a permanent recipient address for student payments.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       if (!title.trim()) {
         setStepErrorMsg("Please enter a clear, descriptive gig title.");
         return;
@@ -407,6 +554,13 @@ export default function CreateGigPage() {
   const handlePublishGig = async () => {
     setStepErrorMsg("");
 
+    if (!isWalletLocked || !lockedAddress) {
+      setStepErrorMsg("Payout Wallet Not Locked: Please lock your Arbitrum payout wallet before publishing this gig. Where should student payments go when milestones are released?");
+      setCurrentStep(1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     if (!title.trim() || !description.trim()) {
       setStepErrorMsg("Please fill in the gig title and description in Step 1.");
       setCurrentStep(1);
@@ -448,8 +602,9 @@ export default function CreateGigPage() {
         price: Number(effectivePackages[0]?.price) || 0,
         mentorName: user?.name || "Verified Mentor",
         mentorPhoto: user?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        mentorAddress: user?.walletAddress || walletAddress || null,
+        mentorAddress: lockedAddress || user?.walletAddress || walletAddress,
         mentorId: user?.id || null,
+        email: user?.email || null,
       };
 
       const res = await fetch("/api/mentor/gigs", {
@@ -595,6 +750,119 @@ export default function CreateGigPage() {
                   })}
                 </div>
               </div>
+
+              {/* ── MANDATORY ESCROW PAYOUT WALLET LOCK CARD ── */}
+              {isWalletLocked ? (
+                <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-emerald-50 via-white to-emerald-50/50 border-2 border-emerald-300 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200 shadow-2xs">
+                      <Lock size={18} className="text-emerald-700" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-slate-950 text-sm">
+                          Escrow Payout Destination Locked
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider border border-emerald-200 flex items-center gap-1">
+                          <CheckCircle2 size={11} />
+                          Verified Recipient
+                        </span>
+                      </div>
+                      <p className="text-slate-600 text-xs mt-0.5 flex flex-wrap items-center gap-1.5">
+                        <span>Student milestone payments will disburse non-custodially to:</span>
+                        <code className="bg-emerald-100/70 text-emerald-900 px-2 py-0.5 rounded-md font-mono text-[11px] font-bold border border-emerald-200">
+                          {lockedAddress}
+                        </code>
+                      </p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-emerald-800 border border-emerald-200 text-xs font-bold shadow-2xs shrink-0 self-start sm:self-auto">
+                    <ArbitrumIcon size={14} />
+                    <span>Arbitrum One Active</span>
+                  </span>
+                </div>
+              ) : (
+                <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-50 via-white to-orange-50/40 border-2 border-amber-300 shadow-xs space-y-4 animate-fadeIn">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-200 shadow-xs">
+                      <Lock size={22} className="text-amber-800" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-black text-slate-950 text-sm sm:text-base">
+                          Mandatory: Lock Your Arbitrum Payout Wallet
+                        </h3>
+                        <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-black uppercase tracking-wider border border-rose-200">
+                          Required Before Creating Gig
+                        </span>
+                      </div>
+                      <p className="text-slate-600 text-xs mt-1 leading-relaxed">
+                        In Trust Lesson, student gig payments are deposited into an Arbitrum One smart contract escrow. When milestones are approved, funds are automatically released on-chain. <span className="font-bold text-slate-900">You must lock your payout wallet now so the smart contract knows where to send payments when students purchase your gig.</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {walletLockError && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                      <AlertTriangle size={15} className="shrink-0 text-rose-600" />
+                      <span>{walletLockError}</span>
+                    </div>
+                  )}
+
+                  {walletLockSuccess && (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                      <CheckCircle2 size={15} className="shrink-0 text-emerald-600" />
+                      <span>Payout wallet successfully locked and synchronized with your mentor profile!</span>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        value={inputAddress}
+                        onChange={(e) => setInputAddress(e.target.value)}
+                        placeholder="0x... (Enter Arbitrum One wallet address)"
+                        className="w-full px-4 py-2.5 rounded-xl border border-amber-300 font-mono text-xs text-slate-900 bg-white placeholder:text-slate-400 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleConnectAndQuickLock("metamask")}
+                        disabled={isLockingWallet}
+                        className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        title="Connect with MetaMask"
+                      >
+                        <MetaMaskIcon size={16} />
+                        <span>MetaMask</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleConnectAndQuickLock("coinbase")}
+                        disabled={isLockingWallet}
+                        className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        title="Connect with Coinbase Wallet"
+                      >
+                        <CoinbaseWalletIcon size={16} />
+                        <span>Coinbase</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleLockWallet(inputAddress)}
+                        disabled={isLockingWallet || !inputAddress.trim()}
+                        className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-600/20 active:scale-95"
+                      >
+                        <Lock size={14} />
+                        <span>{isLockingWallet ? "Locking..." : "Lock Payout Wallet"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Step Error Banner */}
               {stepErrorMsg && (
@@ -1380,6 +1648,63 @@ export default function CreateGigPage() {
                     </div>
                   </div>
 
+                  {/* Smart Contract Settlement & Payout Destination Check */}
+                  <div className="bg-white rounded-3xl border-2 border-purple-100 p-6 sm:p-7 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-purple-50">
+                      <div>
+                        <h3 className="font-extrabold text-slate-950 text-base flex items-center gap-2">
+                          <ShieldCheck size={18} className="text-emerald-600" />
+                          <span>Smart Contract Escrow Payout Binding</span>
+                        </h3>
+                        <p className="text-slate-500 text-xs mt-0.5">
+                          Verification of on-chain payout destination before publishing to explore catalog.
+                        </p>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase tracking-wider border border-emerald-200">
+                        Arbitrum One
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                          Settlement Currency
+                        </span>
+                        <div className="flex items-center gap-1.5 font-black text-slate-900 text-sm">
+                          {currency === "USDC" ? <UsdcIcon size={18} /> : <UsdtIcon size={18} />}
+                          <span>{currency} (Arbitrum)</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                          Escrow Protection
+                        </span>
+                        <div className="flex items-center gap-1.5 font-black text-emerald-700 text-sm">
+                          <Shield size={16} />
+                          <span>EscrowRouter.sol</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                          Payout Recipient Wallet
+                        </span>
+                        {isWalletLocked ? (
+                          <div className="flex items-center gap-1 font-mono text-xs font-black text-emerald-700 truncate">
+                            <Lock size={12} className="shrink-0" />
+                            <span className="truncate">{lockedAddress?.slice(0, 8)}...{lockedAddress?.slice(-6)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-rose-600 font-extrabold text-xs flex items-center gap-1">
+                            <AlertTriangle size={12} />
+                            Not Locked
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Live Explore Card Preview */}
                   <div className="bg-white rounded-3xl border-2 border-purple-100 p-6 sm:p-8 shadow-xs space-y-4">
                     <div className="flex items-center justify-between pb-3 border-b border-purple-50">
@@ -1438,10 +1763,23 @@ export default function CreateGigPage() {
                       type="button"
                       disabled={isSubmitting}
                       onClick={handlePublishGig}
-                      className="px-7 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs sm:text-sm flex items-center gap-2 cursor-pointer shadow-lg shadow-purple-600/25 active:scale-95 transition-all disabled:opacity-50"
+                      className={`px-7 py-3 rounded-xl text-white font-black text-xs sm:text-sm flex items-center gap-2 transition-all shadow-lg active:scale-95 cursor-pointer disabled:opacity-50 ${
+                        !isWalletLocked
+                          ? "bg-slate-500 hover:bg-slate-600 shadow-slate-500/20"
+                          : "bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 shadow-purple-600/25"
+                      }`}
                     >
-                      <Sparkles size={16} />
-                      <span>{isSubmitting ? "Deploying Offering to Arbitrum..." : "Publish Gig to Explore"}</span>
+                      {!isWalletLocked ? (
+                        <>
+                          <Lock size={16} />
+                          <span>Lock Payout Wallet to Publish</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={16} />
+                          <span>{isSubmitting ? "Deploying Offering to Arbitrum..." : "Publish Gig to Explore"}</span>
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
