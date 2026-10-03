@@ -4,37 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/src/context/AuthContext";
-import { Eye, EyeOff, Shield, ArrowRight, CheckCircle2, GraduationCap, KeyRound, Sparkles } from "lucide-react";
-
-const QUICK_ACCOUNTS = [
-  {
-    role: "mentor",
-    label: "Mentor",
-    email: "mentor@trustlesson.com",
-    pass: "MentorPassword123!",
-    icon: Shield,
-    name: "0xAnakMommy",
-    color: "bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 border-indigo-200",
-  },
-  {
-    role: "student",
-    label: "Student",
-    email: "student@trustlesson.com",
-    pass: "StudentPassword123!",
-    icon: GraduationCap,
-    name: "Alex Rivera",
-    color: "bg-emerald-50/80 hover:bg-emerald-100 text-emerald-900 border-emerald-200",
-  },
-  {
-    role: "admin",
-    label: "Admin",
-    email: "admin@trustlesson.com",
-    pass: "AdminPassword123!",
-    icon: KeyRound,
-    name: "Rayhan Young",
-    color: "bg-purple-50/80 hover:bg-purple-100 text-purple-900 border-purple-200",
-  },
-];
+import { Eye, EyeOff, ArrowRight, CheckCircle2 } from "lucide-react";
 
 export default function LoginPage() {
   const { login, user, authLoading } = useAuth();
@@ -116,39 +86,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickLogin = async (quickEmail, quickPassword) => {
-    setForm({ email: quickEmail, password: quickPassword });
-    setError("");
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: quickEmail, password: quickPassword, rememberMe: true }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Login failed. Please check credentials.");
-      }
-
-      if (data.token) {
-        localStorage.setItem("tl_jwt", data.token);
-      }
-
-      localStorage.setItem("trust_lesson_remember", "true");
-      localStorage.setItem("trust_lesson_remember_email", quickEmail);
-
-      login(data.user, true);
-      router.push("/dashboard");
-    } catch (err) {
-      setError(err.message || "Failed to sign in.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col lg:flex-row relative bg-slate-950 overflow-x-hidden">
       {/* ─── Mobile Background Backdrop (Only visible on < lg screens) ───── */}
@@ -223,34 +160,6 @@ export default function LoginPage() {
                 <p className="text-slate-500 text-xs sm:text-sm mt-1">
                   Enter your email address and password to continue.
                 </p>
-              </div>
-
-              {/* Quick Login Bar (Demo / Testing for Mentor, Student, Admin) */}
-              <div className="mb-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 shadow-2xs">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-extrabold text-slate-700 flex items-center gap-1.5">
-                    <Sparkles size={13} className="text-indigo-600" />
-                    <span>Quick Login (Demo / Testing):</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-semibold">1-Click Sign In</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {QUICK_ACCOUNTS.map(({ role, label, email: qEmail, pass: qPass, icon: Icon, color, name: qName }) => (
-                    <button
-                      key={role}
-                      type="button"
-                      disabled={loading}
-                      onClick={() => handleQuickLogin(qEmail, qPass)}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${color}`}
-                    >
-                      <div className="flex items-center gap-1 font-bold text-xs">
-                        <Icon size={13} />
-                        <span>{label}</span>
-                      </div>
-                      <span className="text-[10px] opacity-75 truncate max-w-full mt-0.5 font-medium">{qName}</span>
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
