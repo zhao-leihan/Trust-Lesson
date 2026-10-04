@@ -1,25 +1,38 @@
-# 🎓 Trust Lesson
+<div align="center">
+  <a href="https://github.com/zhao-leihan/Trust-Lesson">
+    <img src="./public/logo-full.webp" alt="Trust Lesson Logo" width="380" />
+  </a>
+  <br />
+  <br />
 
-> **Your Knowledge. On-Chain.**  
-> A decentralized, peer-to-peer mentorship and milestone gig exchange protected by non-custodial smart escrow contracts on **Arbitrum**.
+  <p align="center">
+    <strong>Your Knowledge. On-Chain.</strong><br />
+    A decentralized, peer-to-peer mentorship and milestone gig exchange protected by non-custodial smart escrow contracts on <strong>Arbitrum</strong>.
+  </p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](./LICENSE)
-[![Built with Next.js](https://img.shields.io/badge/Frontend-Next.js%2015%20App%20Router-black.svg)](https://nextjs.org)
-[![React 19](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev)
-[![Tailwind CSS v4](https://img.shields.io/badge/Styling-Tailwind%20CSS%20v4-38B2AC.svg)](https://tailwindcss.com)
-[![Network: Arbitrum](https://img.shields.io/badge/Network-Arbitrum%20Sepolia%20%7C%20Arbitrum%20One-28A0F0.svg)](https://arbitrum.io)
-[![Solidity 0.8.24](https://img.shields.io/badge/Smart%20Contracts-Solidity%200.8.24%20(Cancun)-363636.svg)](https://soliditylang.org/)
-[![Security Policy](https://img.shields.io/badge/Security-Policy%20Enforced-emerald.svg)](./SECURITY.md)
-[![Tests: 65 Passing](https://img.shields.io/badge/Hardhat%20Tests-65%20Passing%20(100%25)-brightgreen.svg)](./test)
+  <p align="center">
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-9333ea.svg?style=flat-square" alt="License: MIT" /></a>
+    <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js-15%20App%20Router-000000.svg?style=flat-square&logo=next.js" alt="Next.js 15" /></a>
+    <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-61dafb.svg?style=flat-square&logo=react" alt="React 19" /></a>
+    <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind%20CSS-v4-06B6D4.svg?style=flat-square&logo=tailwindcss" alt="Tailwind CSS v4" /></a>
+    <a href="https://arbitrum.io"><img src="https://img.shields.io/badge/Network-Arbitrum%20Sepolia%20%7C%20One-28A0F0.svg?style=flat-square&logo=arbitrum" alt="Arbitrum" /></a>
+    <a href="https://soliditylang.org/"><img src="https://img.shields.io/badge/Solidity-0.8.24%20(Cancun)-363636.svg?style=flat-square&logo=solidity" alt="Solidity" /></a>
+    <a href="https://cloudflare.com"><img src="https://img.shields.io/badge/Storage-Cloudflare%20Stream%20%2B%20R2-F38020.svg?style=flat-square&logo=cloudflare" alt="Cloudflare" /></a>
+    <a href="./SECURITY.md"><img src="https://img.shields.io/badge/Gas-100%25%20Subsidized-10B981.svg?style=flat-square" alt="Gas Subsidized" /></a>
+  </p>
+</div>
 
 ---
 
-## 🌟 Overview
+## Overview
 
 **Trust Lesson** eliminates payment risk and ghosting in private mentorship and freelance coaching. By combining milestone-based escrow vaults with on-chain reputation verification, learners book sessions with complete confidence and mentors are guaranteed 100% of their earnings upon verified delivery.
 
-### 🛡️ Why Trust Lesson?
+### Why Trust Lesson?
 - **Non-Custodial Smart Escrow V2**: Funds are locked in audited Arbitrum smart contracts until the learner approves milestone deliverables.
+- **Native Access-Gated Content**: Mentors upload curriculum directly through Cloudflare Stream (videos) and Cloudflare R2 (documents) with short-lived signed URLs (1-hour playback tokens, 15-minute download links).
+- **Cost-Effective Fallback Hosting**: Zero-budget mentors can host course content via unlisted YouTube and restricted Google Drive links with interactive setup guides.
+- **Pre-Publish Student Simulator**: Mentors can inspect and verify their curriculum from both unpaid (locked) and paid (unlocked) perspectives before publishing.
 - **100% Mentor Base Earning Guarantee**: Mentors receive 100% of their listed fee without platform deductions.
 - **Fair 10% Protocol Cut**: A transparent 10% operational fee (`PLATFORM_FEE_BPS = 1000`) is calculated upfront on-chain.
 - **100% Gas Subsidy**: The Platform Gas Sponsor vault subsidizes transaction costs so users need 0 ETH for gas.
@@ -28,12 +41,11 @@
 - **On-Chain Skill Graph & Prerequisite Gating**: Completed sessions level up on-chain skill nodes (Level 1, 2, 3) with prerequisite tree verification.
 - **Decentralized Dispute Council (Phase 1.5 Multi-Sig)**: 3-of-5 juror quorum replacing single arbiter, 72h resolution timelock, transparent IPFS evidence hashes, and pluggable Kleros Court / UMA Optimistic Oracle hooks.
 - **Real-Time Ponder Indexer**: Blazing-fast on-chain event indexing across Arbitrum Sepolia for sub-second dashboard updates.
-- **The Lesson Monster Universe**: A playful, gamified aesthetic with friendly mascot guides throughout your learning journey.
 - **100% English Web Experience**: Standardized English UI across all checkout, booking, and dashboard views.
 
 ---
 
-## 🔗 Live Smart Contracts (Arbitrum Sepolia Testnet — V2 Architecture)
+## Live Smart Contracts (Arbitrum Sepolia Testnet — V2 Architecture)
 
 All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and actively deployed on **Arbitrum Sepolia** (`Chain ID: 421614`):
 
@@ -51,7 +63,7 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 | :--- | :--- |
@@ -63,26 +75,28 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 | **Blockchain L2** | [Arbitrum Sepolia](https://sepolia.arbiscan.io/) (Testnet) / [Arbitrum One](https://arbiscan.io/) (Mainnet) |
 | **Web3 Providers** | [Ethers.js v6](https://docs.ethers.org/) + [Viem](https://viem.sh/) (MetaMask, Rabby, Coinbase Wallet) |
 | **Fiat On-Ramp** | [Transak Gateway](https://transak.com/) (Visa, Mastercard, Apple Pay) |
-| **Media & Storage** | [Cloudflare Stream](https://www.cloudflare.com/products/cloudflare-stream/) (HLS DRM) + [Pinata IPFS](https://pinata.cloud/) |
+| **Media & Storage** | [Cloudflare Stream](https://www.cloudflare.com/products/cloudflare-stream/) (HLS Signed Tokens) + [Cloudflare R2](https://www.cloudflare.com/products/r2/) (Presigned AWS SigV4) + [Pinata IPFS](https://pinata.cloud/) |
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-### 1. 🧑‍🏫 Mentor Hub & Workspace
+### 1. Mentor Hub & Workspace
 - **Overview Dashboard**: Monthly earnings, active escrow pool, on-chain reputation score, and hourly rate analytics.
-- **Course & Gig Management**: Publish learning packages with mandatory video verification preview.
+- **Native Gated Curriculum Uploads**: Direct video upload pipeline to Cloudflare Stream and multi-document resources to private Cloudflare R2 storage.
+- **Cost-Free Hosting Tier**: Support for YouTube (Unlisted) videos and Google Drive (Restricted) documents with step-by-step upload guides for mentors with no storage budget.
+- **Student View Simulator**: Pre-publish verification modal to preview curriculum gating from both unpaid and paid student states.
 - **Escrow Wallet**: Track pending escrow deposits, milestone status, and withdraw settled earnings.
 - **Portfolio Showcase**: Interactive portfolio editor with live demo URLs, GitHub repositories, and tech stack tags.
 
-### 2. 🎓 Student Workspace
+### 2. Student Workspace
 - **Live MetaMask Balance**: View connected Arbitrum Sepolia USDC and ETH balances directly in the checkout card.
 - **Insufficient Balance Protection**: Clear warning states and direct faucet links (Circle USDC & Sepolia ETH) when balance is below required deposit.
 - **Milestone Progress Tracker**: Step-by-step visibility (*Escrow Deposited → In Session → Confirmed & Released*).
 - **Dispute Resolution Engine**: Transparent 48-hour dispute resolution with evidence hashing to IPFS.
 - **Soulbound Credentials**: Automatic minting of tamper-proof completion certificates linked to Arbiscan.
 
-### 3. 💳 Economic Model & Fee Mechanics
+### 3. Economic Model & Fee Mechanics
 - **Mentor Listing**: e.g., **$50.00 USDC** base price.
 - **Platform Protocol Cut (10%)**: **$5.00 USDC** calculated upfront on-chain.
 - **Arbitrum Gas Fee**: **FREE** (100% subsidized by the Platform Gas Sponsor).
@@ -91,7 +105,7 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 
 ---
 
-## ⚡ Getting Started
+## Getting Started
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18.18.0 or higher recommended)
@@ -131,7 +145,7 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 Trust-Lesson/
@@ -167,14 +181,14 @@ Trust-Lesson/
 
 ---
 
-## 👥 Leadership & Team
+## Leadership & Team
 
 - **Rayhan Young** — *Chief Technology Officer (CTO) & Core Protocol Architect* (`@0xAnakMommy`)
 - **Janetiloy** — *Chief Marketing Officer (CMO) & Global Growth Lead* (`@Janetiloy`)
 
 ---
 
-## 📄 License & Security
+## License & Security
 
 - **License**: Released under the [MIT License](./LICENSE).
 - **Security Policy**: For vulnerability disclosures and escrow safety guidelines, see [SECURITY.md](./SECURITY.md).
