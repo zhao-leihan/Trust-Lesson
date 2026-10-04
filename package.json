@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:gated": "node --import ./test/register-loader.js test/gated-content.test.js",
     "compile": "hardhat compile",
     "test:contracts": "hardhat test",
     "deploy:contracts": "hardhat run scripts/deploy.cjs",

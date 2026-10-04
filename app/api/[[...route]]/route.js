@@ -3,7 +3,8 @@ import { handle } from "hono/vercel";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { verifyJwt, signJwt, extractBearerToken } from "@/lib/jwt";
 import { hashPassword, verifyPassword } from "@/lib/auth";
-import { getCloudflareUploadUrl, getSignedPlaybackUrl } from "@/lib/cloudflare";
+import { getCloudflareUploadUrl, getSignedPlaybackUrl, getSignedPlaybackToken } from "@/lib/cloudflare";
+import { uploadResourceToR2, getPresignedR2DownloadUrl, verifyAndGetDevResource } from "@/lib/cloudflareR2";
 import { uploadToIpfs, uploadJsonToIpfs } from "@/lib/ipfs";
 import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, PLATFORM_SPONSOR_WALLET } from "@/lib/gasSponsor";
 import { getActiveNetwork } from "@/lib/networkConfig";
@@ -709,6 +710,356 @@ app.post("/videos/:id/purchase", authMiddleware, async (c) => {
   } catch (e) {
     return c.json({ error: e.message }, 400);
   }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// GATED MODULE CONTENT ROUTES (Cloudflare Stream + Cloudflare R2)
+// Escrow-Gated Native Upload & Time-Limited Signed Access Verification
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * Access gatekeeper for video streaming and document downloads.
+ * Verifies on-chain / database milestone escrow payment before issuing signed URLs.
+ */
+async function checkModuleAccess({ user, moduleId, offeringId, videoUid, sessionId }) {
+  if (!user || !user.sub) {
+    return { allowed: false, reason: "Authentication required" };
+  }
+
+  // Admins always have access for content review
+  if (user.role === "ADMIN") {
+    return { allowed: true, role: "admin" };
+  }
+
+  const db = await getPrisma();
+
+  // Check if user is the creator/mentor of this offering or module
+  let targetOffering = null;
+  if (offeringId) {
+    targetOffering = await db.offering.findUnique({ where: { id: offeringId } }).catch(() => null);
+  }
+  if (!targetOffering && moduleId) {
+    targetOffering = await db.offering.findFirst({
+      where: { modules: { contains: moduleId } },
+    }).catch(() => null);
+  }
+
+  if (targetOffering) {
+    const isMentorOwner =
+      (targetOffering.mentorId && targetOffering.mentorId === user.sub) ||
+      (targetOffering.mentorAddress && user.address && targetOffering.mentorAddress.toLowerCase() === user.address.toLowerCase());
+    if (isMentorOwner) {
+      return { allowed: true, role: "mentor" };
+    }
+  }
+
+  // Check if sessionId is provided directly and has confirmed payment
+  if (sessionId) {
+    const session = await db.session.findUnique({
+      where: { id: sessionId },
+    }).catch(() => null);
+
+    if (session) {
+      const isLearner =
+        session.learnerId === user.sub ||
+        (user.address && session.learnerId?.toLowerCase() === user.address.toLowerCase());
+      const isPaid = ["FUNDED", "IN_SESSION", "COMPLETED"].includes(session.status);
+      if (isLearner && isPaid) {
+        return { allowed: true, role: "learner", sessionStatus: session.status };
+      }
+    }
+  }
+
+  // Check if learner has a funded session for this offering/mentor
+  if (targetOffering) {
+    const activeSession = await db.session.findFirst({
+      where: {
+        AND: [
+          {
+            OR: [
+              { learnerId: user.sub },
+              ...(user.address ? [{ learnerId: { contains: user.address.toLowerCase() } }] : []),
+            ],
+          },
+          {
+            OR: [
+              ...(targetOffering.mentorId ? [{ mentorId: targetOffering.mentorId }] : []),
+              ...(targetOffering.mentorAddress ? [{ mentorId: { contains: targetOffering.mentorAddress.toLowerCase() } }] : []),
+            ],
+          },
+          { status: { in: ["FUNDED", "IN_SESSION", "COMPLETED"] } },
+        ],
+      },
+    }).catch(() => null);
+
+    if (activeSession) {
+      return { allowed: true, role: "learner", sessionStatus: activeSession.status };
+    }
+  }
+
+  // Check if user purchased this specific video
+  if (videoUid || moduleId) {
+    const targetVideo = await db.video.findFirst({
+      where: {
+        OR: [
+          ...(videoUid ? [{ cloudflareId: videoUid }] : []),
+          ...(moduleId ? [{ id: moduleId }] : []),
+        ],
+      },
+    }).catch(() => null);
+
+    if (targetVideo) {
+      const purchase = await db.videoPurchase.findFirst({
+        where: {
+          videoId: targetVideo.id,
+          learnerId: user.sub,
+        },
+      }).catch(() => null);
+
+      if (purchase) {
+        return { allowed: true, role: "purchased" };
+      }
+    }
+  }
+
+  // Check any active confirmed session for this learner
+  const anyPaidSession = await db.session.findFirst({
+    where: {
+      OR: [
+        { learnerId: user.sub },
+        ...(user.address ? [{ learnerId: { contains: user.address.toLowerCase() } }] : []),
+      ],
+      status: { in: ["FUNDED", "IN_SESSION", "COMPLETED"] },
+    },
+  }).catch(() => null);
+
+  if (anyPaidSession && !targetOffering) {
+    return { allowed: true, role: "learner", sessionStatus: anyPaidSession.status };
+  }
+
+  return { allowed: false, reason: "Payment not confirmed" };
+}
+
+/** POST /api/modules/upload-video — Gated native video upload to Cloudflare Stream */
+app.post("/modules/upload-video", authMiddleware, async (c) => {
+  const jwtUser = c.get("user");
+  try {
+    const contentType = c.req.header("content-type") || "";
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await c.req.formData();
+      const file = formData.get("file");
+      const title = formData.get("title") || "Lesson Module Video";
+      const moduleId = formData.get("moduleId") || `mod-${Date.now()}`;
+
+      if (!file || typeof file === "string") {
+        return c.json({ error: "Video file is required" }, 400);
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const uploadInit = await getCloudflareUploadUrl({
+        title: String(title),
+        maxDurationSeconds: 7200,
+      });
+
+      // If real Cloudflare upload URL, stream to it
+      if (uploadInit.uploadURL && !uploadInit.uploadURL.includes("mock-cloudflare")) {
+        try {
+          await fetch(uploadInit.uploadURL, {
+            method: "POST",
+            body: buffer,
+            headers: { "Content-Type": file.type || "video/mp4" },
+          });
+        } catch (uploadErr) {
+          console.warn("[Cloudflare Stream] Direct stream upload error:", uploadErr.message);
+        }
+      }
+
+      return c.json({
+        success: true,
+        uid: uploadInit.uid,
+        title: String(title),
+        fileName: file.name,
+        size: buffer.length,
+        moduleId: String(moduleId),
+      }, 201);
+    } else {
+      // JSON request: Mentor requests direct-creator upload URL from Cloudflare Stream
+      const body = await c.req.json().catch(() => ({}));
+      const { title = "Module Video", maxDurationSeconds = 7200 } = body;
+      const result = await getCloudflareUploadUrl({ title, maxDurationSeconds });
+      return c.json(result);
+    }
+  } catch (e) {
+    console.error("[Module Video Upload Error]:", e);
+    return c.json({ error: "Failed to process video upload", detail: e.message }, 500);
+  }
+});
+
+/** GET /api/modules/:id/playback-token — Generate time-limited signed Cloudflare Stream playback token */
+app.get("/modules/:id/playback-token", async (c) => {
+  const token = extractBearerToken(c.req.header("Authorization")) || getCookie(c, "tl_session");
+  if (!token) {
+    return c.json(
+      {
+        error: "Unauthorized. Complete payment to unlock this module.",
+        code: "UNAUTHORIZED",
+      },
+      403
+    );
+  }
+
+  let user = null;
+  try {
+    user = await verifyJwt(token);
+  } catch {
+    return c.json(
+      {
+        error: "Invalid or expired token. Please sign in again.",
+        code: "INVALID_TOKEN",
+      },
+      403
+    );
+  }
+
+  const moduleId = c.req.param("id");
+  const videoUid = c.req.query("videoUid") || moduleId;
+  const offeringId = c.req.query("offeringId");
+  const sessionId = c.req.query("sessionId");
+
+  const access = await checkModuleAccess({ user, moduleId, offeringId, videoUid, sessionId });
+  if (!access.allowed) {
+    return c.json(
+      {
+        error: "Access denied. Complete milestone escrow payment to unlock this module.",
+        code: "PAYMENT_REQUIRED",
+        reason: access.reason,
+      },
+      403
+    );
+  }
+
+  const tokenData = await getSignedPlaybackToken(videoUid, 3600);
+  return c.json({
+    success: true,
+    ...tokenData,
+    accessRole: access.role,
+  });
+});
+
+/** POST /api/modules/upload-resource — Gated native document upload to private Cloudflare R2 */
+app.post("/modules/upload-resource", authMiddleware, async (c) => {
+  try {
+    const formData = await c.req.formData();
+    const file = formData.get("file");
+    const moduleId = formData.get("moduleId") || `mod-${Date.now()}`;
+
+    if (!file || typeof file === "string") {
+      return c.json({ error: "Resource document file is required" }, 400);
+    }
+
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const result = await uploadResourceToR2({
+      fileBuffer,
+      fileName: file.name,
+      contentType: file.type || "application/octet-stream",
+      moduleId: String(moduleId),
+    });
+
+    return c.json({
+      success: true,
+      resource: result,
+    }, 201);
+  } catch (e) {
+    console.error("[Module Resource Upload Error]:", e);
+    return c.json({ error: "Failed to upload resource document", detail: e.message }, 500);
+  }
+});
+
+/** GET /api/modules/:id/resources/:resourceId/download — Generate presigned R2 download URL */
+app.get("/modules/:id/resources/:resourceId/download", async (c) => {
+  const token = extractBearerToken(c.req.header("Authorization")) || getCookie(c, "tl_session");
+  if (!token) {
+    return c.json(
+      {
+        error: "Unauthorized. Complete payment to download this resource.",
+        code: "UNAUTHORIZED",
+      },
+      403
+    );
+  }
+
+  let user = null;
+  try {
+    user = await verifyJwt(token);
+  } catch {
+    return c.json(
+      {
+        error: "Invalid or expired token.",
+        code: "INVALID_TOKEN",
+      },
+      403
+    );
+  }
+
+  const moduleId = c.req.param("id");
+  const resourceId = c.req.param("resourceId");
+  const key = c.req.query("key") || `modules/${moduleId}/${resourceId}`;
+  const filename = c.req.query("filename") || "document.pdf";
+  const offeringId = c.req.query("offeringId");
+  const sessionId = c.req.query("sessionId");
+
+  const access = await checkModuleAccess({ user, moduleId, offeringId, sessionId });
+  if (!access.allowed) {
+    return c.json(
+      {
+        error: "Access denied. Complete milestone escrow payment to download this resource.",
+        code: "PAYMENT_REQUIRED",
+        reason: access.reason,
+      },
+      403
+    );
+  }
+
+  const downloadData = await getPresignedR2DownloadUrl({
+    key,
+    filename,
+    expiresInSeconds: 900, // 15 minutes
+  });
+
+  return c.json({
+    success: true,
+    ...downloadData,
+    accessRole: access.role,
+  });
+});
+
+/** GET /api/modules/resources/download-temp — Secure dev download handler with HMAC timestamp verification */
+app.get("/modules/resources/download-temp", async (c) => {
+  const token = c.req.query("token");
+  if (!token) return c.json({ error: "Token is required" }, 400);
+
+  const verification = verifyAndGetDevResource(token);
+  if (!verification.valid) {
+    return c.json({ error: verification.error || "Invalid or expired download link" }, 403);
+  }
+
+  const file = verification.fileData;
+  if (!file) {
+    return c.json({
+      message: "Resource link is cryptographically valid and active for 15 minutes.",
+      key: verification.key,
+      name: verification.name,
+      status: "VERIFIED_ACTIVE",
+    });
+  }
+
+  return new Response(file.buffer, {
+    headers: {
+      "Content-Type": file.contentType,
+      "Content-Disposition": `attachment; filename="${encodeURIComponent(verification.name || file.fileName)}"`,
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════
@@ -2080,3 +2431,4 @@ export const POST = handle(app);
 export const PUT = handle(app);
 export const PATCH = handle(app);
 export const DELETE = handle(app);
+export { app };

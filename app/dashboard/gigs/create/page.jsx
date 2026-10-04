@@ -13,8 +13,10 @@ import {
   ArbitrumIcon,
 } from "@/src/components/CurrencyBadge";
 import { MetaMaskIcon, CoinbaseWalletIcon } from "@/src/components/WalletIcons";
+import { YouTubeIcon, GoogleDriveIcon } from "@/src/components/PlatformIcons";
 import Footer from "@/src/components/Footer";
 import ExploreCard from "@/src/components/ExploreCard";
+import GatedModulePlayer from "@/src/components/GatedModulePlayer";
 import {
   ArrowLeft,
   ArrowRight,
@@ -45,6 +47,15 @@ import {
   Unlock,
   AlertTriangle,
   Wallet,
+  Eye,
+  Download,
+  Loader2,
+  Paperclip,
+  FileCode,
+  BookOpen,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 // Curated high quality presets for mentors to choose quickly
@@ -332,15 +343,42 @@ export default function CreateGigPage() {
     },
   ]);
 
-  // Curriculum Modules & Video Uploads
+  // Curriculum Modules (Supporting YouTube & Google Drive for Cost Savings)
   const [modules, setModules] = useState([
     {
+      id: "mod-1",
       title: "",
       description: "",
-      videoUrl: "",
-      resources: "",
+      videoSourceType: "youtube", // "youtube" | "cloudflare"
+      videoUrl: "", // YouTube Unlisted URL
+      videoUid: "", // Cloudflare Stream UID
+      videoFileName: "",
+      videoSize: null,
+      videoUploading: false,
+      videoProgress: 0,
+      resourceSourceType: "gdrive", // "gdrive" | "r2"
+      gdriveUrl: "", // Google Drive Restricted URL
+      resources: [], // Cloudflare R2 files
+      resourceUploading: false,
+      githubUrl: "", // Optional starter repository URL
     },
   ]);
+
+  // Upload Tutorial Guide State
+  const [showUploadTutorial, setShowUploadTutorial] = useState(false);
+  const [activeTutorialTab, setActiveTutorialTab] = useState("youtube"); // "youtube" | "gdrive"
+
+  // Student Curriculum Preview Modal State (Part 4)
+  const [showStudentPreview, setShowStudentPreview] = useState(false);
+  const [previewMode, setPreviewMode] = useState("unpaid"); // "unpaid" | "paid"
+
+  // Format bytes helper
+  const formatFileSize = (bytes) => {
+    if (!bytes || isNaN(bytes)) return "";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
 
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -392,10 +430,21 @@ export default function CreateGigPage() {
     setModules((prev) => [
       ...prev,
       {
+        id: `mod-${Date.now()}`,
         title: "",
         description: "",
+        videoSourceType: "youtube",
         videoUrl: "",
-        resources: "",
+        videoUid: "",
+        videoFileName: "",
+        videoSize: null,
+        videoUploading: false,
+        videoProgress: 0,
+        resourceSourceType: "gdrive",
+        gdriveUrl: "",
+        resources: [],
+        resourceUploading: false,
+        githubUrl: "",
       },
     ]);
   };
@@ -408,6 +457,129 @@ export default function CreateGigPage() {
 
   const handleDeleteModule = (index) => {
     setModules((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Native Gated Video Upload to Cloudflare Stream
+  const handleUploadModuleVideo = async (mIdx, file) => {
+    if (!file) return;
+    handleUpdateModule(mIdx, "videoUploading", true);
+    handleUpdateModule(mIdx, "videoProgress", 15);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("title", modules[mIdx]?.title || `Lesson Module ${mIdx + 1}`);
+      formData.append("moduleId", modules[mIdx]?.id || `mod-${mIdx + 1}`);
+
+      const token = localStorage.getItem("tl_jwt");
+      const res = await fetch("/api/modules/upload-video", {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Video upload failed");
+
+      setModules((prev) =>
+        prev.map((mod, i) =>
+          i === mIdx
+            ? {
+                ...mod,
+                videoUid: data.uid,
+                videoFileName: file.name,
+                videoSize: file.size,
+                videoUploading: false,
+                videoProgress: 100,
+              }
+            : mod
+        )
+      );
+    } catch (err) {
+      alert(`Video upload failed: ${err.message}`);
+      handleUpdateModule(mIdx, "videoUploading", false);
+      handleUpdateModule(mIdx, "videoProgress", 0);
+    }
+  };
+
+  const handleRemoveModuleVideo = (mIdx) => {
+    setModules((prev) =>
+      prev.map((mod, i) =>
+        i === mIdx
+          ? {
+              ...mod,
+              videoUid: "",
+              videoFileName: "",
+              videoSize: null,
+              videoUploading: false,
+              videoProgress: 0,
+            }
+          : mod
+      )
+    );
+  };
+
+  // Native Gated Document Upload to Cloudflare R2
+  const handleUploadModuleResource = async (mIdx, file) => {
+    if (!file) return;
+    handleUpdateModule(mIdx, "resourceUploading", true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("moduleId", modules[mIdx]?.id || `mod-${mIdx + 1}`);
+
+      const token = localStorage.getItem("tl_jwt");
+      const res = await fetch("/api/modules/upload-resource", {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Document upload failed");
+
+      const newRes = data.resource || {
+        id: `res-${Date.now()}`,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      };
+
+      setModules((prev) =>
+        prev.map((mod, i) =>
+          i === mIdx
+            ? {
+                ...mod,
+                resources: [...(mod.resources || []), newRes],
+                resourceUploading: false,
+              }
+            : mod
+        )
+      );
+    } catch (err) {
+      alert(`Document upload failed: ${err.message}`);
+      handleUpdateModule(mIdx, "resourceUploading", false);
+    }
+  };
+
+  const handleRemoveModuleResource = (mIdx, resId) => {
+    setModules((prev) =>
+      prev.map((mod, i) =>
+        i === mIdx
+          ? {
+              ...mod,
+              resources: (mod.resources || []).filter(
+                (r) => r.id !== resId && r.resourceId !== resId
+              ),
+            }
+          : mod
+      )
+    );
   };
 
   // Compress single image file using HTML5 canvas
@@ -1215,12 +1387,12 @@ export default function CreateGigPage() {
 
                         <div>
                           <label className="block text-slate-700 font-bold text-xs mb-1">Package Summary & Scope</label>
-                          <input
-                            type="text"
+                          <textarea
+                            rows={3}
                             value={pkg.description}
                             onChange={(e) => handleUpdatePackage(idx, "description", e.target.value)}
                             placeholder="Describe what's included in this milestone and what students will achieve..."
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 placeholder:text-slate-400"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 placeholder:text-slate-400 resize-y"
                           />
                         </div>
 
@@ -1399,30 +1571,162 @@ export default function CreateGigPage() {
                     </div>
                   )}
 
-                  {/* Curriculum Video Modules Builder */}
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-purple-50">
+                  {/* Curriculum Modules & Video Lessons */}
+                  <div className="pt-2 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-100">
                       <div>
                         <h3 className="font-extrabold text-slate-950 text-sm">
                           Curriculum Modules & Video Lessons ({modules.length})
                         </h3>
                         <p className="text-slate-500 text-xs">
-                          Provide pre-recorded video tutorials, code repositories, or homework assignments.
+                          Provide pre-recorded video tutorials, lesson documents, or practice code repositories.
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={handleAddModule}
-                        className="px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-purple-200"
+                        className="px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-purple-200 self-start sm:self-auto"
                       >
                         <Plus size={13} />
                         <span>Add Module</span>
                       </button>
                     </div>
 
+                    {/* UPLOAD GUIDE CARD (YOUTUBE UNLISTED & GOOGLE DRIVE RESTRICTED) */}
+                    <div className="rounded-2xl border-2 border-purple-200/90 bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/60 p-4 sm:p-5 shadow-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                            <BookOpen size={18} />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm">
+                              Upload Guide: YouTube (Unlisted) & Google Drive (Restricted Access)
+                            </h4>
+                            <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
+                              Use these free hosting alternatives to avoid cloud storage fees. Videos and documents remain access-gated and accessible only by learners with confirmed milestone escrow payments.
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowUploadTutorial(!showUploadTutorial)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-purple-50 border border-purple-200 text-purple-800 text-xs font-bold transition-all cursor-pointer shadow-2xs shrink-0 self-start sm:self-auto"
+                        >
+                          <HelpCircle size={14} className="text-purple-600" />
+                          <span>{showUploadTutorial ? "Hide Guide" : "View Step-by-Step Guide"}</span>
+                          {showUploadTutorial ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      </div>
+
+                      {/* Interactive Guide Content */}
+                      {showUploadTutorial && (
+                        <div className="mt-4 pt-4 border-t border-purple-100 space-y-4">
+                          {/* Guide Selector Tabs */}
+                          <div className="flex items-center gap-2 border-b border-purple-100 pb-2">
+                            <button
+                              type="button"
+                              onClick={() => setActiveTutorialTab("youtube")}
+                              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                activeTutorialTab === "youtube"
+                                  ? "bg-red-600 text-white shadow-2xs"
+                                  : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200"
+                              }`}
+                            >
+                              <YouTubeIcon size={14} />
+                              <span>YouTube Video Guide</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTutorialTab("gdrive")}
+                              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                activeTutorialTab === "gdrive"
+                                  ? "bg-blue-600 text-white shadow-2xs"
+                                  : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200"
+                              }`}
+                            >
+                              <GoogleDriveIcon size={14} />
+                              <span>Google Drive Document Guide</span>
+                            </button>
+                          </div>
+
+                          {/* Guide Content: YouTube */}
+                          {activeTutorialTab === "youtube" ? (
+                            <div className="space-y-3 bg-white p-4 rounded-xl border border-red-100">
+                              <div className="flex items-center gap-2 text-red-700 font-extrabold text-xs">
+                                <YouTubeIcon size={16} />
+                                <span>Steps to Upload Video to YouTube (Unlisted Mode)</span>
+                              </div>
+                              <ol className="space-y-2 text-slate-700 text-xs leading-relaxed list-decimal list-inside pl-1">
+                                <li>
+                                  <strong>Open YouTube Studio:</strong> Open your browser and navigate to <code>studio.youtube.com</code> using your Google account.
+                                </li>
+                                <li>
+                                  <strong>Click Create:</strong> In the upper-right corner of the dashboard, click <strong>Create</strong> and select <strong>Upload videos</strong>.
+                                </li>
+                                <li>
+                                  <strong>Select Your Video File:</strong> Upload the recorded lecture video file from your computer.
+                                </li>
+                                <li>
+                                  <strong>Enter Module Details:</strong> Add the module title and a concise description of learning objectives.
+                                </li>
+                                <li>
+                                  <strong>Set Visibility to Unlisted:</strong> Under the <strong>Visibility</strong> tab, select <strong>Unlisted</strong>.
+                                  <div className="mt-1 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-medium">
+                                    <strong>Important:</strong> Do not choose <em>Public</em> so your content does not leak to public search. Do not choose <em>Private</em> either, or enrolled students will not be able to view it. <strong>Unlisted</strong> mode ensures only students who possess the verified link can view your lecture.
+                                  </div>
+                                </li>
+                                <li>
+                                  <strong>Save and Copy Link:</strong> Click <strong>Save</strong>, copy the video URL (e.g. <code>https://youtu.be/xxxx</code> or <code>https://www.youtube.com/watch?v=xxxx</code>), and paste it into the YouTube link field in the module form below.
+                                </li>
+                              </ol>
+                            </div>
+                          ) : (
+                            /* Guide Content: Google Drive */
+                            <div className="space-y-3 bg-white p-4 rounded-xl border border-blue-100">
+                              <div className="flex items-center gap-2 text-blue-700 font-extrabold text-xs">
+                                <GoogleDriveIcon size={16} />
+                                <span>Steps to Upload Documents to Google Drive (Restricted Access Mode)</span>
+                              </div>
+                              <ol className="space-y-2 text-slate-700 text-xs leading-relaxed list-decimal list-inside pl-1">
+                                <li>
+                                  <strong>Open Google Drive:</strong> Go to <code>drive.google.com</code> and create a dedicated folder for your course materials.
+                                </li>
+                                <li>
+                                  <strong>Upload Materials:</strong> Upload your module document files (PDF guides, lecture slides, companion summaries, or project ZIP archives).
+                                </li>
+                                <li>
+                                  <strong>Open Sharing Settings:</strong> Right-click on the uploaded file or folder and click <strong>Share</strong>.
+                                </li>
+                                <li>
+                                  <strong>Configure General Access:</strong> Choose one of the following two options:
+                                  <div className="mt-1 space-y-1.5 pl-2 text-[11px]">
+                                    <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
+                                      <strong>Option 1 (Recommended for Seamless Access):</strong> Set General access to <strong>Anyone with the link</strong> with the role set to <strong>Viewer</strong>. This link is secure because it is only delivered inside the authenticated course portal after the student confirms escrow payment on Arbitrum.
+                                    </div>
+                                    <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-900">
+                                      <strong>Option 2 (Strict Manual Access):</strong> Keep the setting as <strong>Restricted</strong>, and manually add the student's email address once their on-chain escrow payment is confirmed.
+                                    </div>
+                                  </div>
+                                </li>
+                                <li>
+                                  <strong>Copy Link:</strong> Click <strong>Copy link</strong>.
+                                </li>
+                                <li>
+                                  <strong>Paste into Form:</strong> Paste the copied link into the Google Drive field in the module form below.
+                                </li>
+                              </ol>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CURRICULUM MODULES LIST */}
                     <div className="space-y-4">
                       {modules.map((mod, mIdx) => (
-                        <div key={mIdx} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                        <div key={mIdx} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
                           <div className="flex items-center justify-between">
                             <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black uppercase tracking-wider">
                               Lesson Module {mIdx + 1}
@@ -1437,51 +1741,327 @@ export default function CreateGigPage() {
                             </button>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Module Title & Description */}
+                          <div className="space-y-3">
                             <div>
-                              <label className="block text-slate-700 font-bold text-xs mb-1">Module Title</label>
+                              <label className="block text-slate-700 font-bold text-xs mb-1">
+                                Module Title <span className="text-rose-500">*</span>
+                              </label>
                               <input
                                 type="text"
                                 value={mod.title}
                                 onChange={(e) => handleUpdateModule(mIdx, "title", e.target.value)}
-                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
+                                placeholder="e.g. Module 1: Solidity Storage Layout & Reentrancy Security"
+                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs font-semibold focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 placeholder:text-slate-400"
                               />
                             </div>
 
                             <div>
-                              <label className="block text-slate-700 font-bold text-xs mb-1">Video Stream URL</label>
-                              <input
-                                type="url"
-                                value={mod.videoUrl}
-                                onChange={(e) => handleUpdateModule(mIdx, "videoUrl", e.target.value)}
-                                placeholder="https://youtube.com/... or Cloudflare Stream"
-                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-mono"
+                              <label className="block text-slate-700 font-bold text-xs mb-1">
+                                Module Description & Learning Outcomes
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={mod.description}
+                                onChange={(e) => handleUpdateModule(mIdx, "description", e.target.value)}
+                                placeholder="Detail concepts, code exercises, or architecture patterns students master in this lesson..."
+                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 placeholder:text-slate-400 resize-y"
                               />
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-slate-700 font-bold text-xs mb-1">Module Description</label>
-                              <input
-                                type="text"
-                                value={mod.description}
-                                onChange={(e) => handleUpdateModule(mIdx, "description", e.target.value)}
-                                placeholder="What will be learned in this module"
-                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
-                              />
+                          {/* ── PART 1: VIDEO SOURCE (YOUTUBE / CLOUDFLARE) ── */}
+                          <div className="pt-3 border-t border-slate-200/80 space-y-2.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <label className="block text-slate-800 font-extrabold text-xs flex items-center gap-1.5">
+                                <Video size={14} className="text-purple-600" />
+                                <span>Lesson Video Lecture</span>
+                              </label>
+
+                              {/* Video Method Switcher */}
+                              <div className="inline-flex p-1 rounded-xl bg-slate-200/70 border border-slate-300/80 self-start sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateModule(mIdx, "videoSourceType", "youtube")}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                    mod.videoSourceType !== "cloudflare"
+                                      ? "bg-white text-slate-900 shadow-2xs"
+                                      : "text-slate-600 hover:text-slate-900"
+                                  }`}
+                                >
+                                  <YouTubeIcon size={13} />
+                                  <span>YouTube Link (Cost-Effective)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateModule(mIdx, "videoSourceType", "cloudflare")}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                    mod.videoSourceType === "cloudflare"
+                                      ? "bg-white text-purple-700 shadow-2xs"
+                                      : "text-slate-600 hover:text-slate-900"
+                                  }`}
+                                >
+                                  <Video size={13} />
+                                  <span>Cloudflare Stream</span>
+                                </button>
+                              </div>
                             </div>
 
-                            <div>
-                              <label className="block text-slate-700 font-bold text-xs mb-1">Resources / GitHub URL</label>
-                              <input
-                                type="url"
-                                value={mod.resources}
-                                onChange={(e) => handleUpdateModule(mIdx, "resources", e.target.value)}
-                                placeholder="https://github.com/..."
-                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-mono"
-                              />
+                            {/* Option 1: YouTube Link (Unlisted) */}
+                            {mod.videoSourceType !== "cloudflare" ? (
+                              <div className="space-y-1.5">
+                                <input
+                                  type="url"
+                                  value={mod.videoUrl || ""}
+                                  onChange={(e) => handleUpdateModule(mIdx, "videoUrl", e.target.value)}
+                                  placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-red-500/30 focus:border-red-500 placeholder:text-slate-400 font-mono"
+                                />
+                                <p className="text-[11px] text-slate-500">
+                                  Make sure video visibility is set to <strong>Unlisted</strong> in YouTube Studio. Only enrolled learners with confirmed escrow payment will unlock access to this lecture.
+                                </p>
+                              </div>
+                            ) : (
+                              /* Option 2: Cloudflare Stream Native Upload */
+                              <div className="space-y-2">
+                                <p className="text-[11px] text-slate-500">
+                                  Upload lesson video directly to encrypted Cloudflare Stream storage.
+                                </p>
+
+                                {mod.videoUploading ? (
+                                  <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 flex flex-col items-center justify-center gap-2 text-center">
+                                    <Loader2 size={24} className="animate-spin text-purple-600" />
+                                    <span className="text-xs font-bold text-purple-900">
+                                      Uploading video to Cloudflare Stream... {mod.videoProgress}%
+                                    </span>
+                                    <div className="w-48 h-1.5 rounded-full bg-purple-200 overflow-hidden">
+                                      <div
+                                        className="h-full bg-purple-600 transition-all duration-300"
+                                        style={{ width: `${mod.videoProgress}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                ) : mod.videoUid ? (
+                                  <div className="p-3.5 rounded-xl bg-white border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                                        <Video size={18} />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-extrabold text-slate-900 truncate">
+                                          {mod.videoFileName || "Lesson Video File"}
+                                        </p>
+                                        <p className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5">
+                                          <span className="text-purple-700 font-bold">UID:</span>
+                                          <span>{mod.videoUid.slice(0, 16)}...</span>
+                                          {mod.videoSize && (
+                                            <span>• {formatFileSize(mod.videoSize)}</span>
+                                          )}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                                        <CheckCircle2 size={12} className="text-emerald-600" />
+                                        <span>Gated on Cloudflare</span>
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveModuleVideo(mIdx)}
+                                        className="px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-bold transition-colors cursor-pointer"
+                                      >
+                                        Replace
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="relative">
+                                    <input
+                                      type="file"
+                                      id={`video-upload-${mIdx}`}
+                                      accept="video/mp4,video/quicktime,video/webm"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleUploadModuleVideo(mIdx, file);
+                                      }}
+                                      className="hidden"
+                                    />
+                                    <label
+                                      htmlFor={`video-upload-${mIdx}`}
+                                      className="flex flex-col items-center justify-center p-5 rounded-2xl border-2 border-dashed border-purple-200 hover:border-purple-400 bg-white hover:bg-purple-50/40 transition-all cursor-pointer group text-center"
+                                    >
+                                      <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+                                        <Upload size={18} />
+                                      </div>
+                                      <p className="text-xs font-black text-slate-800">
+                                        Click to Upload Native Video File (MP4, MOV, WebM)
+                                      </p>
+                                      <p className="text-[11px] text-slate-400 mt-0.5">
+                                        Direct upload to Cloudflare Stream storage server
+                                      </p>
+                                    </label>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ── PART 2: DOCUMENT SOURCE (GOOGLE DRIVE / CLOUDFLARE R2) ── */}
+                          <div className="pt-3 border-t border-slate-200/80 space-y-2.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <label className="block text-slate-800 font-extrabold text-xs flex items-center gap-1.5">
+                                <FileText size={14} className="text-purple-600" />
+                                <span>Curriculum Documents & Companion Files</span>
+                              </label>
+
+                              {/* Document Method Switcher */}
+                              <div className="inline-flex p-1 rounded-xl bg-slate-200/70 border border-slate-300/80 self-start sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateModule(mIdx, "resourceSourceType", "gdrive")}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                    mod.resourceSourceType !== "r2"
+                                      ? "bg-white text-slate-900 shadow-2xs"
+                                      : "text-slate-600 hover:text-slate-900"
+                                  }`}
+                                >
+                                  <GoogleDriveIcon size={13} />
+                                  <span>Google Drive Link (Cost-Effective)</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateModule(mIdx, "resourceSourceType", "r2")}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                    mod.resourceSourceType === "r2"
+                                      ? "bg-white text-purple-700 shadow-2xs"
+                                      : "text-slate-600 hover:text-slate-900"
+                                  }`}
+                                >
+                                  <FileText size={13} />
+                                  <span>Cloudflare R2</span>
+                                </button>
+                              </div>
                             </div>
+
+                            {/* Option 1: Google Drive Link (Restricted Access) */}
+                            {mod.resourceSourceType !== "r2" ? (
+                              <div className="space-y-1.5">
+                                <input
+                                  type="url"
+                                  value={mod.gdriveUrl || ""}
+                                  onChange={(e) => handleUpdateModule(mIdx, "gdriveUrl", e.target.value)}
+                                  placeholder="https://drive.google.com/file/d/... or https://drive.google.com/drive/folders/..."
+                                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 placeholder:text-slate-400 font-mono"
+                                />
+                                <p className="text-[11px] text-slate-500">
+                                  Ensure access is set to <strong>Viewer</strong> for Anyone with the link, or <strong>Restricted</strong> to enrolled student email addresses.
+                                </p>
+                              </div>
+                            ) : (
+                              /* Option 2: Cloudflare R2 Multi-File Upload */
+                              <div className="space-y-2">
+                                <p className="text-[11px] text-slate-500">
+                                  Upload PDF slides, code walkthrough guides, or project archives to Cloudflare R2.
+                                </p>
+
+                                {mod.resources && mod.resources.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    {mod.resources.map((resItem, rIdx) => {
+                                      const resId = resItem.id || resItem.resourceId || `res-${rIdx}`;
+                                      return (
+                                        <div
+                                          key={resId}
+                                          className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200 text-xs gap-2 shadow-2xs"
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <FileText size={14} className="text-purple-600 shrink-0" />
+                                            <span className="font-bold text-slate-800 truncate">
+                                              {resItem.name}
+                                            </span>
+                                            {resItem.size && (
+                                              <span className="text-[10px] text-slate-400 shrink-0">
+                                                ({formatFileSize(resItem.size)})
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-[9px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md font-mono font-bold">
+                                              R2 Gated
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleRemoveModuleResource(mIdx, resId)}
+                                              className="text-slate-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
+                                              title="Remove file"
+                                            >
+                                              <Trash2 size={12} />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                <div>
+                                  <input
+                                    type="file"
+                                    id={`resource-upload-${mIdx}`}
+                                    multiple
+                                    accept=".pdf,.ppt,.pptx,.doc,.docx,.zip,.txt"
+                                    onChange={(e) => {
+                                      const files = e.target.files;
+                                      if (files && files.length > 0) {
+                                        Array.from(files).forEach((f) => handleUploadModuleResource(mIdx, f));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label
+                                    htmlFor={`resource-upload-${mIdx}`}
+                                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-purple-200 hover:border-purple-400 bg-white hover:bg-purple-50/50 text-purple-700 text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                                      mod.resourceUploading ? "opacity-60 pointer-events-none" : ""
+                                    }`}
+                                  >
+                                    {mod.resourceUploading ? (
+                                      <Loader2 size={13} className="animate-spin" />
+                                    ) : (
+                                      <Plus size={13} />
+                                    )}
+                                    <span>
+                                      {mod.resourceUploading
+                                        ? "Uploading Document to R2..."
+                                        : "+ Upload Document (PDF, Slides, PPT, ZIP)"}
+                                    </span>
+                                  </label>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ── PART 3: GITHUB PRACTICE REPOSITORY (OPTIONAL) ── */}
+                          <div className="pt-3 border-t border-slate-200/80">
+                            <label className="block text-slate-700 font-bold text-xs mb-1 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <FileCode size={13} className="text-slate-700" />
+                                <span>Practice Code Repository (GitHub - Optional)</span>
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                Open-source starter templates only
+                              </span>
+                            </label>
+                            <input
+                              type="url"
+                              value={mod.githubUrl || ""}
+                              onChange={(e) => handleUpdateModule(mIdx, "githubUrl", e.target.value)}
+                              placeholder="https://github.com/your-username/course-repo"
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-mono placeholder:text-slate-400"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              Notice: Proprietary course materials and paid PDFs should be linked via Google Drive or Cloudflare R2 above.
+                            </p>
                           </div>
                         </div>
                       ))}
@@ -1726,6 +2306,31 @@ export default function CreateGigPage() {
                       <ExploreCard item={previewItem} />
                     </div>
                   </div>
+
+                  {/* ── Step 4: Curriculum Gating Check Box (Part 4) ── */}
+                  <div className="bg-gradient-to-br from-purple-50/70 via-indigo-50/50 to-white rounded-3xl border-2 border-purple-200/80 p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black uppercase tracking-wider">
+                        <ShieldCheck size={12} className="text-purple-600" />
+                        <span>Pre-Publish Escrow Gating Verification</span>
+                      </div>
+                      <h3 className="text-slate-950 font-black text-base">
+                        Preview Gated Learner Experience Before Deploying
+                      </h3>
+                      <p className="text-slate-600 text-xs max-w-xl leading-relaxed">
+                        Verify that non-paying learners see locked video placeholders and restricted documents, while confirmed escrow deposits unlock signed Cloudflare Stream & R2 links.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowStudentPreview(true)}
+                      className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center gap-2 shadow-md shadow-purple-600/20 transition-all active:scale-95 cursor-pointer shrink-0"
+                    >
+                      <Eye size={15} />
+                      <span>Preview Gated View</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1748,6 +2353,17 @@ export default function CreateGigPage() {
                   <span className="text-xs text-slate-500 font-medium hidden sm:inline">
                     Step {currentStep} of 4: {STEPS[currentStep - 1]?.title}
                   </span>
+
+                  {currentStep === 4 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowStudentPreview(true)}
+                      className="px-4 py-2.5 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Eye size={14} />
+                      <span>Preview as Student</span>
+                    </button>
+                  )}
 
                   {currentStep < 4 ? (
                     <button
@@ -1784,6 +2400,110 @@ export default function CreateGigPage() {
                   )}
                 </div>
               </div>
+
+              {/* ── PART 4: STUDENT PREVIEW MODAL (UNPAID VS PAID) ── */}
+              {showStudentPreview && (
+                <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+                  <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border-2 border-purple-100 max-h-[90vh] overflow-y-auto">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                      <div className="space-y-1">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black uppercase tracking-wider">
+                          <Eye size={12} className="text-purple-600" />
+                          <span>Student View Verification</span>
+                        </div>
+                        <h3 className="text-slate-950 font-black text-lg sm:text-xl">
+                          Curriculum Gating Experience Preview
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowStudentPreview(false)}
+                        className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    {/* View Mode Switcher: Unpaid vs Paid */}
+                    <div className="p-3 rounded-2xl bg-slate-100 border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <span className="text-xs font-bold text-slate-700">
+                        Simulate Student Account Status:
+                      </span>
+                      <div className="inline-flex p-1 rounded-xl bg-white border border-slate-200 shadow-inner">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewMode("unpaid")}
+                          className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                            previewMode === "unpaid"
+                              ? "bg-amber-500 text-white shadow-xs"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          <Lock size={12} />
+                          <span>Unpaid Learner (Before Escrow)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewMode("paid")}
+                          className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                            previewMode === "paid"
+                              ? "bg-emerald-600 text-white shadow-xs"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          <CheckCircle2 size={12} />
+                          <span>Paid Learner (Escrow Confirmed)</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Explanation Banner */}
+                    {previewMode === "unpaid" ? (
+                      <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/90 text-amber-900 text-xs flex items-start gap-2.5">
+                        <Lock size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Unpaid Learner View Active:</strong>
+                          <p className="text-amber-800 text-[11px] mt-0.5">
+                            This is what prospective students see before funding escrow on Arbitrum. Video streams are locked with no public URLs leaked; documents are disabled until smart contract escrow confirms.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/90 text-emerald-900 text-xs flex items-start gap-2.5">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Paid Learner View Active:</strong>
+                          <p className="text-emerald-800 text-[11px] mt-0.5">
+                            This is what enrolled students see once their Arbitrum milestone escrow is confirmed. Cloudflare Stream generates a 1-hour signed playback token; document downloads issue a 15-minute presigned R2 link.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Modules Render List */}
+                    <div className="space-y-4">
+                      {modules.map((mod, i) => (
+                        <GatedModulePlayer
+                          key={mod.id || i}
+                          module={mod}
+                          forceUnpaidPreview={previewMode === "unpaid"}
+                          isPaidPreview={previewMode === "paid"}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setShowStudentPreview(false)}
+                        className="px-6 py-2.5 rounded-xl bg-slate-900 text-white font-extrabold text-xs hover:bg-slate-800 cursor-pointer"
+                      >
+                        Done Previewing
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
