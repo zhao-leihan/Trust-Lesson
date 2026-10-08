@@ -301,25 +301,12 @@ export default function HowToUsePage() {
                 </div>
 
                 {/* Learner Mascot Spotlight */}
-                <div className="lg:col-span-4 flex justify-center lg:justify-end">
-                  <div className="relative group">
-                    <div className="absolute -inset-2 bg-gradient-to-r from-purple-300 to-indigo-300 rounded-3xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
-                    <div className="relative rounded-2xl bg-purple-50/80 border-2 border-purple-200 p-4 shadow-md text-center space-y-2">
-                      <img
-                        src="/monsters/knowledge.webp"
-                        alt="Student Learning Mascot"
-                        className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto animate-float drop-shadow-sm"
-                      />
-                      <div className="space-y-0.5">
-                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 font-extrabold text-[10px] border border-purple-200">
-                          Verified Learner
-                        </span>
-                        <div className="text-slate-900 text-xs font-black">
-                          Escrow Protected
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <div className="lg:col-span-4 flex justify-center lg:justify-end items-center">
+                  <img
+                    src="/monsters/knowledge.webp"
+                    alt="Student Learning Mascot"
+                    className="w-36 h-36 sm:w-44 sm:h-44 object-contain animate-float drop-shadow-xl"
+                  />
                 </div>
               </div>
 
@@ -1139,28 +1126,13 @@ export default function HowToUsePage() {
           {/* Core Feature Grid with Official 3D Monsters Payment Graphic */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             {/* Visual Graphic: monsters/Payment.webp with gentle float animation */}
-            <div className="lg:col-span-5 flex flex-col items-center">
+            <div className="lg:col-span-5 flex flex-col items-center justify-center">
               <Reveal direction="right" delay={150}>
-                <div className="relative group">
-                  <div className="absolute -inset-2 bg-gradient-to-r from-purple-200 to-emerald-200 rounded-3xl blur-xl opacity-60 group-hover:opacity-90 transition duration-500" />
-                  <div className="relative rounded-3xl overflow-hidden bg-white border-2 border-purple-200 p-2 shadow-xl hover:shadow-2xl transition-all duration-300">
-                    <img
-                      src="/monsters/Payment.webp"
-                      alt="Trust Monsters holding USDC and USDT stablecoins"
-                      className="w-full h-auto object-contain rounded-2xl animate-float-slow transform group-hover:scale-[1.03] transition-transform duration-500 drop-shadow-md"
-                    />
-                    <div className="p-4 bg-slate-50 rounded-xl mt-2 border border-slate-200/80 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <UsdcIcon size={20} />
-                        <UsdtIcon size={20} />
-                        <span className="text-slate-900 font-extrabold text-xs">USDC & USDT Supported</span>
-                      </div>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono text-[10px] font-black border border-emerald-200">
-                        Arbitrum One
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                <img
+                  src="/monsters/Payment.webp"
+                  alt="Trust Monsters holding USDC and USDT stablecoins"
+                  className="w-full max-w-md h-auto object-contain animate-float-slow drop-shadow-2xl"
+                />
               </Reveal>
             </div>
 
@@ -1327,8 +1299,8 @@ export default function HowToUsePage() {
       <section className="py-16 px-4 sm:px-6 bg-gradient-to-r from-purple-100 via-indigo-50 to-purple-100 border-t border-purple-200 relative">
         <div className="max-w-4xl mx-auto text-center space-y-6">
           <Reveal direction="down">
-            <div className="w-14 h-14 rounded-2xl bg-purple-600 text-white flex items-center justify-center mx-auto shadow-md shadow-purple-600/30 animate-float">
-              <ArbitrumIcon size={26} />
+            <div className="flex items-center justify-center mx-auto animate-float">
+              <ArbitrumIcon size={48} className="drop-shadow-md" />
             </div>
           </Reveal>
 

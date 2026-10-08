@@ -62,7 +62,7 @@ import {
 import { Avatar, AvatarFallback } from "../../src/components/ui/Avatar";
 
 export default function DashboardPage() {
-  const { user, authLoading } = useAuth();
+  const { user, authLoading, activeRole, switchRole } = useAuth();
 
   if (authLoading) {
     return (
@@ -100,18 +100,100 @@ export default function DashboardPage() {
     );
   }
 
+  const cleanEmail = user.email?.toLowerCase();
   const isAdmin =
     user.role === "admin" ||
     user.role === "ADMIN" ||
     user.roleType === "ADMIN" ||
-    user.email?.toLowerCase().includes("admin") ||
+    cleanEmail === "rayhanabbrar233@gmail.com" ||
+    cleanEmail === "jilonasalma@gmail.com" ||
+    cleanEmail?.includes("admin") ||
     user.name?.toLowerCase().includes("admin");
   const isMentor = user.role === "mentor" || user.role === "MENTOR" || user.roleType === "MENTOR";
 
   if (isAdmin) {
+    const currentMode = activeRole || "admin";
     return (
-      <div className="min-h-screen bg-white flex flex-col pt-16 sm:pt-20">
-        <AdminDashboardView user={user} />
+      <div className="min-h-screen bg-slate-50 flex flex-col pt-16 sm:pt-20">
+        {/* Admin Multi-Role Switcher Banner */}
+        <div className="bg-slate-900 border-b border-purple-500/30 px-4 py-3 sticky top-16 z-20 shadow-md">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                <ShieldCheck size={16} />
+              </span>
+              <div>
+                <span className="text-xs font-black text-purple-300 uppercase tracking-wider">
+                  Admin Multiverse Control
+                </span>
+                <span className="text-slate-400 text-xs ml-2">
+                  (Operating as: <strong className="text-white capitalize">{currentMode}</strong>)
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center p-1 rounded-xl bg-slate-950 border border-slate-800">
+                <button
+                  onClick={() => switchRole("admin")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    currentMode === "admin"
+                      ? "bg-purple-600 text-white shadow-xs"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Admin Verse
+                </button>
+                <button
+                  onClick={() => switchRole("mentor")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    currentMode === "mentor"
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Mentor Mode
+                </button>
+                <button
+                  onClick={() => switchRole("student")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    currentMode === "student"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Student Mode
+                </button>
+              </div>
+
+              <Link
+                href="/admin"
+                className="px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center gap-1 transition-all"
+              >
+                <span>Full Verse</span>
+                <ExternalLink size={12} />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* View based on active role */}
+        {currentMode === "mentor" ? (
+          <div className="pt-6 pb-12 px-3 sm:px-6 flex-1">
+            <div className="max-w-6xl mx-auto animate-fadeInUp">
+              <MentorDashboardView user={user} />
+            </div>
+          </div>
+        ) : currentMode === "student" ? (
+          <div className="pt-6 pb-12 px-3 sm:px-6 flex-1">
+            <div className="max-w-6xl mx-auto animate-fadeInUp">
+              <StudentDashboardView user={user} />
+            </div>
+          </div>
+        ) : (
+          <AdminDashboardView user={user} />
+        )}
+        <Footer />
       </div>
     );
   }
@@ -138,6 +220,17 @@ export default function DashboardPage() {
 function AdminDashboardView({ user }) {
   const { updateUserProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("view");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam && ["view", "users", "wallet", "profile"].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
   const [stats, setStats] = useState({
     usersCount: 0,
     mentorsCount: 0,
@@ -865,6 +958,19 @@ function AdminDashboardView({ user }) {
 function MentorDashboardView({ user }) {
   const { portfolios, addPortfolioItem, deletePortfolioItem, connectWallet, updateUserProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "profile") {
+        setActiveTab("portfolio");
+      } else if (tabParam && ["overview", "courses", "wallet", "leveling", "portfolio"].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
 
   // Live Database States
   const [stats, setStats] = useState({
@@ -3064,6 +3170,17 @@ function MentorDashboardView({ user }) {
 function StudentDashboardView({ user }) {
   const { sessions, updateSessionStatus, clearAllSessions } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam && ["overview", "courses", "wallet", "profile"].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
   const [selectedCert, setSelectedCert] = useState(null);
   const [loadingCert, setLoadingCert] = useState(false);
   const [showCertModal, setShowCertModal] = useState(false);

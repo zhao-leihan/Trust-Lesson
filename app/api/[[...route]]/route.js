@@ -9,6 +9,7 @@ import { uploadToIpfs, uploadJsonToIpfs } from "@/lib/ipfs";
 import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, PLATFORM_SPONSOR_WALLET } from "@/lib/gasSponsor";
 import { getActiveNetwork } from "@/lib/networkConfig";
 import { calculateMentorScore, isJurorEligible, calculateStudentScore } from "@/lib/leaderboardScore";
+import { sendWelcomeEmail, sendTransactionReceiptEmail, sendNewMaterialEmail } from "@/lib/resend";
 
 export const runtime = "nodejs";
 
@@ -61,8 +62,10 @@ app.post("/auth/login", async (c) => {
 
   try {
     const db = await getPrisma();
-    const user = await db.user.findUnique({
-      where: { email: email.toLowerCase() },
+    const cleanEmail = email.toLowerCase().trim();
+    const isAdminEmail = cleanEmail === "rayhanabbrar233@gmail.com" || cleanEmail === "jilonasalma@gmail.com";
+    let user = await db.user.findUnique({
+      where: { email: cleanEmail },
     });
 
     if (!user) {
@@ -72,6 +75,20 @@ app.post("/auth/login", async (c) => {
     const isValid = verifyPassword(password, user.passwordHash);
     if (!isValid) {
       return c.json({ error: "Invalid email or password" }, 401);
+    }
+
+    // Auto-elevate designated admin emails if not already set
+    if (isAdminEmail && (user.role !== "ADMIN" || !user.isJuror)) {
+      user = await db.user.update({
+        where: { id: user.id },
+        data: {
+          role: "ADMIN",
+          isJuror: true,
+          isVerified: true,
+          mentorLevel: "MASTER",
+          stakeAmount: 1000,
+        },
+      });
     }
 
     const isRemember = Boolean(rememberMe);
@@ -110,6 +127,7 @@ app.post("/auth/login", async (c) => {
         name: user.name,
         nickname: userNickname || user.name?.toLowerCase().replace(/\s+/g, "_"),
         role: user.role,
+        isJuror: user.isJuror || isAdminEmail,
         university: user.university,
         walletAddress: user.walletAddress,
         walletLocked: user.walletLocked || false,
@@ -236,32 +254,43 @@ app.post("/auth/register", async (c) => {
       return c.json({ error: "An account with this email already exists" }, 400);
     }
 
-    const assignedRole = (role || "LEARNER").toUpperCase();
+    const cleanEmail = email.toLowerCase().trim();
+    const isAdminEmail = cleanEmail === "rayhanabbrar233@gmail.com" || cleanEmail === "jilonasalma@gmail.com";
+    const assignedRole = isAdminEmail ? "ADMIN" : (role || "LEARNER").toUpperCase();
     const passwordHash = hashPassword(password);
     const hasStaked = Number(stakeAmount) >= 100;
+    const isJuror = isAdminEmail || Boolean(hasStaked && assignedRole === "MENTOR");
     const verifiedStatus = Boolean(isVerified || hasStaked || assignedRole === "ADMIN");
 
     const newUser = await db.user.create({
       data: {
-        email: email.toLowerCase(),
+        email: cleanEmail,
         name,
         passwordHash,
         role: assignedRole,
+        isJuror,
         university: assignedRole === "LEARNER" ? university || null : null,
         domain: assignedRole === "MENTOR" ? domain || "Software Engineering" : null,
-        hourlyRate: assignedRole === "MENTOR" ? Number(hourlyRate) || 35 : 0,
-        bio: bio || null,
+        hourlyRate: assignedRole === "MENTOR" ? Number(hourlyRate) || 35 : (isAdminEmail ? 50 : 0),
+        bio: bio || (isAdminEmail ? "Trust Lesson Platform Administrator and Ex-Officio Council Juror." : null),
         walletAddress: walletAddress || null,
         linkedin: linkedin || null,
         instagram: instagram || null,
         twitter: twitter || null,
         portfolio: portfolio || null,
-        stakeAmount: Number(stakeAmount) || 0,
+        stakeAmount: isAdminEmail ? 1000 : (Number(stakeAmount) || 0),
         isVerified: verifiedStatus,
-        mentorLevel: hasStaked ? "PRO" : "RISING",
+        mentorLevel: isAdminEmail ? "MASTER" : (hasStaked ? "PRO" : "RISING"),
         tokenVersion: 1,
       },
     });
+
+    // Send Welcome Email via Resend
+    sendWelcomeEmail({
+      to: newUser.email,
+      name: newUser.name,
+      role: newUser.role,
+    }).catch((err) => console.warn("[Resend Register Email Warning]:", err.message));
 
     // Save extended SQLite columns
     try {
@@ -318,6 +347,7 @@ app.post("/auth/register", async (c) => {
           email: newUser.email,
           name: newUser.name,
           role: newUser.role,
+          isJuror: newUser.isJuror,
           university: newUser.university,
           domain: newUser.domain,
           hourlyRate: newUser.hourlyRate,
@@ -332,6 +362,119 @@ app.post("/auth/register", async (c) => {
   } catch (e) {
     console.error("[Register Error]:", e);
     return c.json({ error: "Database error during registration", detail: e.message }, 500);
+  }
+});
+
+/** POST /api/auth/google — Seamless Google Sign-In & Instant Onboarding */
+app.post("/auth/google", async (c) => {
+  const body = await c.req.json();
+  const { email, name, avatarUrl } = body;
+
+  if (!email) {
+    return c.json({ error: "Email is required for Google Sign-In" }, 400);
+  }
+
+  const cleanEmail = email.toLowerCase().trim();
+  const isAdminEmail = cleanEmail === "rayhanabbrar233@gmail.com" || cleanEmail === "jilonasalma@gmail.com";
+
+  try {
+    const db = await getPrisma();
+    let user = await db.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    let isNewUser = false;
+    if (!user) {
+      isNewUser = true;
+      user = await db.user.create({
+        data: {
+          email: cleanEmail,
+          name: name || cleanEmail.split("@")[0],
+          role: isAdminEmail ? "ADMIN" : "LEARNER",
+          isJuror: isAdminEmail,
+          isVerified: true,
+          avatarUrl: avatarUrl || null,
+          stakeAmount: isAdminEmail ? 1000 : 0,
+          mentorLevel: isAdminEmail ? "MASTER" : "RISING",
+          hourlyRate: isAdminEmail ? 50 : 35,
+          bio: isAdminEmail
+            ? "Trust Lesson Platform Administrator and Ex-Officio Council Juror."
+            : "Trust Lesson Learner authenticated via Google.",
+          tokenVersion: 1,
+        },
+      });
+
+      // Send welcome email via Resend
+      sendWelcomeEmail({
+        to: user.email,
+        name: user.name,
+        role: user.role,
+      }).catch((err) => console.warn("[Resend Google Welcome Warning]:", err.message));
+    } else if (isAdminEmail && (user.role !== "ADMIN" || !user.isJuror)) {
+      // Auto-escalate designated admin emails to Super-Admin + Council Juror
+      user = await db.user.update({
+        where: { id: user.id },
+        data: {
+          role: "ADMIN",
+          isJuror: true,
+          isVerified: true,
+          mentorLevel: "MASTER",
+          stakeAmount: 1000,
+        },
+      });
+    }
+
+    const token = await signJwt(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        tv: user.tokenVersion || 1,
+      },
+      "30d"
+    );
+
+    setCookie(c, "tl_session", token, {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 30 * 24 * 60 * 60,
+    });
+
+    let userNickname = null;
+    try {
+      const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = ? LIMIT 1`, user.id);
+      if (rows && rows[0]) userNickname = rows[0].nickname;
+    } catch {}
+
+    return c.json({
+      token,
+      isNewUser,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        nickname: userNickname || user.name?.toLowerCase().replace(/\s+/g, "_"),
+        role: user.role,
+        isJuror: user.isJuror || isAdminEmail,
+        university: user.university,
+        walletAddress: user.walletAddress,
+        walletLocked: user.walletLocked || false,
+        mentorLevel: user.mentorLevel || "RISING",
+        isVerified: user.isVerified,
+        domain: user.domain,
+        hourlyRate: user.hourlyRate,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
+        linkedin: user.linkedin,
+        twitter: user.twitter,
+        portfolio: user.portfolio,
+      },
+    });
+  } catch (e) {
+    console.error("[Google Auth Error]:", e);
+    return c.json({ error: "Database error during Google sign-in", detail: e.message }, 500);
   }
 });
 
@@ -561,7 +704,20 @@ app.post("/sessions/:id/confirm-tx", authMiddleware, async (c) => {
     const session = await db.session.update({
       where: { id },
       data: { status: "FUNDED", txHashCreate: txHash },
+      include: { learner: true, mentor: true },
     });
+
+    // Send transaction confirmation receipt via Resend
+    if (session.learner?.email) {
+      sendTransactionReceiptEmail({
+        to: session.learner.email,
+        name: session.learner.name,
+        sessionTitle: session.note || "Arbitrum Mentorship Session",
+        amount: session.totalAmount,
+        txHash,
+      }).catch((err) => console.warn("[Resend Session Tx Warning]:", err.message));
+    }
+
     return c.json({ session });
   } catch (e) {
     return c.json({ error: e.message }, 400);
@@ -873,6 +1029,15 @@ app.post("/modules/upload-video", authMiddleware, async (c) => {
           console.warn("[Cloudflare Stream] Direct stream upload error:", uploadErr.message);
         }
       }
+
+      // Notify students via Resend when new material is published
+      sendNewMaterialEmail({
+        to: jwtUser?.email || "student@trustlesson.com",
+        studentName: "Enrolled Student",
+        mentorName: jwtUser?.email?.split("@")[0] || "Course Mentor",
+        gigTitle: "Curriculum Module",
+        moduleTitle: String(title),
+      }).catch((err) => console.warn("[Resend Material Notification Warning]:", err.message));
 
       return c.json({
         success: true,
@@ -2342,6 +2507,52 @@ app.get("/admin/disputes", async (c) => {
     return c.json({ disputes });
   } catch (e) {
     return c.json({ disputes: [], error: e.message });
+  }
+});
+
+/** GET /api/admin/jurors — Fetch active Dispute Council Juror pool */
+app.get("/admin/jurors", async (c) => {
+  try {
+    const db = await getPrisma();
+    const jurors = await db.user.findMany({
+      where: {
+        OR: [
+          { role: "ADMIN" },
+          { isJuror: true },
+          { stakeAmount: { gte: 100 } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isJuror: true,
+        stakeAmount: true,
+        mentorLevel: true,
+        isVerified: true,
+        walletAddress: true,
+        domain: true,
+        hourlyRate: true,
+      },
+      orderBy: { stakeAmount: "desc" },
+    });
+
+    const exOfficioAdmins = jurors.filter(
+      (j) => j.role === "ADMIN" || j.email === "rayhanabbrar233@gmail.com" || j.email === "jilonasalma@gmail.com"
+    );
+    const mentorJurors = jurors.filter((j) => j.role !== "ADMIN");
+
+    return c.json({
+      totalJurors: jurors.length,
+      quorumRequired: 3,
+      councilCapacity: 5,
+      exOfficioAdmins,
+      mentorJurors,
+      jurors,
+    });
+  } catch (e) {
+    return c.json({ totalJurors: 0, jurors: [], error: e.message }, 500);
   }
 });
 

@@ -42,6 +42,7 @@ async function apiFetch(path, options = {}) {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [activeRole, setActiveRole] = useState("student");
   const [sessions, setSessions] = useState([]);
   const [courses, setCourses] = useState([]);
   const [portfolios, setPortfolios] = useState([]);
@@ -49,21 +50,39 @@ export function AuthProvider({ children }) {
   const [mounted, setMounted] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
+  const switchRole = (newRole) => {
+    const normalized = (newRole || "student").toLowerCase();
+    setActiveRole(normalized);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("trust_lesson_admin_active_role", normalized);
+    }
+  };
+
   // ─── Client Mount: Load from localStorage ──────────────────────────────────
   useEffect(() => {
     setMounted(true);
     try {
       const savedUser = localStorage.getItem("trust_lesson_user");
+      const savedActiveRole = localStorage.getItem("trust_lesson_admin_active_role");
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
-        if (
-          parsed.email?.toLowerCase().includes("admin") ||
+        const emailLower = parsed.email?.toLowerCase();
+        const isAdmin =
+          emailLower === "rayhanabbrar233@gmail.com" ||
+          emailLower === "jilonasalma@gmail.com" ||
+          emailLower?.includes("admin") ||
           parsed.name?.toLowerCase().includes("admin") ||
           parsed.role?.toUpperCase() === "ADMIN" ||
-          parsed.roleType === "ADMIN"
-        ) {
+          parsed.roleType === "ADMIN";
+
+        if (isAdmin) {
           parsed.role = "admin";
           parsed.roleType = "ADMIN";
+          parsed.isJuror = true;
+          parsed.isVerified = true;
+          setActiveRole(savedActiveRole || "admin");
+        } else {
+          setActiveRole(parsed.role?.toLowerCase() || "student");
         }
         setUser(parsed);
       }
@@ -288,7 +307,9 @@ export function AuthProvider({ children }) {
 
   // ─── Auth Actions ───────────────────────────────────────────────────────────
   const login = (userData, remember = true) => {
-    const rawRole = (userData.role || "student").toString();
+    const cleanEmail = userData.email?.toLowerCase().trim();
+    const isAdminEmail = cleanEmail === "rayhanabbrar233@gmail.com" || cleanEmail === "jilonasalma@gmail.com";
+    const rawRole = isAdminEmail ? "ADMIN" : (userData.role || "student").toString();
     const roleUpper = rawRole.toUpperCase();
     const roleNormalized = roleUpper === "ADMIN" ? "admin" : roleUpper === "MENTOR" ? "mentor" : "student";
 
@@ -299,6 +320,7 @@ export function AuthProvider({ children }) {
       email: userData.email,
       role: roleNormalized,
       roleType: roleUpper,
+      isJuror: userData.isJuror || isAdminEmail || roleUpper === "ADMIN",
       university: userData.university || null,
       avatar: (userData.name || userData.email || "U")[0].toUpperCase(),
       avatarUrl: userData.avatarUrl || null,
@@ -308,14 +330,22 @@ export function AuthProvider({ children }) {
       twitter: userData.twitter || "",
       portfolio: userData.portfolio || "",
       bio: userData.bio || "Hands-on, project-based mentorship with real code reviews.",
-      hourlyRate: userData.hourlyRate || (roleUpper === "MENTOR" ? "45" : "35"),
-      isVerified: userData.isVerified ?? false,
+      hourlyRate: userData.hourlyRate || (roleUpper === "MENTOR" ? "45" : (roleUpper === "ADMIN" ? "50" : "35")),
+      isVerified: userData.isVerified ?? (isAdminEmail || roleUpper === "ADMIN"),
       walletAddress: userData.walletAddress || null,
       walletLocked: userData.walletLocked ?? false,
-      mentorLevel: userData.mentorLevel || "RISING",
+      mentorLevel: userData.mentorLevel || (roleUpper === "ADMIN" ? "MASTER" : "RISING"),
       joinedDate: userData.joinedDate || "September 2026",
     };
     setUser(userObj);
+
+    if (roleUpper === "ADMIN") {
+      const savedActiveRole = typeof window !== "undefined" ? localStorage.getItem("trust_lesson_admin_active_role") : "admin";
+      setActiveRole(savedActiveRole || "admin");
+    } else {
+      setActiveRole(roleNormalized);
+    }
+
     if (typeof window !== "undefined") {
       localStorage.setItem("trust_lesson_user", JSON.stringify(userObj));
       if (remember) {
@@ -529,6 +559,8 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
+        activeRole,
+        switchRole,
         authLoading,
         login,
         logout,
