@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
-import { LogOut, Shield, GraduationCap, ArrowRight, Menu, X, LayoutDashboard } from "lucide-react";
+import { LogOut, Scale, GraduationCap, ArrowRight, Menu, X, LayoutDashboard } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/Avatar";
 
 const navLinks = [
@@ -16,21 +16,30 @@ const navLinks = [
 ];
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, activeRole, switchRole } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+
+  const isAdmin =
+    user &&
+    (user.role === "admin" ||
+      user.role === "ADMIN" ||
+      user.roleType === "ADMIN" ||
+      user.isAdmin === true);
+
+  const currentRole = activeRole || (isAdmin ? "admin" : user?.role?.toLowerCase() || "student");
 
   // Close mobile drawer on route transition
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // Track scroll for subtle backdrop transition
+  // Track scroll for subtle shadow transition
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      setIsScrolled(window.scrollY > 15);
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
@@ -46,50 +55,29 @@ export default function Navbar() {
     return null;
   }
 
-  // ── Conditional Theme: White on Home & About, Light/Purple on Explore, Course, Leaderboard, Book & Dashboard ──
-  const isWhiteTheme = pathname === "/" || pathname === "/about";
-  const isLightPage =
-    pathname === "/explore" ||
-    pathname === "/course" ||
-    pathname === "/how-to-use" ||
-    pathname.startsWith("/leaderboard") ||
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/book") ||
-    pathname.startsWith("/mentor") ||
-    pathname.startsWith("/certificate");
-
-  // Header background & border classes
-  const headerBgClass = isWhiteTheme
-    ? isScrolled
-      ? "bg-slate-950/80 backdrop-blur-xl border-b border-purple-900/30 shadow-lg shadow-black/20"
-      : "bg-transparent backdrop-blur-sm border-b border-white/10"
-    : isLightPage
-    ? isScrolled
-      ? "bg-white/85 backdrop-blur-xl border-b border-purple-100 shadow-sm"
-      : "bg-white/60 backdrop-blur-md border-b border-purple-100/80"
-    : "bg-slate-950/90 backdrop-blur-xl border-b border-purple-900/30";
-
-  // Logo source
-  const logoSrc = isWhiteTheme ? "/logo-full-white.webp" : "/logo-full.webp";
+  // Clean, consistent white frosted glass navbar across all pages
+  const headerBgClass = isScrolled
+    ? "bg-white/95 backdrop-blur-xl border-b border-purple-100/90 shadow-xs"
+    : "bg-white/85 backdrop-blur-md border-b border-purple-100/60";
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-2.5 sm:py-3 ${headerBgClass}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 flex items-center justify-between gap-6">
-        {/* Brand: Uses white logo on Home, dark logo on Explore */}
-        <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
+        {/* Brand: Uses crisp official full logo */}
+        <Link href="/" className="flex items-center gap-2 group shrink-0">
           <img
-            src={logoSrc}
+            src="/logo-full.webp"
             alt="Trust Lesson"
             width={168}
             height={48}
             fetchPriority="high"
             decoding="async"
-            className="h-10 sm:h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-sm"
+            className="h-9 sm:h-11 md:h-12 w-auto object-contain transition-transform group-hover:scale-105"
           />
         </Link>
 
         {/* Center Navigation Links */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-7">
           {navLinks.map(({ to, label }) => {
             const isActive = pathname === to;
             return (
@@ -97,17 +85,9 @@ export default function Navbar() {
                 key={to}
                 href={to}
                 className={`text-sm font-semibold tracking-wide transition-all relative py-1 ${
-                  isWhiteTheme
-                    ? isActive
-                      ? "text-white font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-indigo-400 after:rounded-full"
-                      : "text-white/75 hover:text-white"
-                    : isLightPage
-                    ? isActive
-                      ? "text-purple-700 font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-purple-600 after:rounded-full"
-                      : "text-slate-600 hover:text-purple-700"
-                    : isActive
-                    ? "text-white font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-indigo-400 after:rounded-full"
-                    : "text-white/75 hover:text-white"
+                  isActive
+                    ? "text-purple-700 font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-purple-600 after:rounded-full"
+                    : "text-slate-600 hover:text-purple-700"
                 }`}
               >
                 {label}
@@ -116,48 +96,71 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* Right Section: Desktop Auth controls */}
+        {/* Right Section: Desktop Controls & Profile */}
         <div className="hidden md:flex items-center gap-3">
           {user ? (
             <div className="flex items-center gap-3">
-              {/* Admin Verse direct pill if admin */}
-              {(user.role === "admin" ||
-                user.role === "ADMIN" ||
-                user.roleType === "ADMIN" ||
-                user.email?.toLowerCase() === "rayhanabbrar233@gmail.com" ||
-                user.email?.toLowerCase() === "jilonasalma@gmail.com") && (
-                <Link
-                  href="/admin"
-                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs ${
-                    isWhiteTheme
-                      ? "bg-purple-500/20 hover:bg-purple-500/30 border-purple-400/40 text-purple-200"
-                      : "bg-purple-600/10 hover:bg-purple-600/20 border-purple-500/30 text-purple-700"
-                  }`}
-                >
-                  <Shield size={13} />
-                  <span>Admin Verse</span>
-                </Link>
+              {/* Elegant Admin Role Switcher Pill (Aesthetic, Compact, Zero Page Clutter) */}
+              {isAdmin && (
+                <div className="flex items-center bg-purple-50/90 p-1 rounded-full border border-purple-200/80 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      switchRole("admin");
+                      if (pathname !== "/dashboard") router.push("/dashboard");
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                      currentRole === "admin"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-purple-700"
+                    }`}
+                  >
+                    Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      switchRole("mentor");
+                      if (pathname !== "/dashboard") router.push("/dashboard");
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                      currentRole === "mentor"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-purple-700"
+                    }`}
+                  >
+                    Mentor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      switchRole("student");
+                      if (pathname !== "/dashboard") router.push("/dashboard");
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                      currentRole === "student"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-purple-700"
+                    }`}
+                  >
+                    Learner
+                  </button>
+                </div>
               )}
 
-              {/* User Profile Avatar (Only image, no text) with role indicator */}
+              {/* User Profile Avatar with Live Photo Sync */}
               <Link
                 href="/dashboard?tab=profile"
-                title={
-                  user.role === "admin" || user.roleType === "ADMIN"
-                    ? "Admin Profile & Panel"
-                    : user.role === "mentor" || user.roleType === "MENTOR"
-                    ? "Mentor Profile & Hub"
-                    : "Student Profile"
-                }
+                title="Account Dashboard"
               >
                 <div className="relative">
-                  <Avatar className="w-9 h-9 hover:scale-105 transition-transform cursor-pointer border border-purple-300/40 shadow-xs">
+                  <Avatar className="w-9 h-9 hover:scale-105 transition-transform cursor-pointer border-2 border-purple-200/90 shadow-2xs">
                     <AvatarImage
                       src={
                         user.avatarUrl ||
-                        (user.role === "mentor" || user.roleType === "MENTOR"
+                        (currentRole === "mentor"
                           ? "/mentor-profile.webp"
-                          : user.role === "admin" || user.roleType === "ADMIN"
+                          : currentRole === "admin"
                           ? "/admin-profile.webp"
                           : "/student-profile.webp")
                       }
@@ -169,12 +172,12 @@ export default function Navbar() {
                     </AvatarFallback>
                   </Avatar>
                   {/* Role indicator badge on avatar */}
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full ring-2 ring-white bg-white overflow-hidden shadow-xs">
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full ring-2 ring-white bg-white overflow-hidden shadow-2xs">
                     <img
                       src={
-                        user.role === "admin" || user.roleType === "ADMIN"
+                        currentRole === "admin"
                           ? "/admin-profile.webp"
-                          : user.role === "mentor" || user.roleType === "MENTOR"
+                          : currentRole === "mentor"
                           ? "/mentor-profile.webp"
                           : "/student-profile.webp"
                       }
@@ -188,34 +191,24 @@ export default function Navbar() {
               {/* Logout button */}
               <button
                 onClick={handleLogout}
-                className={`p-2 rounded-full transition-colors cursor-pointer ${
-                  isWhiteTheme
-                    ? "text-white/60 hover:text-rose-400 hover:bg-white/10"
-                    : "text-slate-400 hover:text-rose-600 hover:bg-slate-100"
-                }`}
+                className="p-2 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                 title="Sign out"
                 aria-label="Sign out"
               >
-                <LogOut size={15} />
+                <LogOut size={16} />
               </button>
             </div>
           ) : (
             <div className="flex items-center gap-3">
               <Link
                 href="/login"
-                className={`text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-full transition-colors ${
-                  isWhiteTheme
-                    ? "text-white/80 hover:text-white"
-                    : isLightPage
-                    ? "text-slate-700 hover:text-purple-700"
-                    : "text-white/80 hover:text-white"
-                }`}
+                className="text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-full text-slate-700 hover:text-purple-700 transition-colors"
               >
                 Sign in
               </Link>
               <Link
                 href="/register"
-                className="px-5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-purple-600/25 transition-all hover:scale-105 flex items-center gap-1"
+                className="px-5 py-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-purple-600/25 transition-all hover:scale-105 flex items-center gap-1.5"
               >
                 <span>Get Started</span>
                 <ArrowRight size={13} />
@@ -224,12 +217,12 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile / Android Hamburger Toggle & Quick Avatar */}
+        {/* Mobile Hamburger Toggle & Avatar */}
         <div className="flex md:hidden items-center gap-2">
           {user && (
-            <Link href="/dashboard" title="Account Dashboard">
+            <Link href="/dashboard?tab=profile" title="Account Dashboard">
               <div className="relative">
-                <Avatar className="w-8 h-8 border border-purple-300/40 shadow-xs">
+                <Avatar className="w-8 h-8 border-2 border-purple-200/90 shadow-2xs">
                   <AvatarImage
                     src={
                       user.avatarUrl ||
@@ -246,107 +239,114 @@ export default function Navbar() {
                     {user.name?.[0]?.toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
-                {/* Subtle role indicator badge on corner */}
-                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ring-1.5 ring-white bg-white overflow-hidden shadow-2xs">
-                  <img
-                    src={
-                      user.role === "admin" || user.roleType === "ADMIN"
-                        ? "/admin-profile.webp"
-                        : user.role === "mentor" || user.roleType === "MENTOR"
-                        ? "/mentor-profile.webp"
-                        : "/student-profile.webp"
-                    }
-                    alt="Role"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
               </div>
             </Link>
           )}
 
           <button
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className={`p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500/50 cursor-pointer ${
-              isWhiteTheme
-                ? "text-white/90 hover:text-white hover:bg-white/10"
-                : "text-slate-800 hover:text-purple-700 hover:bg-slate-100"
-            }`}
+            className="p-2 rounded-xl text-slate-800 hover:text-purple-700 hover:bg-purple-50 transition-colors focus:outline-none cursor-pointer"
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Drawer (Android & Mobile Screens) */}
+      {/* Mobile Drawer (Clean, Modern Light Violet Theme) */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-purple-900/40 bg-slate-950/98 backdrop-blur-2xl px-6 py-5 shadow-2xl transition-all animate-fadeIn">
+        <div className="md:hidden border-t border-purple-100 bg-white/98 backdrop-blur-2xl px-6 py-5 shadow-xl transition-all animate-fadeIn">
           {/* Mobile User Overview if logged in */}
           {user && (
-            <div className="mb-5 pb-4 border-b border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar className="w-10 h-10 border border-purple-400/30">
-                  <AvatarImage
-                    src={
-                      user.avatarUrl ||
-                      (user.role === "mentor" || user.roleType === "MENTOR"
-                        ? "/mentor-profile.webp"
-                        : user.role === "admin" || user.roleType === "ADMIN"
-                        ? "/admin-profile.webp"
-                        : "/student-profile.webp")
-                    }
-                    alt={user.name || "User Profile"}
-                    className="object-cover"
-                  />
-                  <AvatarFallback className="bg-gradient-to-tr from-purple-500 to-indigo-600 text-white font-extrabold text-sm">
-                    {user.name?.[0]?.toUpperCase() || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-white font-bold text-sm leading-tight">{user.name}</p>
-                  <p className="text-purple-300/80 text-xs capitalize flex items-center gap-1.5 mt-0.5">
-                    {user.role === "admin" || user.roleType === "ADMIN" ? (
-                      <img src="/admin-profile.webp" alt="Admin" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
-                    ) : user.role === "mentor" || user.roleType === "MENTOR" ? (
-                      <img src="/mentor-profile.webp" alt="Mentor" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
-                    ) : (
-                      <img src="/student-profile.webp" alt="Student" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
-                    )}
-                    {user.role === "admin" || user.roleType === "ADMIN"
-                      ? "Admin"
-                      : user.role === "mentor" || user.roleType === "MENTOR"
-                      ? "Mentor"
-                      : "Student"}{" "}
-                    Workspace
-                  </p>
+            <div className="mb-4 pb-4 border-b border-purple-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-10 h-10 border-2 border-purple-200">
+                    <AvatarImage
+                      src={
+                        user.avatarUrl ||
+                        (currentRole === "mentor"
+                          ? "/mentor-profile.webp"
+                          : currentRole === "admin"
+                          ? "/admin-profile.webp"
+                          : "/student-profile.webp")
+                      }
+                      alt={user.name || "User Profile"}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="bg-gradient-to-tr from-purple-500 to-indigo-600 text-white font-extrabold text-sm">
+                      {user.name?.[0]?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-slate-900 font-bold text-sm leading-tight">{user.name}</p>
+                    <p className="text-purple-600 text-xs capitalize flex items-center gap-1.5 mt-0.5 font-medium">
+                      {currentRole === "admin"
+                        ? "Admin View"
+                        : currentRole === "mentor"
+                        ? "Mentor View"
+                        : "Learner View"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/dashboard?tab=profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs"
+                  >
+                    <LayoutDashboard size={12} />
+                    <span>Profile</span>
+                  </Link>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {(user.role === "admin" ||
-                  user.role === "ADMIN" ||
-                  user.roleType === "ADMIN" ||
-                  user.email?.toLowerCase() === "rayhanabbrar233@gmail.com" ||
-                  user.email?.toLowerCase() === "jilonasalma@gmail.com") && (
-                  <Link
-                    href="/admin"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="px-2.5 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1"
+              {/* Mobile Admin Role Switcher */}
+              {isAdmin && (
+                <div className="flex items-center justify-between p-1 bg-purple-50 rounded-2xl border border-purple-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      switchRole("admin");
+                      setMobileMenuOpen(false);
+                      if (pathname !== "/dashboard") router.push("/dashboard");
+                    }}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
+                      currentRole === "admin" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600"
+                    }`}
                   >
-                    <Shield size={12} />
-                    <span>Admin</span>
-                  </Link>
-                )}
-                <Link
-                  href="/dashboard?tab=profile"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-1.5 rounded-xl bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1"
-                >
-                  <LayoutDashboard size={12} />
-                  <span>Profile</span>
-                </Link>
-              </div>
+                    Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      switchRole("mentor");
+                      setMobileMenuOpen(false);
+                      if (pathname !== "/dashboard") router.push("/dashboard");
+                    }}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
+                      currentRole === "mentor" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600"
+                    }`}
+                  >
+                    Mentor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      switchRole("student");
+                      setMobileMenuOpen(false);
+                      if (pathname !== "/dashboard") router.push("/dashboard");
+                    }}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
+                      currentRole === "student" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600"
+                    }`}
+                  >
+                    Learner
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -359,28 +359,28 @@ export default function Navbar() {
                   key={to}
                   href={to}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`px-4 py-3 rounded-2xl text-sm font-semibold transition-all flex items-center justify-between ${
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-between ${
                     isActive
-                      ? "bg-purple-600/20 text-white font-bold border border-purple-500/30"
-                      : "text-white/80 hover:text-white hover:bg-white/5"
+                      ? "bg-purple-50 text-purple-700 font-bold border border-purple-200"
+                      : "text-slate-700 hover:text-purple-700 hover:bg-slate-50"
                   }`}
                 >
                   <span>{label}</span>
-                  {isActive && <span className="w-2 h-2 rounded-full bg-purple-400" />}
+                  {isActive && <span className="w-2 h-2 rounded-full bg-purple-600" />}
                 </Link>
               );
             })}
           </nav>
 
           {/* Mobile Action Buttons */}
-          <div className="mt-5 pt-4 border-t border-white/10 flex flex-col gap-2.5">
+          <div className="mt-4 pt-4 border-t border-purple-100 flex flex-col gap-2.5">
             {user ? (
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
                   handleLogout();
                 }}
-                className="w-full py-3 rounded-2xl bg-white/5 hover:bg-rose-500/10 text-rose-300 border border-rose-500/20 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
               >
                 <LogOut size={15} />
                 <span>Sign Out ({user.name})</span>
@@ -390,14 +390,14 @@ export default function Navbar() {
                 <Link
                   href="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="py-3 rounded-2xl bg-white/10 text-white font-bold text-xs text-center border border-white/10 hover:bg-white/15 transition-all"
+                  className="py-2.5 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs text-center border border-slate-200 hover:bg-slate-200 transition-all"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/register"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs text-center shadow-lg shadow-purple-900/30 flex items-center justify-center gap-1.5 transition-all"
+                  className="py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs text-center shadow-md shadow-purple-600/25 flex items-center justify-center gap-1.5 transition-all"
                 >
                   <span>Get Started</span>
                   <ArrowRight size={13} />

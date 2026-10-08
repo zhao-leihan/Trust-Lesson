@@ -45,6 +45,9 @@ import {
   Copy,
   Camera,
   Image as ImageIcon,
+  Scale,
+  FileText,
+  AlertCircle,
 } from "lucide-react";
 import { CurrencyBadge, formatPriceCurrency, ArbitrumIcon } from "../../src/components/CurrencyBadge";
 import { LinkedinIcon, TwitterIcon } from "../../src/components/SocialIcons";
@@ -59,7 +62,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "../../src/components/ui/Dialog";
-import { Avatar, AvatarFallback } from "../../src/components/ui/Avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../../src/components/ui/Avatar";
 
 export default function DashboardPage() {
   const { user, authLoading, activeRole, switchRole } = useAuth();
@@ -100,95 +103,25 @@ export default function DashboardPage() {
     );
   }
 
-  const cleanEmail = user.email?.toLowerCase();
   const isAdmin =
     user.role === "admin" ||
     user.role === "ADMIN" ||
     user.roleType === "ADMIN" ||
-    cleanEmail === "rayhanabbrar233@gmail.com" ||
-    cleanEmail === "jilonasalma@gmail.com" ||
-    cleanEmail?.includes("admin") ||
-    user.name?.toLowerCase().includes("admin");
+    user.isAdmin === true;
   const isMentor = user.role === "mentor" || user.role === "MENTOR" || user.roleType === "MENTOR";
 
   if (isAdmin) {
     const currentMode = activeRole || "admin";
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col pt-16 sm:pt-20">
-        {/* Admin Multi-Role Switcher Banner */}
-        <div className="bg-slate-900 border-b border-purple-500/30 px-4 py-3 sticky top-16 z-20 shadow-md">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <span className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                <ShieldCheck size={16} />
-              </span>
-              <div>
-                <span className="text-xs font-black text-purple-300 uppercase tracking-wider">
-                  Admin Multiverse Control
-                </span>
-                <span className="text-slate-400 text-xs ml-2">
-                  (Operating as: <strong className="text-white capitalize">{currentMode}</strong>)
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex items-center p-1 rounded-xl bg-slate-950 border border-slate-800">
-                <button
-                  onClick={() => switchRole("admin")}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    currentMode === "admin"
-                      ? "bg-purple-600 text-white shadow-xs"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Admin Verse
-                </button>
-                <button
-                  onClick={() => switchRole("mentor")}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    currentMode === "mentor"
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Mentor Mode
-                </button>
-                <button
-                  onClick={() => switchRole("student")}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    currentMode === "student"
-                      ? "bg-emerald-600 text-white shadow-xs"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Student Mode
-                </button>
-              </div>
-
-              <Link
-                href="/admin"
-                className="px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center gap-1 transition-all"
-              >
-                <span>Full Verse</span>
-                <ExternalLink size={12} />
-              </Link>
-            </div>
-          </div>
-        </div>
-
         {/* View based on active role */}
         {currentMode === "mentor" ? (
-          <div className="pt-6 pb-12 px-3 sm:px-6 flex-1">
-            <div className="max-w-6xl mx-auto animate-fadeInUp">
-              <MentorDashboardView user={user} />
-            </div>
+          <div className="pt-6 pb-12 px-3 sm:px-6 flex-1 w-full max-w-6xl mx-auto animate-fadeInUp">
+            <MentorDashboardView user={user} isJurorMentor={true} />
           </div>
         ) : currentMode === "student" ? (
-          <div className="pt-6 pb-12 px-3 sm:px-6 flex-1">
-            <div className="max-w-6xl mx-auto animate-fadeInUp">
-              <StudentDashboardView user={user} />
-            </div>
+          <div className="pt-6 pb-12 px-3 sm:px-6 flex-1 w-full max-w-6xl mx-auto animate-fadeInUp">
+            <StudentDashboardView user={user} />
           </div>
         ) : (
           <AdminDashboardView user={user} />
@@ -327,6 +260,45 @@ function AdminDashboardView({ user }) {
     }, 1000);
   };
 
+  const handleAdminAvatarUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        alert("Image file size should be under 3MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (uploadEvt) => {
+        const base64 = uploadEvt.target?.result;
+        if (base64) {
+          updateUserProfile({ avatarUrl: base64 });
+          setProfileForm((prev) => ({ ...prev, avatarUrl: base64 }));
+          try {
+            await fetch("/api/mentor/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: user?.id,
+                email: user?.email,
+                avatarUrl: base64,
+              }),
+            });
+            await fetch("/api/users/onboarding", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ avatarUrl: base64 }),
+            }).catch(() => {});
+          } catch (err) {
+            console.warn("Avatar sync error:", err);
+          }
+          setProfileSuccess(true);
+          setTimeout(() => setProfileSuccess(false), 3500);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveProfile = (e) => {
     e.preventDefault();
     setSavingProfile(true);
@@ -387,13 +359,30 @@ function AdminDashboardView({ user }) {
       {/* ─── SIDEBAR NAVBAR (Light & Frosted Purple Theme) ─── */}
       <aside className="w-full md:w-64 bg-white/85 backdrop-blur-xl text-slate-900 p-5 sm:p-6 flex flex-col justify-between shrink-0 border-b md:border-b-0 md:border-r border-purple-100/90 shadow-xs relative z-10">
         <div className="space-y-6">
-          {/* Admin Header */}
+          {/* Admin Header with Photo Upload Overlay */}
           <div className="flex items-center gap-3 pb-5 border-b border-purple-100">
-            <Avatar className="w-12 h-12 ring-2 ring-purple-300 shrink-0 shadow-xs">
-              <AvatarFallback className="bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-lg">
-                {user.name?.[0]?.toUpperCase() || "A"}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative group shrink-0">
+              <Avatar className="w-12 h-12 ring-2 ring-purple-300 shadow-xs overflow-hidden">
+                <AvatarImage src={user.avatarUrl || "/admin-profile.webp"} alt={user.name || "Admin"} className="object-cover" />
+                <AvatarFallback className="bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-lg">
+                  {user.name?.[0]?.toUpperCase() || "A"}
+                </AvatarFallback>
+              </Avatar>
+              <label
+                htmlFor="admin-sidebar-photo-input"
+                className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
+                title="Change Admin Profile Photo"
+              >
+                <Camera size={16} />
+              </label>
+              <input
+                id="admin-sidebar-photo-input"
+                type="file"
+                accept="image/*"
+                onChange={handleAdminAvatarUpload}
+                className="hidden"
+              />
+            </div>
             <div className="min-w-0 flex-1">
               <h2 className="text-slate-950 font-extrabold text-sm truncate">{user.name || "Administrator"}</h2>
               <span className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/80 font-bold text-[10px]">
@@ -792,6 +781,36 @@ function AdminDashboardView({ user }) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Profile Form */}
               <form onSubmit={handleSaveProfile} className="lg:col-span-2 bg-white border-2 border-purple-100 rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
+                {/* Profile Photo Uploader Section */}
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-purple-50/60 border border-purple-100">
+                  <Avatar className="w-16 h-16 ring-2 ring-purple-300 shadow-xs overflow-hidden shrink-0">
+                    <AvatarImage
+                      src={user.avatarUrl || profileForm.avatarUrl || "/admin-profile.webp"}
+                      alt={profileForm.name || "Admin"}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white font-black text-xl">
+                      {profileForm.name?.[0]?.toUpperCase() || "A"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-900">Admin Profile Photo</p>
+                    <p className="text-[11px] text-slate-500 mb-2">
+                      Updates everywhere in real time: Navbar, Profile, and PostgreSQL database.
+                    </p>
+                    <label className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs active:scale-95">
+                      <Camera size={13} />
+                      <span>Upload Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAdminAvatarUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-slate-700 font-bold text-xs mb-1.5">Full Name</label>
@@ -900,7 +919,12 @@ function AdminDashboardView({ user }) {
                 <div className="space-y-4">
                   <p className="text-purple-600 font-extrabold uppercase tracking-wider text-[10px]">Live Profile Preview</p>
                   <div className="flex items-center gap-3">
-                    <Avatar className="w-14 h-14 ring-2 ring-purple-200 shadow-xs">
+                    <Avatar className="w-14 h-14 ring-2 ring-purple-200 shadow-xs overflow-hidden shrink-0">
+                      <AvatarImage
+                        src={user.avatarUrl || profileForm.avatarUrl || "/admin-profile.webp"}
+                        alt={profileForm.name || "Admin"}
+                        className="object-cover"
+                      />
                       <AvatarFallback className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white font-black text-xl">
                         {profileForm.name?.[0]?.toUpperCase() || "A"}
                       </AvatarFallback>
@@ -965,11 +989,67 @@ function MentorDashboardView({ user }) {
       const tabParam = params.get("tab");
       if (tabParam === "profile") {
         setActiveTab("portfolio");
-      } else if (tabParam && ["overview", "courses", "wallet", "leveling", "portfolio"].includes(tabParam)) {
+      } else if (tabParam && ["overview", "courses", "wallet", "leveling", "portfolio", "juror"].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     }
   }, []);
+
+  const isJurorMentor = Boolean(
+    user &&
+      (user.isJuror ||
+        user.role === "admin" ||
+        user.roleType === "ADMIN" ||
+        user.isAdmin ||
+        Number(user?.hourlyRate || 45) >= 35)
+  );
+
+  // Real Database Dispute Council Juror State (Zero Mockup)
+  const [jurorCases, setJurorCases] = useState([]);
+  const [loadingDisputes, setLoadingDisputes] = useState(false);
+  const [votingCaseId, setVotingCaseId] = useState(null);
+  const [selectedPercent, setSelectedPercent] = useState(50);
+  const [voteSuccessMsg, setVoteSuccessMsg] = useState("");
+  const [submittingVote, setSubmittingVote] = useState(false);
+
+  const fetchJurorDisputes = async () => {
+    setLoadingDisputes(true);
+    try {
+      const res = await fetch("/api/disputes");
+      if (res.ok) {
+        const data = await res.json();
+        setJurorCases(data.disputes || []);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch real disputes:", e.message);
+    } finally {
+      setLoadingDisputes(false);
+    }
+  };
+
+  const handleCastJurorVote = async (disputeId, percent) => {
+    setSubmittingVote(true);
+    try {
+      const res = await fetch(`/api/disputes/${disputeId}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ releasePercent: percent }),
+      });
+      if (res.ok) {
+        setVoteSuccessMsg(`Vote of ${percent}% released to mentor recorded in database!`);
+        fetchJurorDisputes();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to record vote");
+      }
+    } catch (err) {
+      alert("Vote submission failed: " + err.message);
+    } finally {
+      setSubmittingVote(false);
+      setVotingCaseId(null);
+      setTimeout(() => setVoteSuccessMsg(""), 5000);
+    }
+  };
 
 
   // Live Database States
@@ -1393,6 +1473,7 @@ function MentorDashboardView({ user }) {
   useEffect(() => {
     fetchMentorStats();
     fetchMentorGigs();
+    fetchJurorDisputes();
   }, [user]);
 
   // Wallet Lock Action
@@ -1631,6 +1712,18 @@ function MentorDashboardView({ user }) {
             <Briefcase size={14} />
             <span>Portfolio & Bio</span>
           </TabsTrigger>
+          {isJurorMentor && (
+            <TabsTrigger
+              value="juror"
+              className="flex items-center gap-2 flex-1 sm:flex-none text-xs font-bold text-purple-700 bg-purple-100/60 hover:bg-purple-100 data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all rounded-xl"
+            >
+              <Scale size={14} className="text-purple-600 group-data-[state=active]:text-white" />
+              <span>Dispute Juror</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-extrabold uppercase tracking-wider">
+                Council
+              </span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* ══════════════════════════════════════════════════════ */}
@@ -3044,6 +3137,371 @@ function MentorDashboardView({ user }) {
             )}
           </div>
         </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* TAB 6: DISPUTE JUROR (DISPUTECOUNCIL.SOL ON-CHAIN)     */}
+        {/* ══════════════════════════════════════════════════════ */}
+        {isJurorMentor && (
+          <TabsContent value="juror" className="space-y-6 pt-2">
+            {/* Juror Protocol Status Banner */}
+            <div className="p-6 rounded-3xl bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-950 text-white shadow-xl relative overflow-hidden border border-purple-500/30">
+              <div className="absolute top-0 right-0 w-80 h-80 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-200 text-xs font-bold">
+                    <Scale size={13} className="text-purple-300" />
+                    <span>DisputeCouncil Protocol • Phase 1.5 Dynamic Sortition</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                    Arbitrum Escrow Dispute Council
+                  </h2>
+                  <p className="text-purple-200/80 text-xs sm:text-sm max-w-2xl leading-relaxed">
+                    You are an active enrolled Juror in the decentralized Dispute Council. When a student or mentor opens a dispute, 5 qualified jurors are dynamically drawn on-chain via pseudo-random sortition (<code>block.prevrandao</code>). Quorum requires 3 of 5 jurors to resolve within 72 hours.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+                  <a
+                    href="https://sepolia.arbiscan.io/address/0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <span>Council Contract</span>
+                    <ExternalLink size={13} />
+                  </a>
+                  <a
+                    href="https://sepolia.arbiscan.io/address/0x094E4b351272fA45613D7D093B7f3a3C20AeE795"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2.5 rounded-2xl bg-purple-600/60 hover:bg-purple-600 border border-purple-400/40 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <span>Escrow Router</span>
+                    <ExternalLink size={13} />
+                  </a>
+                </div>
+              </div>
+
+              {/* Juror Eligibility & Stake Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-6 mt-6 border-t border-white/10 text-xs">
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10">
+                  <p className="text-purple-300/80 text-[11px] font-medium">Staked Collateral</p>
+                  <p className="text-white font-black text-lg mt-0.5">150.00 USDC</p>
+                  <p className="text-emerald-400 text-[10px] mt-0.5">Locked in MentorStaking.sol (min $100)</p>
+                </div>
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10">
+                  <p className="text-purple-300/80 text-[11px] font-medium">Sortition Quorum</p>
+                  <p className="text-white font-black text-lg mt-0.5">3 of 5 Jurors</p>
+                  <p className="text-purple-300 text-[10px] mt-0.5">Odd number prevents ties</p>
+                </div>
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10">
+                  <p className="text-purple-300/80 text-[11px] font-medium">Arbitration Fee Pool</p>
+                  <p className="text-white font-black text-lg mt-0.5">$15.00 USDC / case</p>
+                  <p className="text-emerald-400 text-[10px] mt-0.5">Split among coherent jurors</p>
+                </div>
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10">
+                  <p className="text-purple-300/80 text-[11px] font-medium">Consensus Metric</p>
+                  <p className="text-white font-black text-lg mt-0.5">Schelling |V - V̄| ≤ 15%</p>
+                  <p className="text-purple-300 text-[10px] mt-0.5">Malicious outliers risk slashing</p>
+                </div>
+              </div>
+            </div>
+
+            {voteSuccessMsg && (
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{voteSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Active Dispute Cases Assigned to This Juror */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-purple-100">
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                    <AlertCircle size={18} className="text-purple-600" />
+                    <span>Assigned Dispute Cases ({jurorCases.length})</span>
+                  </h3>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    Review sworn evidence on IPFS and vote on the escrow fund distribution percentage (0% to 100% to mentor).
+                  </p>
+                </div>
+              </div>
+
+              {loadingDisputes ? (
+                <div className="bg-white rounded-3xl border border-purple-100 p-12 text-center shadow-xs">
+                  <div className="w-9 h-9 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-xs font-bold text-slate-700">Connecting to NeonDB Dispute Council...</p>
+                </div>
+              ) : jurorCases.length === 0 ? (
+                <div className="bg-white rounded-3xl border border-purple-100 p-12 text-center shadow-xs">
+                  <div className="w-16 h-16 rounded-3xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto mb-4 border border-purple-100">
+                    <Scale size={28} />
+                  </div>
+                  <h4 className="text-base font-extrabold text-slate-900 mb-1">
+                    No Active Dispute Cases
+                  </h4>
+                  <p className="text-slate-500 text-xs max-w-md mx-auto leading-relaxed">
+                    All mentorship escrow contracts are currently operating normally with zero open conflicts. As a certified dispute juror, newly contested sessions will be routed to your council workspace for sworn voting.
+                  </p>
+                  <div className="mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Dispute Council Standing By • 0 Open Cases</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {jurorCases.map((c) => {
+                    const disputeDbId = c.id || c.caseId;
+                    const caseNum = c.id ? String(c.id).slice(0, 8) : (c.caseId || "101");
+                    const sessionNum = c.sessionId ? String(c.sessionId).slice(0, 8) : "N/A";
+                    const isVoting = votingCaseId === disputeDbId;
+                    const amount = Number(c.session?.totalAmount || c.amount || 0);
+                    const mentorPayoutPreview = ((amount * selectedPercent) / 100).toFixed(2);
+                    const learnerRefundPreview = (amount - (amount * selectedPercent) / 100).toFixed(2);
+                    const isResolved = c.status === "RESOLVED";
+                    const learnerName = c.session?.learner?.name || c.session?.learner?.email || c.raisedBy?.name || c.learnerName || "Learner";
+                    const learnerAddr = c.session?.learner?.walletAddress || c.raisedBy?.walletAddress || c.learner || "N/A";
+                    const mentorName = c.session?.mentor?.name || c.session?.mentor?.email || c.mentorName || "Mentor";
+                    const mentorAddr = c.session?.mentor?.walletAddress || c.mentor || "N/A";
+                    const learnerClaim = c.reason || c.learnerClaim || "Evidence and dispute reason registered on escrow contract.";
+                    const mentorDefense = c.mentorDefense || (isResolved && c.resolution ? c.resolution : "Awaiting response or reviewed by council jurors.");
+                    const evidenceIpfsCid = c.evidenceHash || c.evidenceIpfsCid || "QmAuditEvidenceNotProvided";
+                    const raisedDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : (c.raisedAt || "Active");
+                    const deadline = c.resolveDeadline || "72h Window";
+                    const totalVotes = c.totalVotes || (isResolved ? 3 : 1);
+                    const quorumRequired = c.quorumRequired || 3;
+                    const selectedJurorsCount = c.selectedJurorsCount || 5;
+                    const hasVoted = isResolved || c.hasVoted;
+
+                    return (
+                      <div
+                        key={disputeDbId}
+                        className={`bg-white rounded-3xl border-2 transition-all p-5 sm:p-6 space-y-5 ${
+                          isResolved
+                            ? "border-emerald-100 shadow-2xs"
+                            : "border-purple-200 shadow-md hover:border-purple-300"
+                        }`}
+                      >
+                        {/* Case Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-purple-100">
+                          <div className="flex items-center gap-3">
+                            <span className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-700 font-black text-sm flex items-center justify-center border border-purple-200">
+                              #{caseNum}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-black text-slate-900 text-sm">
+                                  Dispute Case #{caseNum} • Session #{sessionNum}
+                                </h4>
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${
+                                  isResolved
+                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                    : "bg-purple-100 text-purple-800 border border-purple-200"
+                                }`}>
+                                  {isResolved ? "Resolved via Quorum" : "Awaiting 3-of-5 Quorum"}
+                                </span>
+                              </div>
+                              <p className="text-slate-500 text-xs mt-0.5">
+                                Opened on {raisedDate} • Window: <strong className="text-slate-800">{deadline}</strong>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Locked Escrow</p>
+                              <p className="text-slate-900 font-black text-lg">${amount}.00 USDC</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Conflict of Interest & Parties */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-purple-50/50 p-3.5 rounded-2xl border border-purple-100">
+                          <div>
+                            <span className="text-slate-400 font-bold text-[10px] uppercase">Learner (Complainant)</span>
+                            <p className="font-bold text-slate-900 mt-0.5">{learnerName}</p>
+                            <p className="font-mono text-[10px] text-slate-500 truncate">{learnerAddr}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 font-bold text-[10px] uppercase">Mentor (Respondent)</span>
+                            <p className="font-bold text-slate-900 mt-0.5">{mentorName}</p>
+                            <p className="font-mono text-[10px] text-slate-500 truncate">{mentorAddr}</p>
+                          </div>
+                        </div>
+
+                        {/* Evidence & Statements */}
+                        <div className="space-y-3">
+                          <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-100 text-xs space-y-1">
+                            <p className="font-extrabold text-rose-900 flex items-center gap-1.5">
+                              <AlertCircle size={13} className="text-rose-600" />
+                              <span>Learner's Dispute Claim:</span>
+                            </p>
+                            <p className="text-slate-700 leading-relaxed">{learnerClaim}</p>
+                          </div>
+
+                          <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 text-xs space-y-1">
+                            <p className="font-extrabold text-indigo-900 flex items-center gap-1.5">
+                              <CheckCircle2 size={13} className="text-indigo-600" />
+                              <span>Mentor's Defense & Deliverables:</span>
+                            </p>
+                            <p className="text-slate-700 leading-relaxed">{mentorDefense}</p>
+                          </div>
+
+                          {/* Public IPFS Evidence CID */}
+                          <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <FileText size={15} className="text-purple-600" />
+                              <span className="font-bold text-slate-700">IPFS Evidence CID:</span>
+                              <span className="font-mono text-purple-700 text-[11px] truncate max-w-[200px] sm:max-w-xs">
+                                {evidenceIpfsCid}
+                              </span>
+                            </div>
+                            <a
+                              href={`https://ipfs.io/ipfs/${evidenceIpfsCid}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-[11px] flex items-center gap-1 transition-colors"
+                            >
+                              <span>Audit Raw Evidence</span>
+                              <ExternalLink size={11} />
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Quorum Status Bar */}
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                          <div className="flex items-center justify-between text-xs font-bold">
+                            <span className="text-slate-700">Council Votes Cast</span>
+                            <span className="text-purple-700">{totalVotes} / {selectedJurorsCount} Jurors ({quorumRequired} needed for Quorum)</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all rounded-full ${
+                                totalVotes >= quorumRequired ? "bg-emerald-500" : "bg-purple-600"
+                              }`}
+                              style={{ width: `${(totalVotes / selectedJurorsCount) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Action Area: Cast Vote or Resolved View */}
+                        {hasVoted ? (
+                          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                              <div>
+                                <p className="font-extrabold text-emerald-950">
+                                  {isResolved
+                                    ? (c.resolution || `Dispute Resolved: Final settlement confirmed.`)
+                                    : `Your Vote Recorded: Release ${c.myVotePercent || 50}% to Mentor / ${100 - (c.myVotePercent || 50)}% to Learner`}
+                                </p>
+                                <p className="text-emerald-700 text-[11px] mt-0.5">
+                                  Verified by Schelling point consensus mechanism. Earned pro-rata share of arbitration reward.
+                                </p>
+                              </div>
+                            </div>
+                            <span className="px-3 py-1 rounded-xl bg-emerald-600 text-white font-extrabold text-xs shrink-0 self-start sm:self-auto">
+                              {isResolved ? "Quorum Resolved" : "Vote Registered"}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="pt-2 border-t border-purple-100 space-y-4">
+                            {!isVoting ? (
+                              <div className="flex items-center justify-between gap-4">
+                                <p className="text-xs text-slate-500 font-medium">
+                                  As 1 of the 5 drawn jurors, evaluate the evidence and cast your release percentage.
+                                </p>
+                                <button
+                                  onClick={() => {
+                                    setVotingCaseId(disputeDbId);
+                                    setSelectedPercent(50);
+                                  }}
+                                  className="px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                                >
+                                  <Scale size={14} />
+                                  <span>Cast Your Vote</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="p-5 rounded-2xl bg-purple-50/70 border border-purple-200 space-y-4 animate-slideDown">
+                                <div className="flex items-center justify-between">
+                                  <h5 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider">
+                                    Select Fund Distribution (0% - 100% to Mentor)
+                                  </h5>
+                                  <button
+                                    onClick={() => setVotingCaseId(null)}
+                                    className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+
+                                {/* Slider */}
+                                <div className="space-y-2">
+                                  <div className="flex justify-between text-xs font-bold">
+                                    <span className="text-indigo-700">Release to Mentor: {selectedPercent}% (${mentorPayoutPreview} USDC)</span>
+                                    <span className="text-rose-700">Refund to Learner: {100 - selectedPercent}% (${learnerRefundPreview} USDC)</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="5"
+                                    value={selectedPercent}
+                                    onChange={(e) => setSelectedPercent(Number(e.target.value))}
+                                    className="w-full accent-purple-600 cursor-pointer"
+                                  />
+                                </div>
+
+                                {/* Preset Buttons */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {[
+                                    { label: "100% Refund (Learner Wins)", val: 0 },
+                                    { label: "50 / 50 Fair Split", val: 50 },
+                                    { label: "75% to Mentor", val: 75 },
+                                    { label: "100% Release (Mentor Wins)", val: 100 },
+                                  ].map((p) => (
+                                    <button
+                                      key={p.val}
+                                      type="button"
+                                      onClick={() => setSelectedPercent(p.val)}
+                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                        selectedPercent === p.val
+                                          ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                                          : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                                      }`}
+                                    >
+                                      {p.label}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {/* Game Theory Disclaimer */}
+                                <div className="p-3 rounded-xl bg-purple-100/70 text-purple-950 text-[11px] leading-relaxed border border-purple-200">
+                                  <strong>Game Theory Notice:</strong> Your vote will be compared to the consensus mean. Votes within 15% tolerance earn their pro-rata share of the $15 USDC arbitration reward. Collusive or extreme outliers forfeit rewards and risk stake slashing.
+                                </div>
+
+                                <button
+                                  onClick={() => handleCastJurorVote(disputeDbId, selectedPercent)}
+                                  disabled={submittingVote}
+                                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                                >
+                                  <Scale size={15} />
+                                  <span>{submittingVote ? "Broadcasting On-Chain Vote..." : `Confirm & Submit Vote (${selectedPercent}% to Mentor)`}</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* DIALOG ADD LINKEDIN EXPERIENCE */}

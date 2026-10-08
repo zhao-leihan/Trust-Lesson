@@ -63,7 +63,8 @@ app.post("/auth/login", async (c) => {
   try {
     const db = await getPrisma();
     const cleanEmail = email.toLowerCase().trim();
-    const isAdminEmail = cleanEmail === "rayhanabbrar233@gmail.com" || cleanEmail === "jilonasalma@gmail.com";
+    const adminEmails = (process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
+    const isAdminEmail = adminEmails.includes(cleanEmail);
     let user = await db.user.findUnique({
       where: { email: cleanEmail },
     });
@@ -255,7 +256,8 @@ app.post("/auth/register", async (c) => {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    const isAdminEmail = cleanEmail === "rayhanabbrar233@gmail.com" || cleanEmail === "jilonasalma@gmail.com";
+    const adminEmails = (process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
+    const isAdminEmail = adminEmails.includes(cleanEmail);
     const assignedRole = isAdminEmail ? "ADMIN" : (role || "LEARNER").toUpperCase();
     const passwordHash = hashPassword(password);
     const hasStaked = Number(stakeAmount) >= 100;
@@ -375,7 +377,8 @@ app.post("/auth/google", async (c) => {
   }
 
   const cleanEmail = email.toLowerCase().trim();
-  const isAdminEmail = cleanEmail === "rayhanabbrar233@gmail.com" || cleanEmail === "jilonasalma@gmail.com";
+  const adminEmails = (process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
+  const isAdminEmail = adminEmails.includes(cleanEmail);
 
   try {
     const db = await getPrisma();
@@ -775,6 +778,52 @@ app.post("/sessions/:id/dispute", authMiddleware, async (c) => {
       args: [sessionId, `0x${Buffer.from(evidenceHash).toString("hex").slice(0, 64)}`],
     };
     return c.json({ dispute, evidenceHash, txData }, 201);
+  } catch (e) {
+    return c.json({ error: e.message }, 400);
+  }
+});
+
+/** GET /api/disputes — Fetch real dispute cases from database */
+app.get("/disputes", async (c) => {
+  try {
+    const db = await getPrisma();
+    const disputes = await db.dispute.findMany({
+      include: {
+        session: {
+          include: { learner: true, mentor: true },
+        },
+        raisedBy: true,
+      },
+      orderBy: { id: "desc" },
+    });
+    return c.json({ disputes });
+  } catch (e) {
+    return c.json({ disputes: [], error: e.message });
+  }
+});
+
+/** POST /api/disputes/:id/vote — Record juror vote on dispute in database */
+app.post("/disputes/:id/vote", async (c) => {
+  const disputeId = c.req.param("id");
+  const { releasePercent } = await c.req.json();
+  try {
+    const db = await getPrisma();
+    const dispute = await db.dispute.update({
+      where: { id: disputeId },
+      data: {
+        status: "RESOLVED",
+        resolution: `Resolved via Council Quorum: ${releasePercent}% released to mentor.`,
+        resolvedAt: new Date(),
+      },
+      include: { session: true },
+    });
+    if (dispute.sessionId) {
+      await db.session.update({
+        where: { id: dispute.sessionId },
+        data: { status: "RESOLVED" },
+      });
+    }
+    return c.json({ success: true, dispute });
   } catch (e) {
     return c.json({ error: e.message }, 400);
   }
@@ -2552,8 +2601,9 @@ app.get("/admin/jurors", async (c) => {
       orderBy: { stakeAmount: "desc" },
     });
 
+    const adminEmails = (process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
     const exOfficioAdmins = jurors.filter(
-      (j) => j.role === "ADMIN" || j.email === "rayhanabbrar233@gmail.com" || j.email === "jilonasalma@gmail.com"
+      (j) => j.role === "ADMIN" || adminEmails.includes(j.email?.toLowerCase())
     );
     const mentorJurors = jurors.filter((j) => j.role !== "ADMIN");
 
