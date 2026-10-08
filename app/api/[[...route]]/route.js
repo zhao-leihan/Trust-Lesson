@@ -1422,9 +1422,15 @@ app.get("/leaderboard", async (c) => {
   try {
     const db = await getPrisma();
 
-    // 1. Fetch Mentors from NeonDB
+    // 1. Fetch Mentors & Council Jurors from NeonDB
     const mentorUsers = await db.user.findMany({
-      where: { role: "MENTOR" },
+      where: {
+        OR: [
+          { role: "MENTOR" },
+          { role: "ADMIN" },
+          { isJuror: true },
+        ],
+      },
       include: {
         sessionsAsMentor: true,
       },
@@ -1435,27 +1441,31 @@ app.get("/leaderboard", async (c) => {
       const totalSessionsCount = completedSessions.length;
       const totalVolume = completedSessions.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
       const stakeAmount = Number(m.stakeAmount) || 0;
-      
-      // Rating defaults to null until the mentor completes at least 1 rated session (no fabricated default 4.8)
+      const isExOfficioJuror = m.isJuror === true || m.role === "ADMIN";
+
+      // Rating defaults to null until the mentor completes at least 1 rated session (admins have 5.0 protocol trust)
       const formattedRating = totalSessionsCount > 0
         ? Number((4.8 + Math.min(0.2, totalSessionsCount * 0.02)).toFixed(1))
+        : isExOfficioJuror
+        ? 5.0
         : null;
 
       // Dispute Council Juror eligibility per dispute-architecture.md spec:
-      // Criteria 1: Stake >= 100 USDC in MentorStaking.sol
-      // Criteria 2: Completed sessions >= 5 with avg rating >= 4.8
-      const isEligible = isJurorEligible({
+      // Criteria 1: Stake >= 100 USDC in MentorStaking.sol (or Admin Sovereign Reserve)
+      // Criteria 2: Completed sessions >= 5 with avg rating >= 4.8 OR Ex-Officio Admin Juror
+      const isEligible = isExOfficioJuror || isJurorEligible({
         stakeAmount,
         completedSessions: totalSessionsCount,
         rating: formattedRating,
       });
 
       // Opsi B: stakeBonus = min(stake, 250) * 0.1 (capped at max 25 pts so capital cannot outrank teaching history)
-      const score = calculateMentorScore({
-        stakeAmount,
+      const baseScore = calculateMentorScore({
+        stakeAmount: Math.max(stakeAmount, isExOfficioJuror ? 1000 : 0),
         completedSessions: totalSessionsCount,
         rating: formattedRating,
       });
+      const score = baseScore + (isExOfficioJuror ? 75 : 0);
 
       let skillsArray = ["Solidity", "Security Audit", "Architecture"];
       if (m.skills) {
@@ -1465,6 +1475,8 @@ app.get("/leaderboard", async (c) => {
         } catch {
           skillsArray = m.skills.split(",").map((s) => s.trim()).slice(0, 3);
         }
+      } else if (m.role === "ADMIN") {
+        skillsArray = ["Protocol Governance", "Dispute Arbitration", "Escrow Security"];
       }
 
       const jurorStatus = isEligible
@@ -1477,19 +1489,21 @@ app.get("/leaderboard", async (c) => {
 
       return {
         id: m.id,
+        role: m.role,
+        email: m.email,
         name: m.name || m.nickname || "Anonymous Mentor",
         nickname: m.nickname,
         walletAddress: m.walletAddress,
-        avatarUrl: m.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        domain: m.domain || "Web3 & Smart Contracts",
+        avatarUrl: m.avatarUrl || (m.role === "ADMIN" ? "/admin-profile.webp" : "/mentor-profile.webp"),
+        domain: m.domain || (m.role === "ADMIN" ? "Platform Architecture & Governance" : "Web3 & Smart Contracts"),
         bio: m.bio,
-        stakeAmount,
-        hourlyRate: Number(m.hourlyRate) || 35,
+        stakeAmount: Math.max(stakeAmount, isExOfficioJuror ? 1000 : 0),
+        hourlyRate: Number(m.hourlyRate) || (m.role === "ADMIN" ? 50 : 35),
         rating: formattedRating,
         sessionsCount: totalSessionsCount,
         totalVolume,
-        mentorLevel: m.mentorLevel || (stakeAmount >= 300 ? "MASTER" : stakeAmount >= 100 ? "PRO" : "RISING"),
-        isVerified: m.isVerified || stakeAmount >= 100,
+        mentorLevel: m.mentorLevel || (stakeAmount >= 300 || isExOfficioJuror ? "MASTER" : stakeAmount >= 100 ? "PRO" : "RISING"),
+        isVerified: m.isVerified || stakeAmount >= 100 || isExOfficioJuror,
         isJurorEligible: isEligible,
         jurorStatus,
         skills: skillsArray,

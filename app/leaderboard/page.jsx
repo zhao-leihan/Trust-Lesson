@@ -307,8 +307,13 @@ export default function LeaderboardPage() {
                               ) : (
                                 <span className="font-extrabold text-slate-900 text-base">{item.name}</span>
                               )}
+                              {activeTab === "mentors" && item.role === "ADMIN" && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[9px] font-black uppercase border border-purple-200">
+                                  Admin
+                                </span>
+                              )}
                               {activeTab === "mentors" && item.isVerified && (
-                                <span title="Verified Mentor">
+                                <span title="Verified">
                                   <CheckCircle2 className="w-4 h-4 fill-emerald-500 text-white" />
                                 </span>
                               )}
@@ -535,8 +540,13 @@ export default function LeaderboardPage() {
                                   {m.nickname && (
                                     <span className="text-xs text-slate-500 font-medium">(@{m.nickname})</span>
                                   )}
+                                  {m.role === "ADMIN" && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-black uppercase border border-purple-200">
+                                      Admin
+                                    </span>
+                                  )}
                                   {m.isVerified && (
-                                    <span title="Verified Mentor">
+                                    <span title="Verified">
                                       <CheckCircle2 className="w-4 h-4 fill-emerald-500 text-white flex-shrink-0" />
                                     </span>
                                   )}
@@ -599,7 +609,9 @@ export default function LeaderboardPage() {
                                   <Scale className="w-3.5 h-3.5 text-purple-700" />
                                   Council Juror
                                 </span>
-                                <span className="text-[10px] text-purple-600 font-semibold mt-1">Eligible for 3-of-5 Quorum</span>
+                                <span className="text-[10px] text-purple-600 font-semibold mt-1">
+                                  {m.role === "ADMIN" ? "Ex-Officio Authority" : "Eligible for 3-of-5 Quorum"}
+                                </span>
                               </div>
                             ) : (
                               <div className="inline-flex flex-col items-center">
