@@ -120,15 +120,34 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           {user ? (
             <div className="flex items-center gap-3">
+              {/* Admin Verse direct pill if admin */}
+              {(user.role === "admin" ||
+                user.role === "ADMIN" ||
+                user.roleType === "ADMIN" ||
+                user.email?.toLowerCase() === "rayhanabbrar233@gmail.com" ||
+                user.email?.toLowerCase() === "jilonasalma@gmail.com") && (
+                <Link
+                  href="/admin"
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs ${
+                    isWhiteTheme
+                      ? "bg-purple-500/20 hover:bg-purple-500/30 border-purple-400/40 text-purple-200"
+                      : "bg-purple-600/10 hover:bg-purple-600/20 border-purple-500/30 text-purple-700"
+                  }`}
+                >
+                  <Shield size={13} />
+                  <span>Admin Verse</span>
+                </Link>
+              )}
+
               {/* User Profile Avatar (Only image, no text) with role indicator */}
               <Link
-                href="/dashboard"
+                href="/dashboard?tab=profile"
                 title={
                   user.role === "admin" || user.roleType === "ADMIN"
-                    ? "Admin Panel"
+                    ? "Admin Profile & Panel"
                     : user.role === "mentor" || user.roleType === "MENTOR"
-                    ? "Mentor Hub"
-                    : "Student Dashboard"
+                    ? "Mentor Profile & Hub"
+                    : "Student Profile"
                 }
               >
                 <div className="relative">
@@ -304,14 +323,30 @@ export default function Navbar() {
                 </div>
               </div>
 
-              <Link
-                href="/dashboard"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-1.5 rounded-xl bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1"
-              >
-                <LayoutDashboard size={12} />
-                <span>Dashboard</span>
-              </Link>
+              <div className="flex items-center gap-2">
+                {(user.role === "admin" ||
+                  user.role === "ADMIN" ||
+                  user.roleType === "ADMIN" ||
+                  user.email?.toLowerCase() === "rayhanabbrar233@gmail.com" ||
+                  user.email?.toLowerCase() === "jilonasalma@gmail.com") && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-2.5 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1"
+                  >
+                    <Shield size={12} />
+                    <span>Admin</span>
+                  </Link>
+                )}
+                <Link
+                  href="/dashboard?tab=profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-1.5 rounded-xl bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1"
+                >
+                  <LayoutDashboard size={12} />
+                  <span>Profile</span>
+                </Link>
+              </div>
             </div>
           )}
 

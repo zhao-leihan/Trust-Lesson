@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/src/context/AuthContext";
-import { Eye, EyeOff, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, CheckCircle2, ShieldCheck, User, X, Mail } from "lucide-react";
+import { GoogleIcon } from "@/src/components/SocialIcons";
 
 export default function LoginPage() {
   const { login, user, authLoading } = useAuth();
@@ -15,6 +16,11 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState("");
+  const [customGoogleName, setCustomGoogleName] = useState("");
+
 
   // Restore remembered credentials preference
   useEffect(() => {
@@ -35,13 +41,52 @@ export default function LoginPage() {
   // Auto-redirect if user is already logged in
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace("/dashboard");
+      router.replace("/dashboard?tab=profile");
     }
   }, [user, authLoading, router]);
 
   const handleChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
     setError("");
+  };
+
+  const handleGoogleSignIn = async (targetEmail, targetName = "") => {
+    if (!targetEmail) {
+      setError("Please enter a valid Google email address.");
+      return;
+    }
+    setGoogleLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: targetEmail,
+          name: targetName || targetEmail.split("@")[0],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Google Sign-In failed.");
+      }
+
+      if (data.token) {
+        localStorage.setItem("tl_jwt", data.token);
+      }
+
+      localStorage.setItem("trust_lesson_remember", "true");
+      localStorage.setItem("trust_lesson_remember_email", targetEmail);
+
+      login(data.user, true);
+      router.push("/dashboard?tab=profile");
+    } catch (err) {
+      setError(err.message || "Failed to sign in with Google.");
+    } finally {
+      setGoogleLoading(false);
+      setShowGoogleModal(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -78,7 +123,7 @@ export default function LoginPage() {
       }
 
       login(data.user, rememberMe);
-      router.push("/dashboard");
+      router.push("/dashboard?tab=profile");
     } catch (err) {
       setError(err.message || "Failed to sign in. Please try again.");
     } finally {
@@ -141,10 +186,10 @@ export default function LoginPage() {
 
               <button
                 type="button"
-                onClick={() => router.push("/dashboard")}
+                onClick={() => router.push("/dashboard?tab=profile")}
                 className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Continue to Dashboard</span>
+                <span>Continue to Profile</span>
                 <ArrowRight size={14} />
               </button>
             </div>
@@ -160,6 +205,24 @@ export default function LoginPage() {
                 <p className="text-slate-500 text-xs sm:text-sm mt-1">
                   Enter your email address and password to continue.
                 </p>
+              </div>
+
+              {/* Google Sign-In Quick Action */}
+              <button
+                type="button"
+                onClick={() => setShowGoogleModal(true)}
+                disabled={googleLoading}
+                className="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer mb-5"
+              >
+                <GoogleIcon size={18} />
+                <span>{googleLoading ? "Connecting with Google..." : "Continue with Google"}</span>
+              </button>
+
+              <div className="relative flex items-center justify-center mb-5">
+                <div className="border-t border-slate-200 w-full" />
+                <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider relative">
+                  or sign in with email
+                </span>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -259,6 +322,116 @@ export default function LoginPage() {
             </div>
           )}
         </div>
+
+        {/* Google Sign-In Account Selector Modal */}
+        {showGoogleModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fadeIn">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 relative animate-scaleUp">
+              <button
+                type="button"
+                onClick={() => setShowGoogleModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center shadow-xs">
+                  <GoogleIcon size={22} />
+                </div>
+                <div>
+                  <h3 className="text-slate-900 font-extrabold text-lg">Sign in with Google</h3>
+                  <p className="text-slate-500 text-xs">Choose an account to continue to Trust Lesson</p>
+                </div>
+              </div>
+
+              {/* Pre-configured Quick Accounts */}
+              <div className="space-y-2.5 mb-5 mt-4">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Admin & Verified Accounts
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => handleGoogleSignIn("rayhanabbrar233@gmail.com", "Rayhan Abbrar")}
+                  disabled={googleLoading}
+                  className="w-full text-left p-3.5 rounded-2xl border border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 transition-all flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm shrink-0">
+                      RA
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-900 text-xs truncate">Rayhan Abbrar</span>
+                        <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[9px] font-extrabold uppercase">
+                          Admin / Juror
+                        </span>
+                      </div>
+                      <p className="text-slate-500 text-[11px] truncate">rayhanabbrar233@gmail.com</p>
+                    </div>
+                  </div>
+                  <ArrowRight size={14} className="text-slate-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleGoogleSignIn("jilonasalma@gmail.com", "Jilona Salma")}
+                  disabled={googleLoading}
+                  className="w-full text-left p-3.5 rounded-2xl border border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 transition-all flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0">
+                      JS
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-900 text-xs truncate">Jilona Salma</span>
+                        <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[9px] font-extrabold uppercase">
+                          Admin / Juror
+                        </span>
+                      </div>
+                      <p className="text-slate-500 text-[11px] truncate">jilonasalma@gmail.com</p>
+                    </div>
+                  </div>
+                  <ArrowRight size={14} className="text-slate-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                </button>
+              </div>
+
+              {/* Or enter any custom Google account */}
+              <div className="pt-4 border-t border-slate-100">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Or enter another Google account
+                </p>
+                <div className="space-y-3">
+                  <input
+                    type="email"
+                    value={customGoogleEmail}
+                    onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                    placeholder="your-google-account@gmail.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  />
+                  <input
+                    type="text"
+                    value={customGoogleName}
+                    onChange={(e) => setCustomGoogleName(e.target.value)}
+                    placeholder="Your Name (Optional)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleGoogleSignIn(customGoogleEmail, customGoogleName)}
+                    disabled={!customGoogleEmail || googleLoading}
+                    className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-indigo-600 disabled:opacity-50 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {googleLoading ? "Signing In..." : "Continue with this Email"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── RIGHT COLUMN: GRAPHICS & ARTWORK SHOWCASE (PC / DESKTOP ONLY) ── */}

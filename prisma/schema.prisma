@@ -26,6 +26,7 @@ model User {
   hourlyRate    Float     @default(35)
   stakeAmount   Float     @default(0)
   isVerified    Boolean   @default(false)
+  isJuror       Boolean   @default(false)
   walletLocked  Boolean   @default(false)
   mentorLevel       String    @default("RISING") // "RISING" | "PRO" | "MASTER"
   tokenVersion      Int       @default(1)
