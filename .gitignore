@@ -51,3 +51,7 @@ test/
 
 # Archives
 *.zip
+
+# Local Developer Reminder (NEVER COMMIT OR PUSH)
+remind.md
+REMIND.md

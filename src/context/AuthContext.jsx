@@ -66,14 +66,10 @@ export function AuthProvider({ children }) {
       const savedActiveRole = localStorage.getItem("trust_lesson_admin_active_role");
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
-        const emailLower = parsed.email?.toLowerCase();
         const isAdmin =
-          emailLower === "rayhanabbrar233@gmail.com" ||
-          emailLower === "jilonasalma@gmail.com" ||
-          emailLower?.includes("admin") ||
-          parsed.name?.toLowerCase().includes("admin") ||
           parsed.role?.toUpperCase() === "ADMIN" ||
-          parsed.roleType === "ADMIN";
+          parsed.roleType === "ADMIN" ||
+          parsed.isAdmin === true;
 
         if (isAdmin) {
           parsed.role = "admin";
@@ -307,9 +303,7 @@ export function AuthProvider({ children }) {
 
   // ─── Auth Actions ───────────────────────────────────────────────────────────
   const login = (userData, remember = true) => {
-    const cleanEmail = userData.email?.toLowerCase().trim();
-    const isAdminEmail = cleanEmail === "rayhanabbrar233@gmail.com" || cleanEmail === "jilonasalma@gmail.com";
-    const rawRole = isAdminEmail ? "ADMIN" : (userData.role || "student").toString();
+    const rawRole = (userData.role || (userData.roleType ? userData.roleType.toLowerCase() : "student")).toString();
     const roleUpper = rawRole.toUpperCase();
     const roleNormalized = roleUpper === "ADMIN" ? "admin" : roleUpper === "MENTOR" ? "mentor" : "student";
 
@@ -320,7 +314,7 @@ export function AuthProvider({ children }) {
       email: userData.email,
       role: roleNormalized,
       roleType: roleUpper,
-      isJuror: userData.isJuror || isAdminEmail || roleUpper === "ADMIN",
+      isJuror: userData.isJuror || roleUpper === "ADMIN",
       university: userData.university || null,
       avatar: (userData.name || userData.email || "U")[0].toUpperCase(),
       avatarUrl: userData.avatarUrl || null,

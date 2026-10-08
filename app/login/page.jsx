@@ -346,86 +346,43 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Pre-configured Quick Accounts */}
-              <div className="space-y-2.5 mb-5 mt-4">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Admin & Verified Accounts
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => handleGoogleSignIn("rayhanabbrar233@gmail.com", "Rayhan Abbrar")}
-                  disabled={googleLoading}
-                  className="w-full text-left p-3.5 rounded-2xl border border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 transition-all flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm shrink-0">
-                      RA
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-900 text-xs truncate">Rayhan Abbrar</span>
-                        <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[9px] font-extrabold uppercase">
-                          Admin / Juror
-                        </span>
-                      </div>
-                      <p className="text-slate-500 text-[11px] truncate">rayhanabbrar233@gmail.com</p>
-                    </div>
-                  </div>
-                  <ArrowRight size={14} className="text-slate-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleGoogleSignIn("jilonasalma@gmail.com", "Jilona Salma")}
-                  disabled={googleLoading}
-                  className="w-full text-left p-3.5 rounded-2xl border border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 transition-all flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0">
-                      JS
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-900 text-xs truncate">Jilona Salma</span>
-                        <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[9px] font-extrabold uppercase">
-                          Admin / Juror
-                        </span>
-                      </div>
-                      <p className="text-slate-500 text-[11px] truncate">jilonasalma@gmail.com</p>
-                    </div>
-                  </div>
-                  <ArrowRight size={14} className="text-slate-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
-                </button>
-              </div>
-
-              {/* Or enter any custom Google account */}
-              <div className="pt-4 border-t border-slate-100">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Or enter another Google account
+              <div className="pt-2">
+                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                  Enter your Google account credentials to authenticate with Trust Lesson SSO.
                 </p>
                 <div className="space-y-3">
-                  <input
-                    type="email"
-                    value={customGoogleEmail}
-                    onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                    placeholder="your-google-account@gmail.com"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                  />
-                  <input
-                    type="text"
-                    value={customGoogleName}
-                    onChange={(e) => setCustomGoogleName(e.target.value)}
-                    placeholder="Your Name (Optional)"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                  />
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Google Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={customGoogleEmail}
+                      onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                      placeholder="account@gmail.com"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Account Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={customGoogleName}
+                      onChange={(e) => setCustomGoogleName(e.target.value)}
+                      placeholder="Your Full Name"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleGoogleSignIn(customGoogleEmail, customGoogleName)}
                     disabled={!customGoogleEmail || googleLoading}
-                    className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-indigo-600 disabled:opacity-50 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3 rounded-xl bg-slate-900 hover:bg-purple-600 disabled:opacity-50 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md mt-2"
                   >
-                    {googleLoading ? "Signing In..." : "Continue with this Email"}
+                    {googleLoading ? "Signing In..." : "Continue with Google SSO"}
                   </button>
                 </div>
               </div>
