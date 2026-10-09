@@ -29,6 +29,18 @@ export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
 
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      if (searchQuery.trim()) {
+        document.title = `Search: "${searchQuery}" | Explore Mentors & Gigs`;
+      } else if (activeCategory && activeCategory !== "All") {
+        document.title = `${activeCategory} Mentors & Gigs | Trust Lesson`;
+      } else {
+        document.title = "Explore Mentors & Skill Gigs | Trust Lesson";
+      }
+    }
+  }, [searchQuery, activeCategory]);
+
   // ── Fetch Live Catalog from Backend API ──
   const fetchExploreCatalog = () => {
     setLoading(true);

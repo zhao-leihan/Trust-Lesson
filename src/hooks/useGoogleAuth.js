@@ -8,7 +8,8 @@ const GOOGLE_CLIENT_ID =
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
   "144586018759-pl02601bl9a3u9r3r3uu0nsuqkamtma7.apps.googleusercontent.com";
 
-export function useGoogleAuth() {
+export function useGoogleAuth(options = {}) {
+  const { onProfileSuccess } = options;
   const { login } = useAuth();
   const router = useRouter();
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -55,6 +56,17 @@ export function useGoogleAuth() {
 
               if (!profile.email) {
                 throw new Error("Unable to retrieve email from Google.");
+              }
+
+              // If consumer provided onProfileSuccess callback (e.g. registration flow), pass data and stop
+              if (onProfileSuccess) {
+                onProfileSuccess({
+                  email: profile.email,
+                  name: profile.name || "",
+                  avatarUrl: profile.picture || null,
+                });
+                setGoogleLoading(false);
+                return;
               }
 
               // Send to backend
@@ -210,6 +222,15 @@ export function useGoogleAuth() {
               headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
             });
             const profile = await userinfoRes.json();
+            if (onProfileSuccess) {
+              onProfileSuccess({
+                email: profile.email,
+                name: profile.name || "",
+                avatarUrl: profile.picture || null,
+              });
+              setGoogleLoading(false);
+              return;
+            }
             const res = await fetch("/api/auth/google", {
               method: "POST",
               headers: { "Content-Type": "application/json" },

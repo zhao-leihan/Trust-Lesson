@@ -27,6 +27,14 @@ import {
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState("mentors"); // "mentors" | "students"
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.title = activeTab === "mentors"
+        ? "Top Mentors Leaderboard | Trust Lesson"
+        : "Top Students Leaderboard | Trust Lesson";
+    }
+  }, [activeTab]);
   const [data, setData] = useState({ stats: null, mentors: [], students: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

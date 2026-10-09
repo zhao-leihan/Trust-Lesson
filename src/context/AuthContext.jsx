@@ -19,12 +19,30 @@ const AuthContext = createContext(null);
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const USE_API = true;
 
+async function refreshAccessToken() {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.token && typeof window !== "undefined") {
+      localStorage.setItem("tl_jwt", data.token);
+      return data.token;
+    }
+  } catch (e) {
+    console.warn("[Auth] Silent token refresh failed:", e.message);
+  }
+  return null;
+}
+
 /**
- * Fetch helper with JWT auth header.
+ * Fetch helper with JWT auth header and silent token refresh.
  */
 async function apiFetch(path, options = {}) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("tl_jwt") : null;
-  const res = await fetch(`${API_URL}/api${path}`, {
+  let token = typeof window !== "undefined" ? localStorage.getItem("tl_jwt") : null;
+  let res = await fetch(`${API_URL}/api${path}`, {
     ...options,
     credentials: "include",
     headers: {
@@ -33,6 +51,23 @@ async function apiFetch(path, options = {}) {
       ...options.headers,
     },
   });
+
+  // If token expired (401), attempt silent refresh once and retry
+  if (res.status === 401 && !path.includes("/auth/login") && !path.includes("/auth/refresh")) {
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) {
+      res = await fetch(`${API_URL}/api${path}`, {
+        ...options,
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${refreshedToken}`,
+          ...options.headers,
+        },
+      });
+    }
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || "API error");

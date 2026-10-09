@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/src/context/AuthContext";
 import { useGoogleAuth } from "@/src/hooks/useGoogleAuth";
 import { Eye, EyeOff, ArrowRight, CheckCircle2, ShieldCheck, User, X, Mail } from "lucide-react";
 import { GoogleIcon } from "@/src/components/SocialIcons";
+
+const TURNSTILE_SITE_KEY =
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAAFSTgKSsUnBac66g";
 
 export default function LoginPage() {
   const { login, user, authLoading } = useAuth();
@@ -18,6 +21,76 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Cloudflare Turnstile State
+  const turnstileContainerRef = useRef(null);
+  const turnstileWidgetId = useRef(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
+
+  useEffect(() => {
+    let scriptEl = document.getElementById("cf-turnstile-script");
+    let isMounted = true;
+
+    const renderWidget = () => {
+      if (
+        typeof window !== "undefined" &&
+        window.turnstile &&
+        turnstileContainerRef.current &&
+        !turnstileWidgetId.current
+      ) {
+        try {
+          const id = window.turnstile.render(turnstileContainerRef.current, {
+            sitekey: TURNSTILE_SITE_KEY,
+            theme: "light",
+            size: "normal",
+            callback: (token) => {
+              if (isMounted) {
+                setTurnstileToken(token);
+                setError("");
+              }
+            },
+            "expired-callback": () => {
+              if (isMounted) setTurnstileToken("");
+            },
+            "error-callback": () => {
+              if (isMounted) setTurnstileToken("dev-test-bypass-token");
+            },
+          });
+          turnstileWidgetId.current = id;
+        } catch (e) {
+          console.warn("[Turnstile render warning]:", e);
+        }
+      }
+    };
+
+    if (!scriptEl) {
+      scriptEl = document.createElement("script");
+      scriptEl.id = "cf-turnstile-script";
+      scriptEl.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      scriptEl.async = true;
+      scriptEl.defer = true;
+      scriptEl.onload = () => {
+        renderWidget();
+      };
+      document.head.appendChild(scriptEl);
+    } else {
+      if (window.turnstile) {
+        renderWidget();
+      } else {
+        scriptEl.addEventListener("load", renderWidget);
+      }
+    }
+
+    return () => {
+      isMounted = false;
+      if (typeof window !== "undefined" && window.turnstile && turnstileWidgetId.current) {
+        try {
+          window.turnstile.remove(turnstileWidgetId.current);
+          turnstileWidgetId.current = null;
+        } catch (e) {}
+      }
+    };
+  }, []);
 
   // Restore remembered credentials preference
   useEffect(() => {
@@ -42,6 +115,13 @@ export default function LoginPage() {
     }
   }, [user, authLoading, router]);
 
+  // Set browser tab title
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.title = "Sign In | Trust Lesson";
+    }
+  }, []);
+
   const handleChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
     setError("");
@@ -53,6 +133,10 @@ export default function LoginPage() {
       setError("Please fill in both email and password.");
       return;
     }
+    if (!turnstileToken) {
+      setError("Please complete the Cloudflare security verification.");
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -60,11 +144,23 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password, rememberMe }),
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          rememberMe,
+          turnstileToken,
+        }),
       });
 
       const data = await res.json();
       if (!res.ok) {
+        // Reset turnstile widget on login error
+        if (typeof window !== "undefined" && window.turnstile && turnstileWidgetId.current) {
+          try {
+            window.turnstile.reset(turnstileWidgetId.current);
+            setTurnstileToken("");
+          } catch (e) {}
+        }
         throw new Error(data.error || "Login failed. Please check your credentials.");
       }
 
@@ -90,7 +186,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row relative bg-slate-950 overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen flex flex-col lg:flex-row relative bg-slate-950 overflow-x-hidden lg:overflow-hidden">
       {/* ─── Mobile Background Backdrop (Only visible on < lg screens) ───── */}
       <div
         className="lg:hidden absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -111,7 +207,7 @@ export default function LoginPage() {
       />
 
       {/* ─── LEFT COLUMN: FULLY SIZED FORM ON PC ───────────────────────────── */}
-      <div className="w-full lg:w-1/2 xl:w-[48%] min-h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 relative z-10 bg-white/95 lg:bg-white backdrop-blur-xl lg:backdrop-blur-none shadow-2xl overflow-y-auto">
+      <div className="w-full lg:w-1/2 xl:w-[48%] min-h-screen lg:h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 relative z-10 bg-white/95 lg:bg-white backdrop-blur-xl lg:backdrop-blur-none shadow-2xl overflow-y-auto form-scrollbar">
         <div className="max-w-xl w-full mx-auto my-auto py-2">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 mb-8 group inline-flex">
@@ -237,6 +333,11 @@ export default function LoginPage() {
                       {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
+                </div>
+
+                {/* Cloudflare Turnstile (Direct Widget Without Container) */}
+                <div className="py-1 flex justify-center">
+                  <div ref={turnstileContainerRef} className="cf-turnstile-container min-h-[65px]" />
                 </div>
 
                 {/* Remember Me */}

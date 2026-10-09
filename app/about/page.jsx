@@ -2,6 +2,11 @@ import { Shield, Globe, Users, Heart, Star, Sparkles } from "lucide-react";
 import Reveal from "../../src/components/Reveal";
 import Footer from "../../src/components/Footer";
 
+export const metadata = {
+  title: "About Us",
+  description: "Learn about the mission, protocol architecture, and leadership team behind Trust Lesson.",
+};
+
 const team = [
   {
     name: "Rayhan Young",
