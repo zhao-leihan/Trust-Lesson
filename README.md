@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/zhao-leihan/Trust-Lesson">
-    <img src="./public/logo-full.webp" alt="Trust Lesson Logo" width="380" />
+    <img src="./public/logo-full-white.webp" alt="Trust Lesson Logo" width="380" />
   </a>
   <br />
   <br />
