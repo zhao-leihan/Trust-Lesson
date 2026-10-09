@@ -51,7 +51,7 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 
 | Contract | Address | Explorer Link | Function |
 | :--- | :--- | :--- | :--- |
-| **EscrowRouter (V2)** | `0x094E4b351272fA45613D7D093B7f3a3C20AeE795` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x094E4b351272fA45613D7D093B7f3a3C20AeE795) | Modular milestone escrow vault with 10% protocol cut distribution & multi-sig dispute resolution |
+| **EscrowRouter (V2)** | `0x22f3aa08A15d24f7D274b33A234d96EDC5A98E88` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x22f3aa08A15d24f7D274b33A234d96EDC5A98E88) | Modular milestone escrow vault with 10% protocol cut distribution & multi-sig dispute resolution |
 | **VerifiableCredential** | `0x50fA8e6c56B97484D2571b2C220d3EDbBAe6847D` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x50fA8e6c56B97484D2571b2C220d3EDbBAe6847D) | Dual-party W3C & EIP-712 credential ledger (Learner Completion & Mentor Delivery) |
 | **SkillGraph** | `0x99303483484cc2c9393138574969f15C415A3016` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x99303483484cc2c9393138574969f15C415A3016) | On-chain composable skill tree with prerequisite gating & level progression |
 | **DisputeCouncil** | `0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006) | Decentralized 3-of-5 jury council with on-chain dynamic sortition, conflict filter & Kleros Court hooks |

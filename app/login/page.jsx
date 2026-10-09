@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/src/context/AuthContext";
+import { useGoogleAuth } from "@/src/hooks/useGoogleAuth";
 import { Eye, EyeOff, ArrowRight, CheckCircle2, ShieldCheck, User, X, Mail } from "lucide-react";
 import { GoogleIcon } from "@/src/components/SocialIcons";
 
 export default function LoginPage() {
   const { login, user, authLoading } = useAuth();
+  const { signInWithGoogle, googleLoading, googleError } = useGoogleAuth();
   const router = useRouter();
 
   const [form, setForm] = useState({ email: "", password: "" });
@@ -16,11 +18,6 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState("");
-  const [customGoogleName, setCustomGoogleName] = useState("");
-
 
   // Restore remembered credentials preference
   useEffect(() => {
@@ -48,45 +45,6 @@ export default function LoginPage() {
   const handleChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
     setError("");
-  };
-
-  const handleGoogleSignIn = async (targetEmail, targetName = "") => {
-    if (!targetEmail) {
-      setError("Please enter a valid Google email address.");
-      return;
-    }
-    setGoogleLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: targetEmail,
-          name: targetName || targetEmail.split("@")[0],
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Google Sign-In failed.");
-      }
-
-      if (data.token) {
-        localStorage.setItem("tl_jwt", data.token);
-      }
-
-      localStorage.setItem("trust_lesson_remember", "true");
-      localStorage.setItem("trust_lesson_remember_email", targetEmail);
-
-      login(data.user, true);
-      router.push("/dashboard?tab=profile");
-    } catch (err) {
-      setError(err.message || "Failed to sign in with Google.");
-    } finally {
-      setGoogleLoading(false);
-      setShowGoogleModal(false);
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -210,13 +168,19 @@ export default function LoginPage() {
               {/* Google Sign-In Quick Action */}
               <button
                 type="button"
-                onClick={() => setShowGoogleModal(true)}
+                onClick={signInWithGoogle}
                 disabled={googleLoading}
-                className="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer mb-5"
+                className="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer mb-5 disabled:opacity-60"
               >
                 <GoogleIcon size={18} />
                 <span>{googleLoading ? "Connecting with Google..." : "Continue with Google"}</span>
               </button>
+
+              {(error || googleError) && (
+                <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold leading-relaxed">
+                  {error || googleError}
+                </div>
+              )}
 
               <div className="relative flex items-center justify-center mb-5">
                 <div className="border-t border-slate-200 w-full" />
@@ -322,73 +286,6 @@ export default function LoginPage() {
             </div>
           )}
         </div>
-
-        {/* Google Sign-In Account Selector Modal */}
-        {showGoogleModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fadeIn">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 relative animate-scaleUp">
-              <button
-                type="button"
-                onClick={() => setShowGoogleModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center shadow-xs">
-                  <GoogleIcon size={22} />
-                </div>
-                <div>
-                  <h3 className="text-slate-900 font-extrabold text-lg">Sign in with Google</h3>
-                  <p className="text-slate-500 text-xs">Choose an account to continue to Trust Lesson</p>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                  Enter your Google account credentials to authenticate with Trust Lesson SSO.
-                </p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Google Email Address
-                    </label>
-                    <input
-                      type="email"
-                      value={customGoogleEmail}
-                      onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                      placeholder="account@gmail.com"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                      autoFocus
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Account Name (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={customGoogleName}
-                      onChange={(e) => setCustomGoogleName(e.target.value)}
-                      placeholder="Your Full Name"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleGoogleSignIn(customGoogleEmail, customGoogleName)}
-                    disabled={!customGoogleEmail || googleLoading}
-                    className="w-full py-3 rounded-xl bg-slate-900 hover:bg-purple-600 disabled:opacity-50 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md mt-2"
-                  >
-                    {googleLoading ? "Signing In..." : "Continue with Google SSO"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ─── RIGHT COLUMN: GRAPHICS & ARTWORK SHOWCASE (PC / DESKTOP ONLY) ── */}

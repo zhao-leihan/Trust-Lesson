@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
-import { LogOut, Scale, GraduationCap, ArrowRight, Menu, X, LayoutDashboard } from "lucide-react";
+import { LogOut, ArrowRight, Menu, X, LayoutDashboard } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/Avatar";
 
 const navLinks = [
@@ -29,6 +29,13 @@ export default function Navbar() {
       user.roleType === "ADMIN" ||
       user.isAdmin === true);
 
+  const isMentorUser =
+    user &&
+    !isAdmin &&
+    (user.role === "mentor" ||
+      user.role === "MENTOR" ||
+      user.roleType === "MENTOR");
+
   const currentRole = activeRole || (isAdmin ? "admin" : user?.role?.toLowerCase() || "student");
 
   // Close mobile drawer on route transition
@@ -36,10 +43,10 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // Track scroll for subtle shadow transition
+  // Track scroll for subtle backdrop transition
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 15);
+      setIsScrolled(window.scrollY > 20);
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
@@ -55,18 +62,29 @@ export default function Navbar() {
     return null;
   }
 
-  // Clean, consistent white frosted glass navbar across all pages
-  const headerBgClass = isScrolled
+  // ── Dual Theme: Transparent / dark-glass on Home & About, Frosted White on app & content pages ──
+  const isWhiteTheme = pathname === "/" || pathname === "/about";
+  const isLightPage = !isWhiteTheme;
+
+  // Header background & border classes
+  const headerBgClass = isWhiteTheme
+    ? isScrolled
+      ? "bg-slate-950/85 backdrop-blur-xl border-b border-purple-900/30 shadow-lg shadow-black/20"
+      : "bg-transparent backdrop-blur-sm border-b border-white/10"
+    : isScrolled
     ? "bg-white/95 backdrop-blur-xl border-b border-purple-100/90 shadow-xs"
     : "bg-white/85 backdrop-blur-md border-b border-purple-100/60";
+
+  // Logo source: crisp white on transparent dark hero, purple/dark logo on light pages
+  const logoSrc = isWhiteTheme ? "/logo-full-white.webp" : "/logo-full.webp";
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-2.5 sm:py-3 ${headerBgClass}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-8 flex items-center justify-between gap-6">
-        {/* Brand: Uses crisp official full logo */}
+        {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-2 group shrink-0">
           <img
-            src="/logo-full.webp"
+            src={logoSrc}
             alt="Trust Lesson"
             width={168}
             height={48}
@@ -85,7 +103,11 @@ export default function Navbar() {
                 key={to}
                 href={to}
                 className={`text-sm font-semibold tracking-wide transition-all relative py-1 ${
-                  isActive
+                  isWhiteTheme
+                    ? isActive
+                      ? "text-white font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-indigo-400 after:rounded-full"
+                      : "text-white/75 hover:text-white"
+                    : isActive
                     ? "text-purple-700 font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-purple-600 after:rounded-full"
                     : "text-slate-600 hover:text-purple-700"
                 }`}
@@ -100,23 +122,33 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           {user ? (
             <div className="flex items-center gap-3">
-              {/* Elegant Admin Role Switcher Pill (Aesthetic, Compact, Zero Page Clutter) */}
-              {isAdmin && (
-                <div className="flex items-center bg-purple-50/90 p-1 rounded-full border border-purple-200/80 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      switchRole("admin");
-                      if (pathname !== "/dashboard") router.push("/dashboard");
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                      currentRole === "admin"
-                        ? "bg-purple-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-purple-700"
-                    }`}
-                  >
-                    Admin
-                  </button>
+              {/* Role Switcher Pill (Admin: 3 modes, Mentor: 2 modes) */}
+              {(isAdmin || isMentorUser) && (
+                <div
+                  className={`flex items-center p-1 rounded-full text-xs transition-all ${
+                    isWhiteTheme
+                      ? "bg-white/10 backdrop-blur-md border border-white/20"
+                      : "bg-purple-50/90 border border-purple-200/80"
+                  }`}
+                >
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        switchRole("admin");
+                        if (pathname !== "/dashboard") router.push("/dashboard");
+                      }}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                        currentRole === "admin"
+                          ? "bg-purple-600 text-white shadow-xs"
+                          : isWhiteTheme
+                          ? "text-white/80 hover:text-white"
+                          : "text-slate-600 hover:text-purple-700"
+                      }`}
+                    >
+                      Admin
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -126,6 +158,8 @@ export default function Navbar() {
                     className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
                       currentRole === "mentor"
                         ? "bg-purple-600 text-white shadow-xs"
+                        : isWhiteTheme
+                        ? "text-white/80 hover:text-white"
                         : "text-slate-600 hover:text-purple-700"
                     }`}
                   >
@@ -140,6 +174,8 @@ export default function Navbar() {
                     className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
                       currentRole === "student"
                         ? "bg-purple-600 text-white shadow-xs"
+                        : isWhiteTheme
+                        ? "text-white/80 hover:text-white"
                         : "text-slate-600 hover:text-purple-700"
                     }`}
                   >
@@ -154,7 +190,11 @@ export default function Navbar() {
                 title="Account Dashboard"
               >
                 <div className="relative">
-                  <Avatar className="w-9 h-9 hover:scale-105 transition-transform cursor-pointer border-2 border-purple-200/90 shadow-2xs">
+                  <Avatar
+                    className={`w-9 h-9 hover:scale-105 transition-transform cursor-pointer border-2 shadow-2xs ${
+                      isWhiteTheme ? "border-white/30" : "border-purple-200/90"
+                    }`}
+                  >
                     <AvatarImage
                       src={
                         user.avatarUrl ||
@@ -191,7 +231,11 @@ export default function Navbar() {
               {/* Logout button */}
               <button
                 onClick={handleLogout}
-                className="p-2 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                className={`p-2 rounded-full transition-colors cursor-pointer ${
+                  isWhiteTheme
+                    ? "text-white/60 hover:text-rose-400 hover:bg-white/10"
+                    : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                }`}
                 title="Sign out"
                 aria-label="Sign out"
               >
@@ -202,7 +246,11 @@ export default function Navbar() {
             <div className="flex items-center gap-3">
               <Link
                 href="/login"
-                className="text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-full text-slate-700 hover:text-purple-700 transition-colors"
+                className={`text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-full transition-colors ${
+                  isWhiteTheme
+                    ? "text-white/80 hover:text-white"
+                    : "text-slate-700 hover:text-purple-700"
+                }`}
               >
                 Sign in
               </Link>
@@ -222,13 +270,17 @@ export default function Navbar() {
           {user && (
             <Link href="/dashboard?tab=profile" title="Account Dashboard">
               <div className="relative">
-                <Avatar className="w-8 h-8 border-2 border-purple-200/90 shadow-2xs">
+                <Avatar
+                  className={`w-8 h-8 border-2 shadow-2xs ${
+                    isWhiteTheme ? "border-white/30" : "border-purple-200/90"
+                  }`}
+                >
                   <AvatarImage
                     src={
                       user.avatarUrl ||
-                      (user.role === "mentor" || user.roleType === "MENTOR"
+                      (currentRole === "mentor"
                         ? "/mentor-profile.webp"
-                        : user.role === "admin" || user.roleType === "ADMIN"
+                        : currentRole === "admin"
                         ? "/admin-profile.webp"
                         : "/student-profile.webp")
                     }
@@ -245,7 +297,11 @@ export default function Navbar() {
 
           <button
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="p-2 rounded-xl text-slate-800 hover:text-purple-700 hover:bg-purple-50 transition-colors focus:outline-none cursor-pointer"
+            className={`p-2 rounded-xl transition-colors focus:outline-none cursor-pointer ${
+              isWhiteTheme
+                ? "text-white/90 hover:text-white hover:bg-white/10"
+                : "text-slate-800 hover:text-purple-700 hover:bg-purple-50"
+            }`}
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
@@ -254,15 +310,29 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Drawer (Clean, Modern Light Violet Theme) */}
+      {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-purple-100 bg-white/98 backdrop-blur-2xl px-6 py-5 shadow-xl transition-all animate-fadeIn">
+        <div
+          className={`md:hidden px-6 py-5 shadow-2xl transition-all animate-fadeIn ${
+            isWhiteTheme
+              ? "border-t border-purple-900/40 bg-slate-950/98 backdrop-blur-2xl text-white"
+              : "border-t border-purple-100 bg-white/98 backdrop-blur-2xl text-slate-900"
+          }`}
+        >
           {/* Mobile User Overview if logged in */}
           {user && (
-            <div className="mb-4 pb-4 border-b border-purple-100 space-y-3">
+            <div
+              className={`mb-4 pb-4 space-y-3 ${
+                isWhiteTheme ? "border-b border-white/10" : "border-b border-purple-100"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Avatar className="w-10 h-10 border-2 border-purple-200">
+                  <Avatar
+                    className={`w-10 h-10 border-2 ${
+                      isWhiteTheme ? "border-purple-400/40" : "border-purple-200"
+                    }`}
+                  >
                     <AvatarImage
                       src={
                         user.avatarUrl ||
@@ -280,8 +350,18 @@ export default function Navbar() {
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-slate-900 font-bold text-sm leading-tight">{user.name}</p>
-                    <p className="text-purple-600 text-xs capitalize flex items-center gap-1.5 mt-0.5 font-medium">
+                    <p
+                      className={`font-bold text-sm leading-tight ${
+                        isWhiteTheme ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {user.name}
+                    </p>
+                    <p
+                      className={`text-xs capitalize flex items-center gap-1.5 mt-0.5 font-medium ${
+                        isWhiteTheme ? "text-purple-300/80" : "text-purple-600"
+                      }`}
+                    >
                       {currentRole === "admin"
                         ? "Admin View"
                         : currentRole === "mentor"
@@ -295,7 +375,7 @@ export default function Navbar() {
                   <Link
                     href="/dashboard?tab=profile"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="px-3 py-1.5 rounded-xl bg-purple-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs"
+                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1 shadow-xs"
                   >
                     <LayoutDashboard size={12} />
                     <span>Profile</span>
@@ -303,22 +383,34 @@ export default function Navbar() {
                 </div>
               </div>
 
-              {/* Mobile Admin Role Switcher */}
-              {isAdmin && (
-                <div className="flex items-center justify-between p-1 bg-purple-50 rounded-2xl border border-purple-200">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      switchRole("admin");
-                      setMobileMenuOpen(false);
-                      if (pathname !== "/dashboard") router.push("/dashboard");
-                    }}
-                    className={`flex-1 py-1.5 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
-                      currentRole === "admin" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600"
-                    }`}
-                  >
-                    Admin
-                  </button>
+              {/* Mobile Role Switcher (Admin: 3 modes, Mentor: 2 modes) */}
+              {(isAdmin || isMentorUser) && (
+                <div
+                  className={`flex items-center justify-between p-1 rounded-2xl ${
+                    isWhiteTheme
+                      ? "bg-white/10 border border-white/20"
+                      : "bg-purple-50 border border-purple-200"
+                  }`}
+                >
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        switchRole("admin");
+                        setMobileMenuOpen(false);
+                        if (pathname !== "/dashboard") router.push("/dashboard");
+                      }}
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
+                        currentRole === "admin"
+                          ? "bg-purple-600 text-white shadow-xs"
+                          : isWhiteTheme
+                          ? "text-white/80 hover:text-white"
+                          : "text-slate-600"
+                      }`}
+                    >
+                      Admin
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -327,7 +419,11 @@ export default function Navbar() {
                       if (pathname !== "/dashboard") router.push("/dashboard");
                     }}
                     className={`flex-1 py-1.5 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
-                      currentRole === "mentor" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600"
+                      currentRole === "mentor"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : isWhiteTheme
+                        ? "text-white/80 hover:text-white"
+                        : "text-slate-600"
                     }`}
                   >
                     Mentor
@@ -340,7 +436,11 @@ export default function Navbar() {
                       if (pathname !== "/dashboard") router.push("/dashboard");
                     }}
                     className={`flex-1 py-1.5 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
-                      currentRole === "student" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600"
+                      currentRole === "student"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : isWhiteTheme
+                        ? "text-white/80 hover:text-white"
+                        : "text-slate-600"
                     }`}
                   >
                     Learner
@@ -360,27 +460,45 @@ export default function Navbar() {
                   href={to}
                   onClick={() => setMobileMenuOpen(false)}
                   className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-between ${
-                    isActive
+                    isWhiteTheme
+                      ? isActive
+                        ? "bg-purple-600/20 text-white font-bold border border-purple-500/30"
+                        : "text-white/80 hover:text-white hover:bg-white/5"
+                      : isActive
                       ? "bg-purple-50 text-purple-700 font-bold border border-purple-200"
                       : "text-slate-700 hover:text-purple-700 hover:bg-slate-50"
                   }`}
                 >
                   <span>{label}</span>
-                  {isActive && <span className="w-2 h-2 rounded-full bg-purple-600" />}
+                  {isActive && (
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isWhiteTheme ? "bg-purple-400" : "bg-purple-600"
+                      }`}
+                    />
+                  )}
                 </Link>
               );
             })}
           </nav>
 
           {/* Mobile Action Buttons */}
-          <div className="mt-4 pt-4 border-t border-purple-100 flex flex-col gap-2.5">
+          <div
+            className={`mt-4 pt-4 flex flex-col gap-2.5 ${
+              isWhiteTheme ? "border-t border-white/10" : "border-t border-purple-100"
+            }`}
+          >
             {user ? (
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
                   handleLogout();
                 }}
-                className="w-full py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+                  isWhiteTheme
+                    ? "bg-white/5 hover:bg-rose-500/10 text-rose-300 border border-rose-500/20"
+                    : "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200"
+                }`}
               >
                 <LogOut size={15} />
                 <span>Sign Out ({user.name})</span>
@@ -390,7 +508,11 @@ export default function Navbar() {
                 <Link
                   href="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="py-2.5 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs text-center border border-slate-200 hover:bg-slate-200 transition-all"
+                  className={`py-2.5 rounded-xl font-bold text-xs text-center border transition-all ${
+                    isWhiteTheme
+                      ? "bg-white/10 text-white border-white/15 hover:bg-white/20"
+                      : "bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-200"
+                  }`}
                 >
                   Sign In
                 </Link>

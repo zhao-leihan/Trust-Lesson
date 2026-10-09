@@ -4,6 +4,7 @@ import { Shield, Star, Clock, ArrowRight, CheckCircle2, Layers, Radio } from "lu
 import Link from "next/link";
 import { useState } from "react";
 import { CurrencyBadge, formatPriceCurrency } from "./CurrencyBadge";
+import { useAuth } from "@/src/context/AuthContext";
 
 const categoryStyles = {
   Coding: {
@@ -46,6 +47,19 @@ const categoryStyles = {
 
 export default function ExploreCard({ item }) {
   const isCourse = Boolean(item.milestones || item.deliverables || item.offeringType === "course");
+  const auth = useAuth();
+  const user = auth?.user;
+  const walletAddress = auth?.walletAddress;
+
+  const isOwner = Boolean(
+    user && item && (
+      (user.id && item.mentorId && String(user.id) === String(item.mentorId)) ||
+      (user.email && item.mentorEmail && user.email.toLowerCase() === item.mentorEmail.toLowerCase()) ||
+      (user.walletAddress && item.mentorAddress && user.walletAddress.toLowerCase() === item.mentorAddress.toLowerCase()) ||
+      (walletAddress && item.mentorAddress && walletAddress.toLowerCase() === item.mentorAddress.toLowerCase())
+    )
+  );
+
   const type = isCourse ? "course" : "mentor";
   const title = item.skill || item.title;
   const name = item.name || item.mentorName;
@@ -238,13 +252,23 @@ export default function ExploreCard({ item }) {
             </span>
           </div>
 
-          <Link
-            href={`/book/${type}/${item.id}`}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-500/20 hover:shadow-lg hover:shadow-purple-500/30 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-          >
-            <span>Book Now</span>
-            <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
-          </Link>
+          {isOwner ? (
+            <Link
+              href="/dashboard?tab=courses"
+              className="px-3.5 py-2.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-bold text-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-xs"
+            >
+              <span>Your Gig</span>
+              <ArrowRight size={13} />
+            </Link>
+          ) : (
+            <Link
+              href={`/book/${type}/${item.id}`}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-500/20 hover:shadow-lg hover:shadow-purple-500/30 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            >
+              <span>Book Now</span>
+              <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          )}
         </div>
       </div>
     </div>

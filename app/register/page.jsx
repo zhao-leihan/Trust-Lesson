@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/src/context/AuthContext";
+import { useGoogleAuth } from "@/src/hooks/useGoogleAuth";
 import {
   Eye,
   EyeOff,
@@ -131,50 +132,8 @@ export default function RegisterPage() {
     }
   }, [user, authLoading, router]);
 
-  // Google Sign-In / Account Selector State
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState("");
-  const [customGoogleName, setCustomGoogleName] = useState("");
-
-  const handleGoogleSignIn = async (targetEmail, targetName = "") => {
-    if (!targetEmail) {
-      setError("Please enter a valid Google email address.");
-      return;
-    }
-    setGoogleLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: targetEmail,
-          name: targetName || targetEmail.split("@")[0],
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Google Sign-In failed.");
-      }
-
-      if (data.token) {
-        localStorage.setItem("tl_jwt", data.token);
-      }
-
-      localStorage.setItem("trust_lesson_remember", "true");
-      localStorage.setItem("trust_lesson_remember_email", targetEmail);
-
-      login(data.user, true);
-      router.push("/dashboard?tab=profile");
-    } catch (err) {
-      setError(err.message || "Failed to sign up with Google.");
-    } finally {
-      setGoogleLoading(false);
-      setShowGoogleModal(false);
-    }
-  };
+  // Official Google Authentication
+  const { signInWithGoogle, googleLoading, googleError } = useGoogleAuth();
 
   // ─── Flow State ─────────────────────────────────────────────────────────────
   // 0: Role Selection, 1+: Steps for Student or Mentor
@@ -454,21 +413,21 @@ export default function RegisterPage() {
                   onClick={() => setSelectedRole("student")}
                   className={`flex flex-col text-left p-5 rounded-2xl border-2 transition-all relative cursor-pointer ${
                     selectedRole === "student"
-                      ? "border-emerald-500 bg-emerald-50/60 shadow-md ring-2 ring-emerald-500/20"
+                      ? "border-purple-600 bg-purple-50/60 shadow-md ring-2 ring-purple-500/20"
                       : "border-slate-200 hover:border-slate-300 bg-white"
                   }`}
                 >
                   {selectedRole === "student" && (
-                    <CheckCircle2 size={20} className="absolute top-4 right-4 text-emerald-600" />
+                    <CheckCircle2 size={20} className="absolute top-4 right-4 text-purple-600" />
                   )}
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 shadow-xs">
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-3 shadow-xs">
                     <GraduationCap size={24} />
                   </div>
                   <h3 className="text-slate-900 font-extrabold text-lg">Student / Learner</h3>
                   <p className="text-slate-500 text-xs mt-1.5 leading-relaxed">
                     Learn high-impact skills 1-on-1 with mentors. Your funds stay safe in escrow until lessons are delivered.
                   </p>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] font-bold text-emerald-700">
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] font-bold text-purple-700">
                     <Sparkles size={13} />
                     <span>Soulbound NFT Credentials</span>
                   </div>
@@ -522,13 +481,19 @@ export default function RegisterPage() {
 
                 <button
                   type="button"
-                  onClick={() => setShowGoogleModal(true)}
+                  onClick={signInWithGoogle}
                   disabled={googleLoading}
-                  className="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer"
+                  className="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60"
                 >
                   <GoogleIcon size={18} />
                   <span>{googleLoading ? "Connecting with Google..." : "Continue with Google"}</span>
                 </button>
+
+                {googleError && (
+                  <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold leading-relaxed">
+                    {googleError}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -566,7 +531,7 @@ export default function RegisterPage() {
                             isActive
                               ? "bg-slate-900 text-white ring-4 ring-slate-200 shadow-sm scale-105"
                               : isCompleted
-                              ? "bg-emerald-600 text-white cursor-pointer hover:bg-emerald-700 hover:scale-105"
+                              ? "bg-purple-600 text-white cursor-pointer hover:bg-purple-700 hover:scale-105"
                               : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
                           }`}
                         >
@@ -575,7 +540,7 @@ export default function RegisterPage() {
                         {idx < totalSteps - 1 && (
                           <div
                             className={`w-2.5 sm:w-4 h-0.5 mx-0.5 rounded transition-colors ${
-                              s < step ? "bg-emerald-500" : "bg-slate-200"
+                              s < step ? "bg-purple-500" : "bg-slate-200"
                             }`}
                           />
                         )}
@@ -848,7 +813,7 @@ export default function RegisterPage() {
             <div className="space-y-4">
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3.5">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-emerald-700">
+                  <div className="flex items-center gap-2 text-purple-700">
                     <Building size={18} />
                     <h3 className="font-extrabold text-sm text-slate-900">Current Educational Status</h3>
                   </div>
@@ -1042,8 +1007,8 @@ export default function RegisterPage() {
           {selectedRole === "student" && step === 6 && (
             /* Student Step 6: Security, Password & TOS */
             <form onSubmit={handleFinalSubmit} className="space-y-4">
-              <div className="bg-emerald-50/70 border border-emerald-200/80 p-3 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-950">
-                <FileCheck size={16} className="text-emerald-600 shrink-0" />
+              <div className="bg-purple-50/70 border border-purple-200/80 p-3 rounded-2xl flex items-center gap-2.5 text-xs text-purple-950">
+                <FileCheck size={16} className="text-purple-600 shrink-0" />
                 <p>
                   A confirmation dispatch has been prepared for <strong>{email}</strong>.
                 </p>
@@ -1096,7 +1061,7 @@ export default function RegisterPage() {
                   </p>
                 </div>
                 {walletAddress ? (
-                  <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-mono text-[11px] font-bold border border-emerald-200">
+                  <span className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-mono text-[11px] font-bold border border-purple-200">
                     {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
                   </span>
                 ) : (
@@ -1906,73 +1871,6 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
-
-        {/* Google Sign-In Account Selector Modal */}
-        {showGoogleModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fadeIn">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 relative animate-scaleUp">
-              <button
-                type="button"
-                onClick={() => setShowGoogleModal(false)}
-                className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center shadow-xs">
-                  <GoogleIcon size={22} />
-                </div>
-                <div>
-                  <h3 className="text-slate-900 font-extrabold text-lg">Continue with Google</h3>
-                  <p className="text-slate-500 text-xs">Instant account creation & secure login</p>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                  Enter your Google account credentials to register and authenticate with Trust Lesson SSO.
-                </p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Google Email Address
-                    </label>
-                    <input
-                      type="email"
-                      value={customGoogleEmail}
-                      onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                      placeholder="account@gmail.com"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                      autoFocus
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Account Name (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={customGoogleName}
-                      onChange={(e) => setCustomGoogleName(e.target.value)}
-                      placeholder="Your Full Name"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleGoogleSignIn(customGoogleEmail, customGoogleName)}
-                    disabled={!customGoogleEmail || googleLoading}
-                    className="w-full py-3 rounded-xl bg-slate-900 hover:bg-purple-600 disabled:opacity-50 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md mt-2"
-                  >
-                    {googleLoading ? "Signing Up..." : "Continue with Google SSO"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ─── RIGHT COLUMN: GRAPHICS & ARTWORK SHOWCASE (PC / DESKTOP ONLY) ── */}

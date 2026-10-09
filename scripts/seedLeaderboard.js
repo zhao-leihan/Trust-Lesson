@@ -4,7 +4,7 @@ import { hashPassword } from "../lib/auth.js";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🚀 Seeding NeonDB with real Leaderboard Mentors, Students, and On-Chain Certificates...");
+  console.log("🚀 Seeding Database with real Leaderboard Mentors, Students, and On-Chain Certificates...");
 
   const defaultPassword = "Password123!";
   const passwordHash = hashPassword(defaultPassword);
@@ -118,7 +118,7 @@ async function main() {
     });
     createdMentors.push(mentor);
   }
-  console.log(`✓ ${createdMentors.length} Mentors seeded into NeonDB.`);
+  console.log(`✓ ${createdMentors.length} Mentors seeded into Database.`);
 
   // ── 2. STUDENTS SEEDING ──
   const studentsData = [
@@ -205,7 +205,7 @@ async function main() {
     });
     createdStudents.push(student);
   }
-  console.log(`✓ ${createdStudents.length} Students seeded into NeonDB.`);
+  console.log(`✓ ${createdStudents.length} Students seeded into Database.`);
 
   // ── 3. SESSIONS & CERTIFICATES SEEDING ──
   // Link Alex Rivera with Rayhan Young
@@ -318,7 +318,7 @@ async function main() {
     });
   }
 
-  console.log("🎉 Database seeding complete: Real Mentors, Students, and On-Chain Certificates are active in NeonDB!");
+  console.log("🎉 Database seeding complete: Real Mentors, Students, and On-Chain Certificates are active in Database!");
 }
 
 main()

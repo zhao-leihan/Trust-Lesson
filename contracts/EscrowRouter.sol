@@ -85,6 +85,7 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
     error TransferFailed();
     error DisputeTimeoutNotReached();
     error InvalidReleasePercent();
+    error CannotMentorSelf();
 
     // ─── Constructor ─────────────────────────────────────────────────
     constructor(address _usdc, address _arbiter) Ownable(msg.sender) {
@@ -158,6 +159,7 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
         uint256[] calldata milestoneAmounts,
         string memory skillTag
     ) internal returns (uint256 sessionId) {
+        if (mentor == msg.sender) revert CannotMentorSelf();
         if (milestoneAmounts.length == 0 || milestoneAmounts.length > 10)
             revert InvalidMilestones();
 
