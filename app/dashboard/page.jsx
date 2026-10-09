@@ -67,6 +67,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "../../src/components/ui/Ava
 export default function DashboardPage() {
   const { user, authLoading, activeRole, switchRole } = useAuth();
 
+  useEffect(() => {
+    if (typeof document === "undefined" || !user) return;
+    const mode = activeRole || (user.role?.toLowerCase() || "dashboard");
+    const modeLabel = mode === "admin" ? "Admin" : mode === "mentor" ? "Mentor" : "Student";
+    document.title = `${modeLabel} Dashboard | Trust Lesson`;
+  }, [user, activeRole]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 pt-24">

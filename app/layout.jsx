@@ -18,10 +18,15 @@ const poppins = Poppins({
 });
 
 export const metadata = {
-  title: "Trust Lesson | Global P2P Skill Exchange",
+  title: {
+    default: "Trust Lesson | Global P2P Skill Exchange",
+    template: "%s | Trust Lesson",
+  },
   description: "Decentralized peer-to-peer mentorship and milestone gig marketplace with smart contract escrow on Arbitrum One.",
   icons: {
     icon: "/logo.webp",
+    shortcut: "/logo.webp",
+    apple: "/logo.webp",
   },
 };
 

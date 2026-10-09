@@ -132,13 +132,36 @@ export default function RegisterPage() {
     }
   }, [user, authLoading, router]);
 
-  // Official Google Authentication
-  const { signInWithGoogle, googleLoading, googleError } = useGoogleAuth();
+  // Google Quick Autofill (only fills email and name, then user proceeds with full flow)
+  const [googlePrefilled, setGooglePrefilled] = useState(false);
+  const { signInWithGoogle, googleLoading, googleError } = useGoogleAuth({
+    onProfileSuccess: ({ email: gEmail, name: gName }) => {
+      if (gEmail) setEmail(gEmail);
+      if (gName && !fullName) setFullName(gName);
+      setGooglePrefilled(true);
+      setError("");
+      // Advance to Step 1 if a role was already selected, or prompt user to pick role
+      if (selectedRole) {
+        setStep(1);
+      }
+    },
+  });
 
   // ─── Flow State ─────────────────────────────────────────────────────────────
   // 0: Role Selection, 1+: Steps for Student or Mentor
   const [selectedRole, setSelectedRole] = useState(null); // 'student' | 'mentor'
   const [step, setStep] = useState(0);
+
+  // Dynamic Browser Tab Title based on active step
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (step === 0) {
+      document.title = "Create Account | Trust Lesson";
+    } else {
+      const roleLabel = selectedRole === "mentor" ? "Mentor" : "Student";
+      document.title = `Register as ${roleLabel} (Step ${step}) | Trust Lesson`;
+    }
+  }, [step, selectedRole]);
 
   // ─── Shared Step 1: Personal Details & Early Email Capture ──────────────────
   const [fullName, setFullName] = useState("");
@@ -198,7 +221,23 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+
+  // Password Combination & Safety Strength Checker
+  const passwordCriteria = {
+    minLength: password.length >= 8,
+    hasUpper: /[A-Z]/.test(password),
+    hasLower: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecial: /[^A-Za-z0-9]/.test(password),
+  };
+  const passwordStrengthScore = Object.values(passwordCriteria).filter(Boolean).length;
+  const isPasswordSafe = passwordCriteria.minLength && (
+    (passwordCriteria.hasUpper || passwordCriteria.hasLower) &&
+    passwordCriteria.hasNumber &&
+    (passwordCriteria.hasSpecial || (passwordCriteria.hasUpper && passwordCriteria.hasLower))
+  );
 
   // ─── Execution State ────────────────────────────────────────────────────────
   const [error, setError] = useState("");
@@ -278,13 +317,23 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    if (!/[0-9]/.test(password) || !(/[a-zA-Z]/.test(password))) {
+      setError("Password must contain a combination of letters and numbers.");
+      return;
+    }
+
+    if (!isPasswordSafe) {
+      setError("Please create a stronger password (min. 8 characters with letters, numbers, and special characters).");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError("Passwords do not match. Please verify your re-typed password.");
       return;
     }
 
@@ -348,11 +397,11 @@ export default function RegisterPage() {
     }
   };
 
-  // Total steps computation
-  const totalSteps = selectedRole === "mentor" ? 7 : 6;
+  // Total steps computation (Mentor: 7 steps, Student: 5 steps)
+  const totalSteps = selectedRole === "mentor" ? 7 : 5;
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row relative bg-slate-950 overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen flex flex-col lg:flex-row relative bg-slate-950 overflow-x-hidden lg:overflow-hidden">
       {/* ─── Mobile Background Backdrop (Only visible on < lg screens) ───── */}
       <div
         className="lg:hidden absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -373,7 +422,7 @@ export default function RegisterPage() {
       />
 
       {/* ─── LEFT COLUMN: FULLY SIZED FORM ON PC ───────────────────────────── */}
-      <div className="w-full lg:w-1/2 xl:w-[48%] min-h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 relative z-10 bg-white/95 lg:bg-white backdrop-blur-xl lg:backdrop-blur-none shadow-2xl overflow-y-auto">
+      <div className="w-full lg:w-1/2 xl:w-[48%] min-h-screen lg:h-screen flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 relative z-10 bg-white/95 lg:bg-white backdrop-blur-xl lg:backdrop-blur-none shadow-2xl overflow-y-auto form-scrollbar">
         <div className="max-w-xl w-full mx-auto my-auto py-2">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 mb-6 group inline-flex">
@@ -470,12 +519,12 @@ export default function RegisterPage() {
                 <ArrowRight size={16} />
               </button>
 
-              {/* Google Sign-In Quick Action */}
+              {/* Google Fast Autofill Action */}
               <div className="pt-2">
                 <div className="relative flex items-center justify-center my-3">
                   <div className="border-t border-slate-200 w-full" />
                   <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider relative">
-                    or instant access with google
+                    or pre-fill email with google
                   </span>
                 </div>
 
@@ -486,8 +535,15 @@ export default function RegisterPage() {
                   className="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60"
                 >
                   <GoogleIcon size={18} />
-                  <span>{googleLoading ? "Connecting with Google..." : "Continue with Google"}</span>
+                  <span>{googleLoading ? "Connecting Google Account..." : "Auto-fill with Google"}</span>
                 </button>
+
+                {googlePrefilled && (
+                  <p className="mt-2 text-center text-[11px] font-semibold text-emerald-600 flex items-center justify-center gap-1">
+                    <CheckCircle2 size={13} />
+                    <span>Email & name connected from Google ({email}). Please select your role above to continue.</span>
+                  </p>
+                )}
 
                 {googleError && (
                   <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold leading-relaxed">
@@ -514,7 +570,7 @@ export default function RegisterPage() {
                 </button>
 
                 {/* Numbered Stepper Circles connected by lines (Original Style) */}
-                <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-1">
+                <div className="flex items-center gap-1 sm:gap-1.5 overflow-visible py-1.5 px-1 shrink-0">
                   {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s, idx) => {
                     const isActive = s === step;
                     const isCompleted = s < step;
@@ -527,9 +583,9 @@ export default function RegisterPage() {
                             if (s < step) setStep(s);
                           }}
                           title={`Go to Step ${s}`}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all relative ${
                             isActive
-                              ? "bg-slate-900 text-white ring-4 ring-slate-200 shadow-sm scale-105"
+                              ? "bg-slate-900 text-white ring-4 ring-slate-200/90 shadow-sm"
                               : isCompleted
                               ? "bg-purple-600 text-white cursor-pointer hover:bg-purple-700 hover:scale-105"
                               : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
@@ -557,10 +613,9 @@ export default function RegisterPage() {
                 <h2 className="text-slate-900 font-extrabold text-xl sm:text-2xl mt-0.5 tracking-tight">
                   {selectedRole === "student" ? (
                     step === 1 ? "Personal Profile & Age Verification" :
-                    step === 2 ? "Education History" :
+                    step === 2 ? "Educational Background" :
                     step === 3 ? "Country of Residence" :
-                    step === 4 ? "Current Educational Institution" :
-                    step === 5 ? "Learning Interests & Desired Skills" :
+                    step === 4 ? "Learning Interests & Desired Skills" :
                     "Account Security & Terms"
                   ) : (
                     step === 1 ? "Mentor Personal Details & Age Verification" :
@@ -650,115 +705,195 @@ export default function RegisterPage() {
                 onClick={() => setStep(2)}
                 className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-50 cursor-pointer"
               >
-                <span>Continue to Education History</span>
+                <span>Continue to Educational Background</span>
                 <ArrowRight size={14} />
               </button>
             </div>
           )}
 
           {selectedRole === "student" && step === 2 && (
-            /* Student Step 2: Education History (max 5) */
+            /* Student Step 2: Educational Background (Current Status + Education History) */
             <div className="space-y-4">
-              <p className="text-xs text-slate-500">
-                Provide your academic background (up to 5 institutions, high school, university, or bootcamps).
-              </p>
+              {/* Current Status Card */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-purple-700">
+                    <Building size={18} />
+                    <h3 className="font-extrabold text-sm text-slate-900">Current Educational Status</h3>
+                  </div>
+                </div>
 
-              <div className="space-y-3">
-                {educationList.map((edu, idx) => (
-                  <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 relative">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-extrabold text-slate-800">
-                        Education #{idx + 1}
-                      </span>
-                      {educationList.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveEducation(idx)}
-                          className="text-rose-500 hover:text-rose-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Trash2 size={13} />
-                          <span>Remove</span>
-                        </button>
-                      )}
+                {/* Non-student checkbox */}
+                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-slate-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isNotActiveStudent}
+                    onChange={(e) => setIsNotActiveStudent(e.target.checked)}
+                    className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 block">
+                      I am not currently an active student
+                    </span>
+                    <span className="text-[11px] text-slate-400 block mt-0.5">
+                      Check this if you are a fresh graduate, working professional, or career switcher.
+                    </span>
+                  </div>
+                </label>
+
+                {!isNotActiveStudent && (
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <label className="text-slate-900 font-bold text-xs block mb-1">
+                        Current Campus / School Name
+                      </label>
+                      <input
+                        type="text"
+                        value={currentCampus}
+                        onChange={(e) => setCurrentCampus(e.target.value)}
+                        placeholder="e.g. University of California, Berkeley"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1">Degree / Level</label>
-                        <select
-                          value={edu.degree}
-                          onChange={(e) => handleUpdateEducation(idx, "degree", e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
-                        >
-                          <option>High School Diploma</option>
-                          <option>Associate Degree</option>
-                          <option>Bachelor's Degree</option>
-                          <option>Master's Degree</option>
-                          <option>Doctorate (Ph.D.)</option>
-                          <option>Coding Bootcamp / Intensive</option>
-                          <option>Self-Taught / Independent</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1">Institution Name</label>
+                        <label className="text-slate-900 font-bold text-xs block mb-1">
+                          Current Major / Department
+                        </label>
                         <input
                           type="text"
-                          value={edu.institution}
-                          onChange={(e) => handleUpdateEducation(idx, "institution", e.target.value)}
-                          placeholder="e.g. University of California, Berkeley"
-                          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1">Major / Field</label>
-                        <input
-                          type="text"
-                          value={edu.major}
-                          onChange={(e) => handleUpdateEducation(idx, "major", e.target.value)}
+                          value={currentMajor}
+                          onChange={(e) => setCurrentMajor(e.target.value)}
                           placeholder="e.g. Computer Science, Economics"
-                          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                         />
                       </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700 block mb-1">Start Year</label>
-                          <input
-                            type="text"
-                            value={edu.startYear}
-                            onChange={(e) => handleUpdateEducation(idx, "startYear", e.target.value)}
-                            placeholder="2020"
-                            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700 block mb-1">End / Expected</label>
-                          <input
-                            type="text"
-                            value={edu.endYear}
-                            onChange={(e) => handleUpdateEducation(idx, "endYear", e.target.value)}
-                            placeholder="2024"
-                            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
-                          />
-                        </div>
+                      <div>
+                        <label className="text-slate-900 font-bold text-xs block mb-1">
+                          Expected Graduation Year
+                        </label>
+                        <input
+                          type="text"
+                          value={gradYear}
+                          onChange={(e) => setGradYear(e.target.value)}
+                          placeholder="2026"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                        />
                       </div>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
 
-              {educationList.length < 5 && (
-                <button
-                  type="button"
-                  onClick={handleAddEducation}
-                  className="w-full py-2.5 rounded-xl border border-dashed border-indigo-300 hover:border-indigo-500 bg-indigo-50/40 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Plus size={14} />
-                  <span>Add Another Institution ({educationList.length}/5)</span>
-                </button>
-              )}
+              {/* Education History & Qualifications Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900">Education History & Past Qualifications</h3>
+                    <p className="text-[11px] text-slate-500">
+                      Add up to 5 institutions, high school, university degrees, or bootcamps.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {educationList.map((edu, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 relative">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-slate-800">
+                          Education #{idx + 1}
+                        </span>
+                        {educationList.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEducation(idx)}
+                            className="text-rose-500 hover:text-rose-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 size={13} />
+                            <span>Remove</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 block mb-1">Degree / Level</label>
+                          <select
+                            value={edu.degree}
+                            onChange={(e) => handleUpdateEducation(idx, "degree", e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
+                          >
+                            <option>High School Diploma</option>
+                            <option>Associate Degree</option>
+                            <option>Bachelor's Degree</option>
+                            <option>Master's Degree</option>
+                            <option>Doctorate (Ph.D.)</option>
+                            <option>Coding Bootcamp / Intensive</option>
+                            <option>Self-Taught / Independent</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 block mb-1">Institution Name</label>
+                          <input
+                            type="text"
+                            value={edu.institution}
+                            onChange={(e) => handleUpdateEducation(idx, "institution", e.target.value)}
+                            placeholder="e.g. University of California, Berkeley"
+                            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 block mb-1">Major / Field</label>
+                          <input
+                            type="text"
+                            value={edu.major}
+                            onChange={(e) => handleUpdateEducation(idx, "major", e.target.value)}
+                            placeholder="e.g. Computer Science, Economics"
+                            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-700 block mb-1">Start Year</label>
+                            <input
+                              type="text"
+                              value={edu.startYear}
+                              onChange={(e) => handleUpdateEducation(idx, "startYear", e.target.value)}
+                              placeholder="2020"
+                              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-700 block mb-1">End / Expected</label>
+                            <input
+                              type="text"
+                              value={edu.endYear}
+                              onChange={(e) => handleUpdateEducation(idx, "endYear", e.target.value)}
+                              placeholder="2024"
+                              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {educationList.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={handleAddEducation}
+                    className="w-full py-2.5 rounded-xl border border-dashed border-indigo-300 hover:border-indigo-500 bg-indigo-50/40 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Plus size={14} />
+                    <span>Add Another Institution ({educationList.length}/5)</span>
+                  </button>
+                )}
+              </div>
 
               <button
                 type="button"
@@ -802,99 +937,14 @@ export default function RegisterPage() {
                 onClick={() => setStep(4)}
                 className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer"
               >
-                <span>Continue to Current Institution</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          )}
-
-          {selectedRole === "student" && step === 4 && (
-            /* Student Step 4: Current Educational Institution (Optional for working pros) */
-            <div className="space-y-4">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-purple-700">
-                    <Building size={18} />
-                    <h3 className="font-extrabold text-sm text-slate-900">Current Educational Status</h3>
-                  </div>
-                </div>
-
-                {/* Non-student checkbox */}
-                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-slate-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isNotActiveStudent}
-                    onChange={(e) => setIsNotActiveStudent(e.target.checked)}
-                    className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">
-                      I am not currently an active student
-                    </span>
-                    <span className="text-[11px] text-slate-400 block mt-0.5">
-                      Check this if you are a fresh graduate, working professional, or career switcher.
-                    </span>
-                  </div>
-                </label>
-
-                {!isNotActiveStudent && (
-                  <div className="space-y-3 pt-2">
-                    <div>
-                      <label className="text-slate-900 font-bold text-xs block mb-1">
-                        Current Campus / School Name
-                      </label>
-                      <input
-                        type="text"
-                        value={currentCampus}
-                        onChange={(e) => setCurrentCampus(e.target.value)}
-                        placeholder="e.g. University of Indonesia, ITB, Stanford..."
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-slate-900 font-bold text-xs block mb-1">
-                          Current Major / Department
-                        </label>
-                        <input
-                          type="text"
-                          value={currentMajor}
-                          onChange={(e) => setCurrentMajor(e.target.value)}
-                          placeholder="e.g. Informatics, Business"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-slate-900 font-bold text-xs block mb-1">
-                          Expected Graduation Year
-                        </label>
-                        <input
-                          type="text"
-                          value={gradYear}
-                          onChange={(e) => setGradYear(e.target.value)}
-                          placeholder="2026"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setStep(5)}
-                className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer"
-              >
                 <span>Continue to Learning Interests</span>
                 <ArrowRight size={14} />
               </button>
             </div>
           )}
 
-          {selectedRole === "student" && step === 5 && (
-            /* Student Step 5: Learning Interests & Skills (Vital for Dashboard Recommendation!) */
+          {selectedRole === "student" && step === 4 && (
+            /* Student Step 4: Learning Interests & Skills (Vital for Dashboard Recommendation!) */
             <div className="space-y-4">
               <div className="bg-purple-50/70 border border-purple-200/80 p-3 rounded-2xl flex items-start gap-2.5 text-xs text-purple-950">
                 <Sparkles size={16} className="text-purple-600 shrink-0 mt-0.5" />
@@ -995,7 +1045,7 @@ export default function RegisterPage() {
 
               <button
                 type="button"
-                onClick={() => setStep(6)}
+                onClick={() => setStep(5)}
                 className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer"
               >
                 <span>Continue to Security & Password</span>
@@ -1004,7 +1054,7 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {selectedRole === "student" && step === 6 && (
+          {selectedRole === "student" && step === 5 && (
             /* Student Step 6: Security, Password & TOS */
             <form onSubmit={handleFinalSubmit} className="space-y-4">
               <div className="bg-purple-50/70 border border-purple-200/80 p-3 rounded-2xl flex items-center gap-2.5 text-xs text-purple-950">
@@ -1014,39 +1064,129 @@ export default function RegisterPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-900 font-bold text-xs block mb-1">Set Password *</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Min. 6 characters"
-                      className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-900 font-bold text-xs block mb-1">Set Password *</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Min. 8 characters"
+                        className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-900 font-bold text-xs block mb-1">Confirm Password *</label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Repeat password"
+                        className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      >
+                        {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-slate-900 font-bold text-xs block mb-1">Confirm Password *</label>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repeat password"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
-                  />
-                </div>
+                {/* Password Strength & Combination Safety Indicator */}
+                {password && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-700 text-[11px]">Password Security:</span>
+                      <span
+                        className={`font-extrabold text-[11px] ${
+                          passwordStrengthScore >= 4
+                            ? "text-emerald-600"
+                            : passwordStrengthScore >= 3
+                            ? "text-indigo-600"
+                            : "text-amber-600"
+                        }`}
+                      >
+                        {passwordStrengthScore >= 4
+                          ? "Strong & Secure"
+                          : passwordStrengthScore >= 3
+                          ? "Moderate"
+                          : "Weak (Requires Combination)"}
+                      </span>
+                    </div>
+
+                    <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden flex gap-1">
+                      <div
+                        className={`h-full flex-1 rounded-full transition-all ${
+                          passwordCriteria.minLength ? "bg-indigo-600" : "bg-slate-300"
+                        }`}
+                      />
+                      <div
+                        className={`h-full flex-1 rounded-full transition-all ${
+                          passwordCriteria.hasNumber ? "bg-indigo-600" : "bg-slate-300"
+                        }`}
+                      />
+                      <div
+                        className={`h-full flex-1 rounded-full transition-all ${
+                          passwordCriteria.hasUpper || passwordCriteria.hasLower ? "bg-indigo-600" : "bg-slate-300"
+                        }`}
+                      />
+                      <div
+                        className={`h-full flex-1 rounded-full transition-all ${
+                          passwordCriteria.hasSpecial ? "bg-emerald-500" : "bg-slate-300"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1 text-[10px] pt-1">
+                      <div className={`flex items-center gap-1 ${passwordCriteria.minLength ? "text-emerald-600 font-semibold" : "text-slate-400"}`}>
+                        <Check size={11} className={passwordCriteria.minLength ? "text-emerald-600" : "text-slate-300"} />
+                        <span>Min. 8 characters</span>
+                      </div>
+                      <div className={`flex items-center gap-1 ${passwordCriteria.hasNumber ? "text-emerald-600 font-semibold" : "text-slate-400"}`}>
+                        <Check size={11} className={passwordCriteria.hasNumber ? "text-emerald-600" : "text-slate-300"} />
+                        <span>Includes number (0-9)</span>
+                      </div>
+                      <div className={`flex items-center gap-1 ${passwordCriteria.hasUpper ? "text-emerald-600 font-semibold" : "text-slate-400"}`}>
+                        <Check size={11} className={passwordCriteria.hasUpper ? "text-emerald-600" : "text-slate-300"} />
+                        <span>Uppercase letter (A-Z)</span>
+                      </div>
+                      <div className={`flex items-center gap-1 ${passwordCriteria.hasSpecial ? "text-emerald-600 font-semibold" : "text-slate-400"}`}>
+                        <Check size={11} className={passwordCriteria.hasSpecial ? "text-emerald-600" : "text-slate-300"} />
+                        <span>Special character (!@#$)</span>
+                      </div>
+                    </div>
+
+                    {confirmPassword && password !== confirmPassword && (
+                      <p className="text-rose-500 text-[11px] font-semibold flex items-center gap-1 pt-1">
+                        <AlertCircle size={12} />
+                        <span>Passwords do not match yet</span>
+                      </p>
+                    )}
+                    {confirmPassword && password === confirmPassword && (
+                      <p className="text-emerald-600 text-[11px] font-semibold flex items-center gap-1 pt-1">
+                        <Check size={12} />
+                        <span>Passwords match</span>
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Web3 Wallet Connection Optional */}
@@ -1770,39 +1910,129 @@ export default function RegisterPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-900 font-bold text-xs block mb-1">Set Password *</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Min. 6 characters"
-                      className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-900 font-bold text-xs block mb-1">Set Password *</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Min. 8 characters"
+                        className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-900 font-bold text-xs block mb-1">Confirm Password *</label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Repeat password"
+                        className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      >
+                        {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-slate-900 font-bold text-xs block mb-1">Confirm Password *</label>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repeat password"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-indigo-500/40 focus:outline-none"
-                  />
-                </div>
+                {/* Password Strength & Combination Safety Indicator */}
+                {password && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-700 text-[11px]">Password Security:</span>
+                      <span
+                        className={`font-extrabold text-[11px] ${
+                          passwordStrengthScore >= 4
+                            ? "text-emerald-600"
+                            : passwordStrengthScore >= 3
+                            ? "text-indigo-600"
+                            : "text-amber-600"
+                        }`}
+                      >
+                        {passwordStrengthScore >= 4
+                          ? "Strong & Secure"
+                          : passwordStrengthScore >= 3
+                          ? "Moderate"
+                          : "Weak (Requires Combination)"}
+                      </span>
+                    </div>
+
+                    <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden flex gap-1">
+                      <div
+                        className={`h-full flex-1 rounded-full transition-all ${
+                          passwordCriteria.minLength ? "bg-indigo-600" : "bg-slate-300"
+                        }`}
+                      />
+                      <div
+                        className={`h-full flex-1 rounded-full transition-all ${
+                          passwordCriteria.hasNumber ? "bg-indigo-600" : "bg-slate-300"
+                        }`}
+                      />
+                      <div
+                        className={`h-full flex-1 rounded-full transition-all ${
+                          passwordCriteria.hasUpper || passwordCriteria.hasLower ? "bg-indigo-600" : "bg-slate-300"
+                        }`}
+                      />
+                      <div
+                        className={`h-full flex-1 rounded-full transition-all ${
+                          passwordCriteria.hasSpecial ? "bg-emerald-500" : "bg-slate-300"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1 text-[10px] pt-1">
+                      <div className={`flex items-center gap-1 ${passwordCriteria.minLength ? "text-emerald-600 font-semibold" : "text-slate-400"}`}>
+                        <Check size={11} className={passwordCriteria.minLength ? "text-emerald-600" : "text-slate-300"} />
+                        <span>Min. 8 characters</span>
+                      </div>
+                      <div className={`flex items-center gap-1 ${passwordCriteria.hasNumber ? "text-emerald-600 font-semibold" : "text-slate-400"}`}>
+                        <Check size={11} className={passwordCriteria.hasNumber ? "text-emerald-600" : "text-slate-300"} />
+                        <span>Includes number (0-9)</span>
+                      </div>
+                      <div className={`flex items-center gap-1 ${passwordCriteria.hasUpper ? "text-emerald-600 font-semibold" : "text-slate-400"}`}>
+                        <Check size={11} className={passwordCriteria.hasUpper ? "text-emerald-600" : "text-slate-300"} />
+                        <span>Uppercase letter (A-Z)</span>
+                      </div>
+                      <div className={`flex items-center gap-1 ${passwordCriteria.hasSpecial ? "text-emerald-600 font-semibold" : "text-slate-400"}`}>
+                        <Check size={11} className={passwordCriteria.hasSpecial ? "text-emerald-600" : "text-slate-300"} />
+                        <span>Special character (!@#$)</span>
+                      </div>
+                    </div>
+
+                    {confirmPassword && password !== confirmPassword && (
+                      <p className="text-rose-500 text-[11px] font-semibold flex items-center gap-1 pt-1">
+                        <AlertCircle size={12} />
+                        <span>Passwords do not match yet</span>
+                      </p>
+                    )}
+                    {confirmPassword && password === confirmPassword && (
+                      <p className="text-emerald-600 text-[11px] font-semibold flex items-center gap-1 pt-1">
+                        <Check size={12} />
+                        <span>Passwords match</span>
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Status summary banner */}
@@ -1874,7 +2104,7 @@ export default function RegisterPage() {
       </div>
 
       {/* ─── RIGHT COLUMN: GRAPHICS & ARTWORK SHOWCASE (PC / DESKTOP ONLY) ── */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-[52%] sticky top-0 h-screen flex-col justify-between p-10 xl:p-14 relative overflow-hidden bg-slate-950 text-white select-none border-l border-white/10">
+      <div className="hidden lg:flex lg:w-1/2 xl:w-[52%] sticky top-0 h-screen flex-col justify-between p-6 xl:p-10 relative overflow-hidden bg-slate-950 text-white select-none border-l border-white/10">
         {/* Background Fantasy Island Image with Gradient */}
         <div
           className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 hover:scale-105"
@@ -1888,8 +2118,8 @@ export default function RegisterPage() {
         <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
 
         {/* Center Visual Art & Role-Specific Narrative */}
-        <div className="relative z-10 my-auto flex flex-col items-center text-center max-w-lg mx-auto py-6">
-          <div className="mb-6 flex justify-center">
+        <div className="relative z-10 my-auto flex flex-col items-center text-center max-w-md mx-auto py-2">
+          <div className="mb-4 flex justify-center">
             <img
               src={
                 selectedRole === "student"
@@ -1899,11 +2129,11 @@ export default function RegisterPage() {
                   : "/monsters/Register.webp"
               }
               alt={selectedRole ? `${selectedRole} illustration` : "Trust Lesson Register Mascot"}
-              className="w-full max-w-sm xl:max-w-md h-auto object-contain animate-float drop-shadow-2xl select-none"
+              className="w-48 sm:w-56 xl:w-64 max-h-[32vh] h-auto object-contain animate-float drop-shadow-2xl select-none"
             />
           </div>
 
-          <h2 className="text-2xl xl:text-3xl font-black text-white tracking-tight leading-tight">
+          <h2 className="text-xl xl:text-2xl font-black text-white tracking-tight leading-tight">
             {selectedRole === "student"
               ? "Supercharge Your Learning with Zero Risk"
               : selectedRole === "mentor"
@@ -1911,7 +2141,7 @@ export default function RegisterPage() {
               : "Decentralized P2P Learning Protocol"}
           </h2>
 
-          <p className="text-purple-200/80 text-xs xl:text-sm mt-3 leading-relaxed">
+          <p className="text-purple-200/80 text-xs xl:text-sm mt-2 leading-relaxed">
             {selectedRole === "student"
               ? "Book 1-on-1 mentorship sessions where your USDC is locked securely in smart escrow until you confirm deliverable completion."
               : selectedRole === "mentor"
@@ -1921,20 +2151,20 @@ export default function RegisterPage() {
         </div>
 
         {/* Bottom Feature Badges */}
-        <div className="relative z-10 grid grid-cols-3 gap-3 pt-4 border-t border-white/10 text-left">
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
+        <div className="relative z-10 grid grid-cols-3 gap-2.5 pt-3 border-t border-white/10 text-left">
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
             <p className="text-emerald-400 font-extrabold text-xs">EscrowRouter</p>
             <p className="text-white/60 text-[10px] mt-0.5 leading-snug">
               Locks deposit until you confirm completion
             </p>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
             <p className="text-purple-400 font-extrabold text-xs">Soulbound SBT</p>
             <p className="text-white/60 text-[10px] mt-0.5 leading-snug">
               Permanent non-transferable certificate credentials
             </p>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
             <p className="text-amber-400 font-extrabold text-xs">Mentor Staking</p>
             <p className="text-white/60 text-[10px] mt-0.5 leading-snug">
               100 USDC commitment & slashing protection

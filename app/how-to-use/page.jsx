@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Footer from "@/src/components/Footer";
 import Reveal from "@/src/components/Reveal";
@@ -43,6 +43,14 @@ import {
 export default function HowToUsePage() {
   const [openFaq, setOpenFaq] = useState(null);
   const [activeGuideTab, setActiveGuideTab] = useState("student"); // "student" | "mentor"
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.title = activeGuideTab === "student"
+        ? "Student Escrow Guide | Trust Lesson"
+        : "Mentor Onboarding Guide | Trust Lesson";
+    }
+  }, [activeGuideTab]);
 
   const toggleFaq = (idx) => {
     setOpenFaq(openFaq === idx ? null : idx);

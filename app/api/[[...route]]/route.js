@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { verifyJwt, signJwt, extractBearerToken } from "@/lib/jwt";
+import { verifyJwt, signJwt, signAccessToken, signRefreshToken, verifyRefreshToken, extractBearerToken } from "@/lib/jwt";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { getCloudflareUploadUrl, getSignedPlaybackUrl, getSignedPlaybackToken } from "@/lib/cloudflare";
 import { uploadResourceToR2, getPresignedR2DownloadUrl, verifyAndGetDevResource } from "@/lib/cloudflareR2";
@@ -10,6 +10,9 @@ import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, PLATFORM_SPON
 import { getActiveNetwork } from "@/lib/networkConfig";
 import { calculateMentorScore, isJurorEligible, calculateStudentScore } from "@/lib/leaderboardScore";
 import { sendWelcomeEmail, sendTransactionReceiptEmail, sendNewMaterialEmail } from "@/lib/resend";
+import { generateCaptcha, verifyCaptcha } from "@/lib/captcha";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { checkRateLimit, recordFailedAttempt, resetRateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -50,19 +53,67 @@ async function getPrisma() {
 
 
 // ════════════════════════════════════════════════════════════════════
-// AUTH ROUTES (Email/Password + SIWE Web3)
+// AUTH ROUTES (Email/Password + SIWE Web3 + Captcha)
 // ════════════════════════════════════════════════════════════════════
 
-/** POST /api/auth/login — Email + Password Login */
+/** GET /api/auth/captcha — Generate Visual SVG Captcha */
+app.get("/auth/captcha", async (c) => {
+  const captcha = generateCaptcha();
+  return c.json(captcha);
+});
+
+/** POST /api/auth/login — Email + Password Login with Turnstile & Dual Tokens */
 app.post("/auth/login", async (c) => {
-  const { email, password, rememberMe } = await c.req.json();
+  const clientIp = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || c.req.header("x-real-ip") || "127.0.0.1";
+  const body = await c.req.json().catch(() => ({}));
+  const { email, password, rememberMe, turnstileToken, captchaId, captchaAnswer } = body;
+
   if (!email || !password) {
     return c.json({ error: "Email and password are required" }, 400);
   }
 
+  const cleanEmail = email.toLowerCase().trim();
+
+  // 1. Sliding Window Rate Limiting (IP & Email level)
+  const ipLimit = checkRateLimit(`ip:${clientIp}`);
+  if (!ipLimit.allowed) {
+    return c.json({
+      error: `Too many login attempts from this network. Please wait ${ipLimit.retryAfterSeconds} seconds before trying again.`,
+      retryAfter: ipLimit.retryAfterSeconds,
+    }, 429);
+  }
+
+  const emailLimit = checkRateLimit(`email:${cleanEmail}`);
+  if (!emailLimit.allowed) {
+    return c.json({
+      error: `Too many login attempts for this account. Please wait ${emailLimit.retryAfterSeconds} seconds before trying again.`,
+      retryAfter: emailLimit.retryAfterSeconds,
+    }, 429);
+  }
+
+  // 2. Cloudflare Turnstile Bot Verification (with backward-compatible visual captcha fallback)
+  if (turnstileToken) {
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken, clientIp);
+    if (!turnstileCheck.success) {
+      recordFailedAttempt(`ip:${clientIp}`);
+      recordFailedAttempt(`email:${cleanEmail}`);
+      return c.json({ error: turnstileCheck.error || "Turnstile security check failed." }, 400);
+    }
+  } else if (captchaId && captchaAnswer) {
+    const captchaCheck = verifyCaptcha(captchaId, captchaAnswer);
+    if (!captchaCheck.valid) {
+      recordFailedAttempt(`ip:${clientIp}`);
+      recordFailedAttempt(`email:${cleanEmail}`);
+      return c.json({ error: captchaCheck.reason || "Invalid captcha verification code." }, 400);
+    }
+  } else {
+    recordFailedAttempt(`ip:${clientIp}`);
+    recordFailedAttempt(`email:${cleanEmail}`);
+    return c.json({ error: "Security bot verification is required." }, 400);
+  }
+
   try {
     const db = await getPrisma();
-    const cleanEmail = email.toLowerCase().trim();
     const adminEmails = (process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
     const isAdminEmail = adminEmails.includes(cleanEmail);
     let user = await db.user.findUnique({
@@ -70,13 +121,21 @@ app.post("/auth/login", async (c) => {
     });
 
     if (!user) {
+      recordFailedAttempt(`ip:${clientIp}`);
+      recordFailedAttempt(`email:${cleanEmail}`);
       return c.json({ error: "Invalid email or password" }, 401);
     }
 
     const isValid = verifyPassword(password, user.passwordHash);
     if (!isValid) {
+      recordFailedAttempt(`ip:${clientIp}`);
+      recordFailedAttempt(`email:${cleanEmail}`);
       return c.json({ error: "Invalid email or password" }, 401);
     }
+
+    // Reset rate limits on successful authentication
+    resetRateLimit(`ip:${clientIp}`);
+    resetRateLimit(`email:${cleanEmail}`);
 
     // Auto-elevate designated admin emails if not already set
     if (isAdminEmail && (user.role !== "ADMIN" || !user.isJuror)) {
@@ -93,25 +152,33 @@ app.post("/auth/login", async (c) => {
     }
 
     const isRemember = Boolean(rememberMe);
-    const expiresIn = isRemember ? "30d" : "1d";
-    const token = await signJwt(
-      {
-        sub: user.id,
-        email: user.email,
-        address: user.walletAddress,
-        role: user.role,
-        tv: user.tokenVersion || 1,
-      },
-      expiresIn
-    );
+    const tokenPayload = {
+      sub: user.id,
+      email: user.email,
+      address: user.walletAddress,
+      role: user.role,
+      tv: user.tokenVersion || 1,
+    };
 
-    // Set secure HttpOnly cookie to protect against XSS
-    setCookie(c, "tl_session", token, {
+    // Issue short-lived Access Token (15m) + long-lived Refresh Token (7d / 30d)
+    const accessToken = await signAccessToken(tokenPayload);
+    const refreshToken = await signRefreshToken(tokenPayload, isRemember);
+
+    // Set secure HttpOnly cookies
+    setCookie(c, "tl_session", accessToken, {
       path: "/",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "Lax",
-      maxAge: isRemember ? 30 * 24 * 60 * 60 : 24 * 60 * 60,
+      maxAge: 15 * 60, // 15 minutes
+    });
+
+    setCookie(c, "tl_refresh", refreshToken, {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: isRemember ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60,
     });
 
     let userNickname = null;
@@ -121,7 +188,7 @@ app.post("/auth/login", async (c) => {
     } catch {}
 
     return c.json({
-      token,
+      token: accessToken,
       user: {
         id: user.id,
         email: user.email,
@@ -147,6 +214,83 @@ app.post("/auth/login", async (c) => {
     console.error("[Login Error]:", e);
     return c.json({ error: "Database error during login", detail: e.message }, 500);
   }
+});
+
+/** POST /api/auth/refresh — Silent Access Token Refresh with Rotation */
+app.post("/auth/refresh", async (c) => {
+  const refreshToken = getCookie(c, "tl_refresh") || extractBearerToken(c.req.header("Authorization"));
+  if (!refreshToken) {
+    return c.json({ error: "No refresh token provided" }, 401);
+  }
+
+  try {
+    const payload = await verifyRefreshToken(refreshToken);
+    const db = await getPrisma();
+    const user = await db.user.findUnique({ where: { id: payload.sub } });
+    if (!user) {
+      deleteCookie(c, "tl_session", { path: "/" });
+      deleteCookie(c, "tl_refresh", { path: "/" });
+      return c.json({ error: "User not found" }, 401);
+    }
+
+    // Token version check for revocation
+    if ((user.tokenVersion || 1) !== payload.tv) {
+      deleteCookie(c, "tl_session", { path: "/" });
+      deleteCookie(c, "tl_refresh", { path: "/" });
+      return c.json({ error: "Session has been revoked. Please sign in again." }, 401);
+    }
+
+    const tokenPayload = {
+      sub: user.id,
+      email: user.email,
+      address: user.walletAddress,
+      role: user.role,
+      tv: user.tokenVersion || 1,
+    };
+
+    const newAccessToken = await signAccessToken(tokenPayload);
+    const newRefreshToken = await signRefreshToken(tokenPayload, false);
+
+    // Rotate cookies
+    setCookie(c, "tl_session", newAccessToken, {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 15 * 60,
+    });
+
+    setCookie(c, "tl_refresh", newRefreshToken, {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 7 * 24 * 60 * 60,
+    });
+
+    return c.json({
+      token: newAccessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        walletAddress: user.walletAddress,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (err) {
+    deleteCookie(c, "tl_session", { path: "/" });
+    deleteCookie(c, "tl_refresh", { path: "/" });
+    return c.json({ error: "Invalid or expired refresh token" }, 401);
+  }
+});
+
+/** POST /api/auth/logout — Invalidate Session and Clear Cookies */
+app.post("/auth/logout", async (c) => {
+  deleteCookie(c, "tl_session", { path: "/" });
+  deleteCookie(c, "tl_refresh", { path: "/" });
+  return c.json({ success: true, message: "Logged out successfully" });
 });
 
 /** POST /api/auth/google — Authentic Google Identity OAuth Login / Registration */
