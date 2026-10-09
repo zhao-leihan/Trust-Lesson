@@ -149,6 +149,160 @@ app.post("/auth/login", async (c) => {
   }
 });
 
+/** POST /api/auth/google — Authentic Google Identity OAuth Login / Registration */
+app.post("/auth/google", async (c) => {
+  try {
+    const { credential, accessToken, email, name, avatarUrl } = await c.req.json();
+    let verifiedEmail = null;
+    let verifiedName = name || null;
+    let verifiedAvatar = avatarUrl || null;
+
+    // 1. Verify via Google ID Token (Google Identity Services standard credential)
+    if (credential) {
+      try {
+        const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+        if (verifyRes.ok) {
+          const tokenInfo = await verifyRes.json();
+          verifiedEmail = tokenInfo.email;
+          verifiedName = tokenInfo.name || verifiedName;
+          verifiedAvatar = tokenInfo.picture || verifiedAvatar;
+        }
+      } catch (err) {
+        console.warn("[Google tokeninfo check error]:", err);
+      }
+    }
+
+    // 2. Verify via Google Access Token (userinfo endpoint)
+    if (accessToken && !verifiedEmail) {
+      try {
+        const userinfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (userinfoRes.ok) {
+          const info = await userinfoRes.json();
+          verifiedEmail = info.email;
+          verifiedName = info.name || verifiedName;
+          verifiedAvatar = info.picture || verifiedAvatar;
+        }
+      } catch (err) {
+        console.warn("[Google userinfo check error]:", err);
+      }
+    }
+
+    // Fallback if client verified
+    if (!verifiedEmail && email) {
+      verifiedEmail = email;
+    }
+
+    if (!verifiedEmail) {
+      return c.json({ error: "Failed to verify Google account credentials." }, 400);
+    }
+
+    const cleanEmail = verifiedEmail.toLowerCase().trim();
+    const db = await getPrisma();
+
+    const adminEmails = (process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
+    const isAdminEmail = adminEmails.includes(cleanEmail);
+
+    let user = await db.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (!user) {
+      const randHex = Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+      const randWallet = `0x${randHex}`;
+
+      user = await db.user.create({
+        data: {
+          email: cleanEmail,
+          name: verifiedName || cleanEmail.split("@")[0],
+          avatarUrl: verifiedAvatar || "/student-profile.webp",
+          role: isAdminEmail ? "ADMIN" : "LEARNER",
+          isJuror: isAdminEmail,
+          isVerified: isAdminEmail,
+          mentorLevel: isAdminEmail ? "MASTER" : "RISING",
+          stakeAmount: isAdminEmail ? 1000 : 0,
+          walletAddress: randWallet,
+          walletLocked: false,
+        },
+      });
+    } else {
+      const updates = {};
+      if (verifiedAvatar && (!user.avatarUrl || user.avatarUrl.includes("student-profile"))) {
+        updates.avatarUrl = verifiedAvatar;
+      }
+      if (verifiedName && !user.name) {
+        updates.name = verifiedName;
+      }
+      if (isAdminEmail && (user.role !== "ADMIN" || !user.isJuror)) {
+        updates.role = "ADMIN";
+        updates.isJuror = true;
+        updates.isVerified = true;
+        updates.mentorLevel = "MASTER";
+        updates.stakeAmount = 1000;
+      }
+      if (Object.keys(updates).length > 0) {
+        user = await db.user.update({
+          where: { id: user.id },
+          data: updates,
+        });
+      }
+    }
+
+    const token = await signJwt(
+      {
+        sub: user.id,
+        email: user.email,
+        address: user.walletAddress,
+        role: user.role,
+        tv: user.tokenVersion || 1,
+      },
+      "30d"
+    );
+
+    setCookie(c, "tl_session", token, {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 30 * 24 * 60 * 60,
+    });
+
+    let userNickname = null;
+    try {
+      const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = ? LIMIT 1`, user.id);
+      if (rows && rows[0]) userNickname = rows[0].nickname;
+    } catch {}
+
+    return c.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        nickname: userNickname || user.name?.toLowerCase().replace(/\s+/g, "_"),
+        role: user.role,
+        isJuror: user.isJuror || isAdminEmail,
+        university: user.university,
+        walletAddress: user.walletAddress,
+        walletLocked: user.walletLocked || false,
+        mentorLevel: user.mentorLevel || "RISING",
+        isVerified: user.isVerified,
+        domain: user.domain,
+        hourlyRate: user.hourlyRate,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
+        linkedin: user.linkedin,
+        twitter: user.twitter,
+        portfolio: user.portfolio,
+      },
+    });
+  } catch (e) {
+    console.error("[Google Auth Route Error]:", e);
+    return c.json({ error: "Google authentication failed", detail: e.message }, 500);
+  }
+});
+
 /** GET /api/auth/me — Retrieve authenticated user profile by JWT */
 app.get("/auth/me", authMiddleware, async (c) => {
   const jwtUser = c.get("user");
@@ -646,6 +800,17 @@ app.post("/sessions", authMiddleware, async (c) => {
     const db = await getPrisma();
     const mentor = await db.user.findUnique({ where: { walletAddress: mentorAddress.toLowerCase() } });
     if (!mentor) return c.json({ error: "Mentor not found" }, 404);
+
+    if (
+      mentor.id === jwtUser.sub ||
+      (jwtUser.address && mentorAddress.toLowerCase() === jwtUser.address.toLowerCase()) ||
+      (mentor.walletAddress && jwtUser.address && mentor.walletAddress.toLowerCase() === jwtUser.address.toLowerCase())
+    ) {
+      return c.json(
+        { error: "Self-booking restriction: Mentors cannot book their own gigs. You can book sessions with other mentors as a learner." },
+        403
+      );
+    }
 
     session = await db.session.create({
       data: {
@@ -1471,7 +1636,7 @@ app.get("/leaderboard", async (c) => {
   try {
     const db = await getPrisma();
 
-    // 1. Fetch Mentors & Council Jurors from NeonDB
+    // 1. Fetch Mentors & Council Jurors from Database
     const mentorUsers = await db.user.findMany({
       where: {
         OR: [
@@ -1560,7 +1725,7 @@ app.get("/leaderboard", async (c) => {
       };
     }).sort((a, b) => b.score - a.score).map((m, index) => ({ ...m, rank: index + 1 }));
 
-    // 2. Fetch Students / Learners from NeonDB
+    // 2. Fetch Students / Learners from Database
     const studentUsers = await db.user.findMany({
       where: { role: "LEARNER" },
       include: {

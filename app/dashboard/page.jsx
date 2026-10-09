@@ -131,12 +131,14 @@ export default function DashboardPage() {
     );
   }
 
+  const currentMode = activeRole || (isMentor ? "mentor" : "student");
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <div className="pt-24 sm:pt-28 pb-12 px-3 sm:px-6 flex-1">
         <div className="max-w-6xl mx-auto animate-fadeInUp">
-          {isMentor ? (
-            <MentorDashboardView user={user} />
+          {currentMode === "mentor" ? (
+            <MentorDashboardView user={user} isJurorMentor={user.isJuror} />
           ) : (
             <StudentDashboardView user={user} />
           )}
@@ -980,7 +982,7 @@ function AdminDashboardView({ user }) {
 // MENTOR DASHBOARD VIEW (Live Database Connection - Zero Mockup)
 // =============================================================
 function MentorDashboardView({ user }) {
-  const { portfolios, addPortfolioItem, deletePortfolioItem, connectWallet, updateUserProfile } = useAuth();
+  const { portfolios, addPortfolioItem, deletePortfolioItem, connectWallet, updateUserProfile, switchRole } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
@@ -1679,14 +1681,26 @@ function MentorDashboardView({ user }) {
           </div>
         </div>
 
-        {/* Dedicated "Create New Gig" Button Linking to Dedicated Page */}
-        <Link
-          href="/dashboard/gigs/create"
-          className="self-start sm:self-auto px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-        >
-          <PlusCircle size={16} />
-          <span>Create New Gig (3 Packages)</span>
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => switchRole("student")}
+            className="px-4 py-2.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+            title="Switch to Learner Workspace to view your enrolled courses and milestones"
+          >
+            <GraduationCap size={15} className="text-purple-600" />
+            <span>Learner Workspace</span>
+          </button>
+
+          {/* Dedicated "Create New Gig" Button Linking to Dedicated Page */}
+          <Link
+            href="/dashboard/gigs/create"
+            className="px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <PlusCircle size={16} />
+            <span>Create New Gig (3 Packages)</span>
+          </Link>
+        </div>
       </div>
 
       {/* ── Sub-Navbar Tabs ── */}
@@ -1715,11 +1729,11 @@ function MentorDashboardView({ user }) {
           {isJurorMentor && (
             <TabsTrigger
               value="juror"
-              className="flex items-center gap-2 flex-1 sm:flex-none text-xs font-bold text-purple-700 bg-purple-100/60 hover:bg-purple-100 data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all rounded-xl"
+              className="flex items-center gap-2 flex-1 sm:flex-none text-xs font-bold text-slate-900 transition-all rounded-xl"
             >
-              <Scale size={14} className="text-purple-600 group-data-[state=active]:text-white" />
+              <Scale size={14} className="text-slate-900" />
               <span>Dispute Juror</span>
-              <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-extrabold uppercase tracking-wider">
+              <span className="px-2 py-0.5 rounded-full bg-slate-950 text-white text-[9px] font-black uppercase tracking-wider">
                 Council
               </span>
             </TabsTrigger>
@@ -3171,7 +3185,7 @@ function MentorDashboardView({ user }) {
                     <ExternalLink size={13} />
                   </a>
                   <a
-                    href="https://sepolia.arbiscan.io/address/0x094E4b351272fA45613D7D093B7f3a3C20AeE795"
+                    href="https://sepolia.arbiscan.io/address/0x22f3aa08A15d24f7D274b33A234d96EDC5A98E88"
                     target="_blank"
                     rel="noreferrer"
                     className="px-4 py-2.5 rounded-2xl bg-purple-600/60 hover:bg-purple-600 border border-purple-400/40 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
@@ -3231,7 +3245,7 @@ function MentorDashboardView({ user }) {
               {loadingDisputes ? (
                 <div className="bg-white rounded-3xl border border-purple-100 p-12 text-center shadow-xs">
                   <div className="w-9 h-9 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                  <p className="text-xs font-bold text-slate-700">Connecting to NeonDB Dispute Council...</p>
+                  <p className="text-xs font-bold text-slate-700">Connecting to Dispute Council Protocol...</p>
                 </div>
               ) : jurorCases.length === 0 ? (
                 <div className="bg-white rounded-3xl border border-purple-100 p-12 text-center shadow-xs">
@@ -3626,7 +3640,7 @@ function MentorDashboardView({ user }) {
 // STUDENT DASHBOARD VIEW (With Radix UI Tabs)
 // =============================================================
 function StudentDashboardView({ user }) {
-  const { sessions, updateSessionStatus, clearAllSessions } = useAuth();
+  const { sessions, updateSessionStatus, clearAllSessions, switchRole } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
@@ -3702,17 +3716,19 @@ function StudentDashboardView({ user }) {
       {/* Student Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
         <div className="flex items-center gap-4">
-          <Avatar className="w-14 h-14 rounded-full ring-2 ring-emerald-200 shadow-xs shrink-0 overflow-hidden">
+          <Avatar className="w-14 h-14 rounded-full ring-2 ring-purple-200 shadow-xs shrink-0 overflow-hidden">
             {user.avatarUrl ? (
               <img src={user.avatarUrl} alt={user.name} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
             ) : (
-              <img src="/student-profile.webp" alt={user.name || "Student"} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
+              <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xl">
+                {user.name?.[0]?.toUpperCase() || "S"}
+              </AvatarFallback>
             )}
           </Avatar>
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="px-3 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs flex items-center gap-1.5">
-                <img src="/student-profile.webp" alt="Student" width={14} height={14} decoding="async" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+              <span className="px-3 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5">
+                <GraduationCap size={13} className="text-purple-600" />
                 <span>Student Workspace</span>
               </span>
               {user.university && (
@@ -3730,13 +3746,27 @@ function StudentDashboardView({ user }) {
           </div>
         </div>
 
-        <Link
-          href="/explore"
-          className="self-start sm:self-auto px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-purple-600 transition-all flex items-center gap-2 shadow-sm"
-        >
-          <span>Explore Mentors & Gigs</span>
-          <ArrowRight size={14} />
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {(user?.role === "mentor" || user?.role === "MENTOR" || user?.roleType === "MENTOR") && (
+            <button
+              type="button"
+              onClick={() => switchRole("mentor")}
+              className="px-4 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+              title="Return to your Mentor Workspace"
+            >
+              <Briefcase size={14} className="text-purple-600" />
+              <span>Mentor Workspace</span>
+            </button>
+          )}
+
+          <Link
+            href="/explore"
+            className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-purple-600 transition-all flex items-center gap-2 shadow-sm"
+          >
+            <span>Explore Mentors & Gigs</span>
+            <ArrowRight size={14} />
+          </Link>
+        </div>
       </div>
 
       {/* Radix UI Tabs for Student Sub-Navbar */}
@@ -3793,7 +3823,7 @@ function StudentDashboardView({ user }) {
               <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
                 {sessions.filter((s) => s.status === "released").length}
               </p>
-              <p className="text-emerald-700 text-[11px] mt-1.5 font-semibold">On-chain verified credentials</p>
+              <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">On-chain verified credentials</p>
             </div>
           </div>
         </TabsContent>
@@ -3840,8 +3870,8 @@ function StudentDashboardView({ user }) {
                       <h3 className="font-extrabold text-slate-900 text-base">{s.skill}</h3>
                       {s.txHash && (
                         <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1">
-                          <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-[10px] flex items-center gap-1">
-                            <CheckCircle2 size={11} className="text-emerald-600" />
+                          <span className="font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md text-[10px] flex items-center gap-1">
+                            <CheckCircle2 size={11} className="text-purple-600" />
                             Arbitrum Verified
                           </span>
                           <a
@@ -3866,7 +3896,7 @@ function StudentDashboardView({ user }) {
                       <span className="font-extrabold text-slate-900 text-base">${s.price}</span>
                       <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
                         s.status === "released"
-                          ? "bg-emerald-100 text-emerald-800"
+                          ? "bg-purple-100 text-purple-800"
                           : s.status === "disputed"
                           ? "bg-rose-100 text-rose-800"
                           : "bg-amber-100 text-amber-800"
@@ -3881,7 +3911,7 @@ function StudentDashboardView({ user }) {
                     <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-200">
                       <button
                         onClick={() => handleConfirmDone(s.id)}
-                        className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                        className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm shadow-purple-600/20 cursor-pointer"
                       >
                         <CheckCircle size={14} />
                         Confirm Goals Completed & Release Escrow
@@ -3898,7 +3928,7 @@ function StudentDashboardView({ user }) {
 
                   {s.status === "released" && (
                     <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <p className="text-emerald-700 text-xs font-bold flex items-center gap-1.5">
+                      <p className="text-purple-700 text-xs font-bold flex items-center gap-1.5">
                         <CheckCircle size={14} />
                         Milestone verified complete. Funds released to mentor.
                       </p>
@@ -3942,10 +3972,10 @@ function StudentDashboardView({ user }) {
               <p className="text-amber-700 text-[11px] mt-1 font-medium">Locked safely until your explicit confirmation</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100">
-              <p className="text-emerald-900/60 text-xs font-semibold">Smart Contract Guarantee</p>
-              <p className="text-emerald-950 font-extrabold text-3xl mt-1">100% Refundable</p>
-              <p className="text-emerald-700 text-[11px] mt-1 font-medium">Full refund if mentor fails milestone terms</p>
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-100">
+              <p className="text-purple-900/60 text-xs font-semibold">Smart Contract Guarantee</p>
+              <p className="text-purple-950 font-extrabold text-3xl mt-1">100% Refundable</p>
+              <p className="text-purple-700 text-[11px] mt-1 font-medium">Full refund if mentor fails milestone terms</p>
             </div>
           </div>
         </TabsContent>
@@ -4018,15 +4048,15 @@ function StudentDashboardView({ user }) {
                 <div className="p-3.5 bg-slate-900 text-white rounded-2xl text-[10px] font-mono space-y-1.5 shadow-md">
                   <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-1">
                     <span className="text-purple-300 font-bold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
                       ARBITRUM ON-CHAIN PROOF
                     </span>
-                    <span className="text-emerald-400 font-bold bg-emerald-950/80 px-2 py-0.2 rounded border border-emerald-500/30">
+                    <span className="text-purple-300 font-bold bg-purple-950/80 px-2 py-0.2 rounded border border-purple-500/30">
                       100% GAS SUBSIDIZED
                     </span>
                   </div>
                   {selectedCert.txHash && (
-                    <p className="truncate text-emerald-300">
+                    <p className="truncate text-purple-300">
                       <span className="text-slate-400">Tx Hash: </span>{selectedCert.txHash}
                     </p>
                   )}
@@ -4037,7 +4067,7 @@ function StudentDashboardView({ user }) {
                   <p className="truncate text-slate-400">
                     <span className="text-slate-500">Attestation UID: </span>{selectedCert.attestationUid}
                   </p>
-                  <p className="text-[9px] text-emerald-400/90 font-sans pt-0.5">
+                  <p className="text-[9px] text-purple-300/90 font-sans pt-0.5">
                     Gas sponsored by Trust Lesson Vault ({selectedCert.sponsorWallet ? `${selectedCert.sponsorWallet.slice(0, 10)}...` : "0x71C8...bE5b"})
                   </p>
                 </div>
@@ -4076,7 +4106,7 @@ function StudentDashboardView({ user }) {
                     }}
                     className="px-3 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    {copiedUid ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                    {copiedUid ? <Check size={14} className="text-purple-600" /> : <Copy size={14} />}
                     <span>{copiedUid ? "Copied" : "Copy"}</span>
                   </button>
                 </div>
@@ -4107,16 +4137,16 @@ function StudentProfileEditor({ user, sessions }) {
   return (
     <div className="space-y-6 animate-fadeInUp">
       {/* Header Card */}
-      <div className="p-6 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+      <div className="p-6 bg-gradient-to-br from-purple-50 to-indigo-50/60 rounded-2xl border border-purple-100 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <Avatar className="w-16 h-16 shadow-md">
-          <AvatarFallback className="bg-gradient-to-tr from-emerald-500 to-teal-600 text-white font-extrabold text-2xl">
+          <AvatarFallback className="bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-extrabold text-2xl">
             {user.name?.[0]?.toUpperCase() || "S"}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-extrabold text-slate-900 text-lg">{user.name}</h3>
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+            <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold">
               Learner
             </span>
             {saved && (
@@ -4131,7 +4161,7 @@ function StudentProfileEditor({ user, sessions }) {
 
         <button
           onClick={() => setEditing((e) => !e)}
-          className="self-start sm:self-center px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+          className="self-start sm:self-center px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-purple-600/20 shadow-sm"
         >
           <Pencil size={13} />
           <span>{editing ? "Cancel Edit" : "Edit Profile"}</span>
@@ -4151,7 +4181,7 @@ function StudentProfileEditor({ user, sessions }) {
               type="text"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-shadow"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-shadow"
             />
           </div>
 
@@ -4162,7 +4192,7 @@ function StudentProfileEditor({ user, sessions }) {
               value={formBio}
               onChange={(e) => setFormBio(e.target.value)}
               placeholder="Describe your learning goals, interests, and what you hope to achieve..."
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-shadow"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-shadow"
             />
           </div>
 
@@ -4171,7 +4201,7 @@ function StudentProfileEditor({ user, sessions }) {
             <select
               value={formDomain}
               onChange={(e) => setFormDomain(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
             >
               <option value="Frontend & Web Engineering">Frontend & Web Engineering</option>
               <option value="Web3 & Smart Contracts">Web3 & Smart Contracts</option>
@@ -4184,7 +4214,7 @@ function StudentProfileEditor({ user, sessions }) {
 
           <button
             onClick={handleSave}
-            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-purple-600/20 shadow-sm"
           >
             <Save size={13} />
             <span>Save Profile</span>
@@ -4211,10 +4241,10 @@ function StudentProfileEditor({ user, sessions }) {
 
         <div className="p-5 bg-white rounded-2xl border border-slate-200 animate-fadeInUp">
           <h4 className="font-bold text-slate-900 text-sm mb-2 flex items-center gap-1.5">
-            <Award size={14} className="text-emerald-600" />
+            <Award size={14} className="text-purple-600" />
             <span>Milestone Credentials</span>
           </h4>
-          <p className="text-emerald-700 font-extrabold text-2xl mt-1">
+          <p className="text-purple-700 font-extrabold text-2xl mt-1">
             {sessions.filter((s) => s.status === "released").length}
           </p>
           <p className="text-slate-500 text-xs mt-1">

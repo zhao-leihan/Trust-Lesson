@@ -9,7 +9,7 @@ function randomEthAddress() {
 }
 
 async function main() {
-  console.log("🔍 Checking existing accounts and injecting requested users into NeonDB...");
+  console.log("🔍 Checking existing accounts and injecting requested users into Database...");
 
   const password = "Rayhan3723";
   const passwordHash = hashPassword(password);
@@ -109,7 +109,7 @@ async function main() {
   }
 
   console.log("\n=======================================================");
-  console.log("✨ All 3 Accounts Injected Successfully into NeonDB!");
+  console.log("✨ All 3 Accounts Injected Successfully into Database!");
   console.log("   Password for all 3: Rayhan3723");
   console.log("=======================================================");
 }

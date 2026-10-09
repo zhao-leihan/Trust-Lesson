@@ -85,10 +85,22 @@ export default function BookingPage() {
   const params = useParams();
   const type = params?.type;
   const id = params?.id;
-  const { addSession, walletAddress, connectWallet } = useAuth();
+  const { addSession, walletAddress, connectWallet, user } = useAuth();
 
   const [item, setItem] = useState(null);
   const [loadingItem, setLoadingItem] = useState(true);
+
+  // Mentor cannot book their own gig, but can book sessions with other mentors
+  const isSelfMentor = Boolean(
+    item && (
+      (user && (
+        (user.id && item.mentorId && String(user.id) === String(item.mentorId)) ||
+        (user.email && item.mentorEmail && user.email.toLowerCase() === item.mentorEmail.toLowerCase()) ||
+        (user.walletAddress && item.mentorAddress && user.walletAddress.toLowerCase() === item.mentorAddress.toLowerCase())
+      )) ||
+      (walletAddress && item.mentorAddress && walletAddress.toLowerCase() === item.mentorAddress.toLowerCase())
+    )
+  );
 
   // Booking form state
   const [selectedDate, setSelectedDate] = useState("Sep 21");
@@ -387,10 +399,19 @@ export default function BookingPage() {
         await approveTx.wait(1);
       }
 
-      // 7. Execute createSession on EscrowRouter.sol
       let targetMentorAddress = item.mentorAddress;
       if (!targetMentorAddress || !ethers.isAddress(targetMentorAddress) || targetMentorAddress === ethers.ZeroAddress) {
         targetMentorAddress = "0x0db11e31a07dddec044472c7853fbbc3137f51db";
+      }
+
+      // 7.1 Verify Mentor is Not Booking Their Own Gig
+      if (
+        isSelfMentor ||
+        (studentAddress && targetMentorAddress && studentAddress.toLowerCase() === targetMentorAddress.toLowerCase())
+      ) {
+        throw new Error(
+          "Self-booking restriction: You cannot book your own mentorship gig. Mentors are only permitted to book sessions with other mentors as a learner."
+        );
       }
 
       setWeb3Step("depositing");
@@ -727,6 +748,36 @@ export default function BookingPage() {
                   <span className="text-purple-700 font-bold text-[11px] bg-white px-2.5 py-1 rounded-full border border-purple-200">
                     Live Sessions
                   </span>
+                </div>
+              )}
+
+              {/* Self-Booking Restriction Banner */}
+              {isSelfMentor && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-3 shadow-xs animate-fadeIn">
+                  <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-extrabold text-amber-950 text-sm">Self-Booking Restricted</p>
+                    <p className="text-amber-800 text-xs leading-relaxed">
+                      You are the registered mentor for this offering. Mentors cannot book their own gigs. However, you can book sessions with other mentors across the platform to learn as a learner.
+                    </p>
+                    <div className="pt-2 flex items-center gap-3 text-xs font-bold">
+                      <Link
+                        href="/dashboard?tab=courses"
+                        className="text-purple-700 hover:text-purple-900 underline flex items-center gap-1"
+                      >
+                        <span>Manage Your Gigs</span>
+                        <ArrowRight size={12} />
+                      </Link>
+                      <span className="text-amber-300">•</span>
+                      <Link
+                        href="/explore"
+                        className="text-purple-700 hover:text-purple-900 underline flex items-center gap-1"
+                      >
+                        <span>Explore Other Mentors</span>
+                        <ArrowRight size={12} />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1286,7 +1337,16 @@ export default function BookingPage() {
                 )}
 
                 {/* Deposit / Transak CTA Button */}
-                {paymentMethod === "crypto" && ((walletUsdcBalance !== null && walletUsdcBalance < grandTotal) || Boolean(insufficientBalanceInfo)) ? (
+                {isSelfMentor ? (
+                  <button
+                    type="button"
+                    disabled={true}
+                    className="w-full py-4 rounded-2xl bg-slate-100 border border-slate-200 text-slate-500 font-extrabold text-sm flex items-center justify-center gap-2 cursor-not-allowed opacity-90 transition-all shadow-xs"
+                  >
+                    <AlertTriangle size={18} className="text-amber-500 shrink-0" />
+                    <span>Self-Booking Restricted (Your Offering)</span>
+                  </button>
+                ) : paymentMethod === "crypto" && ((walletUsdcBalance !== null && walletUsdcBalance < grandTotal) || Boolean(insufficientBalanceInfo)) ? (
                   <button
                     type="button"
                     disabled={true}

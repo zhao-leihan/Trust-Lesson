@@ -23,15 +23,26 @@ import Navbar from "@/src/components/Navbar";
 import Footer from "@/src/components/Footer";
 import ExploreCard from "@/src/components/ExploreCard";
 import { CurrencyBadge, formatPriceCurrency } from "@/src/components/CurrencyBadge";
+import { useAuth } from "@/src/context/AuthContext";
 
 export default function MentorPublicProfilePage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id;
+  const { user, walletAddress } = useAuth() || {};
 
   const [mentor, setMentor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const isSelfMentor = Boolean(
+    user && mentor && (
+      (user.id && mentor.id && String(user.id) === String(mentor.id)) ||
+      (user.email && mentor.email && user.email.toLowerCase() === mentor.email.toLowerCase()) ||
+      (user.walletAddress && mentor.walletAddress && user.walletAddress.toLowerCase() === mentor.walletAddress.toLowerCase()) ||
+      (walletAddress && mentor.walletAddress && walletAddress.toLowerCase() === mentor.walletAddress.toLowerCase())
+    )
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -207,13 +218,23 @@ export default function MentorPublicProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Link
-                    href={`/book?mentor=${encodeURIComponent(mentor.id)}&price=${mentor.hourlyRate}`}
-                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-purple-600/20 active:scale-95"
-                  >
-                    <span>Book 1-on-1 Mentorship</span>
-                    <ArrowRight size={13} />
-                  </Link>
+                  {isSelfMentor ? (
+                    <Link
+                      href="/dashboard?tab=courses"
+                      className="w-full py-2.5 px-4 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <Layers size={13} />
+                      <span>Manage Your Offerings</span>
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/book/mentor/${mentor.id}`}
+                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-purple-600/20 active:scale-95"
+                    >
+                      <span>Book 1-on-1 Mentorship</span>
+                      <ArrowRight size={13} />
+                    </Link>
+                  )}
 
                   {mentor.offerings && mentor.offerings.length > 0 && (
                     <a
@@ -350,13 +371,23 @@ export default function MentorPublicProfilePage() {
                 <p className="text-slate-500 text-xs max-w-sm mx-auto">
                   {mentor.name} is currently accepting direct 1-on-1 private mentorship sessions.
                 </p>
-                <Link
-                  href={`/book/mentor/${mentor.id}`}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition-all shadow-md shadow-purple-600/20"
-                >
-                  <Calendar size={14} />
-                  <span>Book 1-on-1 Session</span>
-                </Link>
+                {isSelfMentor ? (
+                  <Link
+                    href="/dashboard?tab=courses"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-bold text-xs transition-all shadow-xs"
+                  >
+                    <Layers size={14} />
+                    <span>Manage Gigs in Dashboard</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/book/mentor/${mentor.id}`}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition-all shadow-md shadow-purple-600/20"
+                  >
+                    <Calendar size={14} />
+                    <span>Book 1-on-1 Session</span>
+                  </Link>
+                )}
               </div>
             )}
           </section>

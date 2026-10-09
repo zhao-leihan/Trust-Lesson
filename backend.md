@@ -45,7 +45,7 @@ Dokumen ini adalah panduan lengkap untuk AI Agent yang akan mengimplementasikan 
 
 ## 3. Smart Contract Architecture (Arbitrum Sepolia V2 Live)
 
-### 3.1 EscrowRouter V2 (`0x094E4b351272fA45613D7D093B7f3a3C20AeE795`)
+### 3.1 EscrowRouter V2 (`0x22f3aa08A15d24f7D274b33A234d96EDC5A98E88`)
 **State Machine:**
 ```
 0: CREATED → 1: FUNDED → 2: IN_SESSION → 3: COMPLETED
