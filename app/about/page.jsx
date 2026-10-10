@@ -11,24 +11,13 @@ const team = [
   {
     name: "Rayhan Young",
     handle: "@0xAnakMommy",
-    role: "Chief Technology Officer (CTO)",
-    tagline: "CTO & Protocol Architect",
-    badge: "CTO",
+    role: "Founder & Lead Protocol Architect",
+    tagline: "Founder & Full-Stack Architect",
+    badge: "FOUNDER & CTO",
     image: "/team/Ray.webp",
     bio: "Pioneering Arbitrum smart contract escrow vaults, decentralized milestone settlement, and secure on-chain reputation attestation.",
     glowColor: "from-purple-600/20 to-indigo-600/20",
     badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
-  },
-  {
-    name: "Janetiloy",
-    handle: "@Janetiloy",
-    role: "Chief Marketing Officer (CMO)",
-    tagline: "CMO & Global Growth Lead",
-    badge: "CMO",
-    image: "/team/janet.webp",
-    bio: "Spearheading international brand strategy, mentor community engagement, creator partnerships, and global Web3 education growth.",
-    glowColor: "from-pink-500/20 to-rose-600/20",
-    badgeColor: "bg-rose-50 text-rose-700 border-rose-200",
   },
 ];
 
@@ -141,17 +130,17 @@ export default function AboutPage() {
       <section id="team" className="py-24 max-w-5xl mx-auto px-6 text-center">
         <Reveal direction="up" className="mb-14">
           <span className="text-xs font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-3.5 py-1.5 rounded-full inline-block mb-3 border border-purple-200">
-            Our Team
+            Founder & Architect
           </span>
           <h2 className="text-slate-900 font-extrabold text-3xl sm:text-4xl">
-            Meet Our Leadership Team
+            Meet the Creator
           </h2>
           <p className="text-slate-500 text-sm sm:text-base mt-2 max-w-xl mx-auto">
-            The visionary leaders driving Trust Lesson forward to build transparent, decentralized education.
+            The visionary engineer driving Trust Lesson forward to build transparent, decentralized education.
           </p>
         </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-w-3xl mx-auto">
+        <div className="flex justify-center max-w-md mx-auto">
           {team.map((t, idx) => (
             <Reveal key={t.name} delay={idx * 150} direction="up" className="flex-1">
               <div className="bg-white rounded-3xl p-8 flex flex-col items-center text-center gap-4 border border-slate-200/80 shadow-md hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 relative overflow-hidden group">
