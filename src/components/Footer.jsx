@@ -95,14 +95,11 @@ export default function Footer() {
           {/* Column 4: Leadership & Mascot */}
           <div className="space-y-3">
             <h4 className="text-white font-extrabold text-xs uppercase tracking-wider">
-              Leadership
+              Creator
             </h4>
             <div className="space-y-2 text-xs">
               <p className="text-slate-300">
-                CTO: <span className="font-bold text-white">Rayhan Young (@0xAnakMommy)</span>
-              </p>
-              <p className="text-slate-300">
-                CMO: <span className="font-bold text-purple-300">Janetiloy (@Janetiloy)</span>
+                Founder & Architect: <span className="font-bold text-white">Rayhan Young (@0xAnakMommy)</span>
               </p>
             </div>
             
@@ -123,7 +120,7 @@ export default function Footer() {
         {/* Bottom Copyright & Security Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <p className="text-xs text-slate-500">
-            © 2026 Trust Lesson. Built by <span className="text-slate-300 font-bold">Rayhan Young</span> & <span className="text-slate-300 font-bold">Janetiloy</span>. All rights reserved.
+            © 2026 Trust Lesson. Built by <span className="text-slate-300 font-bold">Rayhan Young</span>. All rights reserved.
           </p>
 
           <div className="flex items-center gap-3">

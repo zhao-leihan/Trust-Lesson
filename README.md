@@ -181,10 +181,9 @@ Trust-Lesson/
 
 ---
 
-## Leadership & Team
+## Leadership & Creator
 
-- **Rayhan Young** — *Chief Technology Officer (CTO) & Core Protocol Architect* (`@0xAnakMommy`)
-- **Janetiloy** — *Chief Marketing Officer (CMO) & Global Growth Lead* (`@Janetiloy`)
+- **Rayhan Young** — *Founder, Lead Protocol Architect & Full-Stack Developer* (`@0xAnakMommy`)
 
 ---
 
