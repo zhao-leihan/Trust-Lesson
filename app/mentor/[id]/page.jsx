@@ -170,13 +170,17 @@ export default function MentorPublicProfilePage() {
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                      {mentor.domain || "Mentor & Educator"}
+                      {mentor.role === "LEARNER" ? "Certified Learner" : mentor.domain || "Mentor & Educator"}
                     </span>
-                    {mentor.mentorLevel && (
+                    {mentor.role === "LEARNER" ? (
+                      <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        {mentor.university || "Web3 Academy"}
+                      </span>
+                    ) : mentor.mentorLevel ? (
                       <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                         Level: {mentor.mentorLevel}
                       </span>
-                    )}
+                    ) : null}
                     {mentor.stakeAmount > 0 && (
                       <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                         <Shield size={11} /> ${mentor.stakeAmount} USDC Collateral
@@ -187,7 +191,7 @@ export default function MentorPublicProfilePage() {
                   <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                     <span>{mentor.name}</span>
                     {mentor.isVerified && (
-                      <span title="Verified Mentor on Arbitrum">
+                      <span title="Verified on Arbitrum">
                         <CheckCircle2 size={22} className="fill-emerald-500 text-white inline-block" />
                       </span>
                     )}
@@ -204,27 +208,51 @@ export default function MentorPublicProfilePage() {
 
               {/* Action / Rate Summary Card */}
               <div className="bg-purple-50/70 p-4 sm:p-5 rounded-2xl border border-purple-100 self-stretch md:self-auto flex flex-col justify-between shrink-0 space-y-3 min-w-[240px]">
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    Starting Hourly Rate
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-0.5">
-                    <span className="text-2xl font-black text-slate-900">
-                      ${mentor.hourlyRate}
+                {mentor.role === "LEARNER" ? (
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                      Learner Status
                     </span>
-                    <span className="text-xs text-slate-500 font-semibold">/ hour</span>
-                    <CurrencyBadge currency="USDC" size="sm" />
+                    <div className="flex items-baseline gap-2 mt-0.5">
+                      <span className="text-xl font-black text-slate-900">
+                        Verified Student
+                      </span>
+                    </div>
+                    <p className="text-xs text-purple-700 font-semibold mt-1">
+                      100% Escrow Milestone Protected
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                      Starting Hourly Rate
+                    </span>
+                    <div className="flex items-baseline gap-2 mt-0.5">
+                      <span className="text-2xl font-black text-slate-900">
+                        ${mentor.hourlyRate}
+                      </span>
+                      <span className="text-xs text-slate-500 font-semibold">/ hour</span>
+                      <CurrencyBadge currency="USDC" size="sm" />
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   {isSelfMentor ? (
                     <Link
-                      href="/dashboard?tab=courses"
+                      href={mentor.role === "LEARNER" ? "/dashboard?tab=overview" : "/dashboard?tab=courses"}
                       className="w-full py-2.5 px-4 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs"
                     >
                       <Layers size={13} />
-                      <span>Manage Your Offerings</span>
+                      <span>{mentor.role === "LEARNER" ? "Go to Your Dashboard" : "Manage Your Offerings"}</span>
+                    </Link>
+                  ) : mentor.role === "LEARNER" ? (
+                    <Link
+                      href="/explore"
+                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-purple-600/20 active:scale-95"
+                    >
+                      <span>Explore Mentors & Gigs</span>
+                      <ArrowRight size={13} />
                     </Link>
                   ) : (
                     <Link

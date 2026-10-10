@@ -48,6 +48,7 @@ model User {
   disputes          Dispute[]
   videoPurchases    VideoPurchase[]
   certificates      Certificate[]
+  feedbacks         Feedback[]
 }
 
 model Offering {
@@ -204,4 +205,22 @@ model Certificate {
   ipfsUrl              String?
 
   learner              User?    @relation(fields: [learnerAddress], references: [walletAddress])
+}
+
+model Feedback {
+  id         String   @id @default(uuid())
+  userId     String?
+  userName   String
+  userEmail  String?
+  userAvatar String?
+  userRole   String   @default("LEARNER") // "LEARNER" | "MENTOR"
+  rating     Int      @default(5)
+  category   String   @default("Platform Experience")
+  comment    String
+  isFeatured Boolean  @default(true)
+  status     String   @default("APPROVED") // "APPROVED" | "PENDING" | "REJECTED"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

@@ -2277,24 +2277,29 @@ app.get("/mentor/public-profile/:id", async (c) => {
       }
     }
 
+    const profileRole = mentorUser?.role || "MENTOR";
+    const isLearnerProfile = profileRole === "LEARNER";
+
     const profileData = {
       id: mentorUser?.id || id,
+      role: profileRole,
       name: mentorUser?.name || mentorOfferings[0]?.mentorName || id,
       nickname: mentorUser?.nickname || (mentorUser?.name || id).toLowerCase().replace(/\s+/g, "_"),
       avatarUrl: mentorUser?.avatarUrl || samplePhoto,
-      domain: mentorUser?.domain || mentorOfferings[0]?.category || "Fullstack & Web3 Engineer",
-      bio: mentorUser?.bio || "Experienced mentor guiding students through milestone projects with audited smart contract escrow protection.",
-      hourlyRate: Number(mentorUser?.hourlyRate) || mentorOfferings[0]?.price || 45,
+      domain: mentorUser?.domain || (isLearnerProfile ? "Web3 Student & Developer" : mentorOfferings[0]?.category || "Fullstack & Web3 Engineer"),
+      bio: mentorUser?.bio || (isLearnerProfile ? "Web3 learner exploring Solidity, decentralized escrows, and Arbitrum nitro ecosystem." : "Experienced mentor guiding students through milestone projects with audited smart contract escrow protection."),
+      university: mentorUser?.university || "Global Web3 Academy",
+      hourlyRate: isLearnerProfile ? 0 : (Number(mentorUser?.hourlyRate) || mentorOfferings[0]?.price || 45),
       stakeAmount,
       mentorLevel: mentorUser?.mentorLevel || (stakeAmount >= 300 ? "MASTER" : stakeAmount >= 100 ? "PRO" : "RISING"),
       isVerified: mentorUser?.isVerified || stakeAmount >= 100,
       skills: skillsList,
-      linkedin: mentorUser?.linkedin || "https://linkedin.com",
-      twitter: mentorUser?.twitter || "https://x.com",
-      portfolio: mentorUser?.portfolio || "https://trustlesson.io",
+      linkedin: mentorUser?.linkedin || "",
+      twitter: mentorUser?.twitter || "",
+      portfolio: mentorUser?.portfolio || "",
       walletAddress: mentorUser?.walletAddress || mentorOfferings[0]?.mentorAddress || "0x71C...49b2",
-      rating: completedSessions.length > 0 ? Number((4.8 + Math.min(0.2, completedSessions.length * 0.02)).toFixed(1)) : null,
-      reputationScore: 99,
+      rating: !isLearnerProfile && completedSessions.length > 0 ? Number((4.8 + Math.min(0.2, completedSessions.length * 0.02)).toFixed(1)) : null,
+      reputationScore: isLearnerProfile ? 100 : 99,
       sessionsCompleted,
       offerings: parsedOfferings,
     };
@@ -2649,7 +2654,7 @@ app.post("/mentor/profile", async (c) => {
     if (userId) user = await db.user.findUnique({ where: { id: userId } });
     if (!user && email) user = await db.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user && address) user = await db.user.findUnique({ where: { walletAddress: address.toLowerCase() } });
-    if (!user) user = await db.user.findFirst({ where: { role: "MENTOR" } });
+    if (!user) user = await db.user.findFirst();
 
     if (!user) {
       return c.json({ error: "User not found" }, 404);
@@ -3001,6 +3006,175 @@ app.get("/certificates/:id", async (c) => {
     });
   } catch (e) {
     return c.json({ error: "Certificate lookup error", detail: e.message }, 500);
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// FEEDBACK & USER SATISFACTION ROUTES
+// ════════════════════════════════════════════════════════════════════
+
+/** GET /api/feedbacks — Public: Get verified user satisfaction feedbacks */
+app.get("/feedbacks", async (c) => {
+  try {
+    const db = await getPrisma();
+    const feedbacks = await db.feedback.findMany({
+      where: { status: "APPROVED" },
+      orderBy: [
+        { isFeatured: "desc" },
+        { createdAt: "desc" },
+      ],
+      take: 12,
+    });
+    return c.json({ feedbacks });
+  } catch (e) {
+    return c.json({ feedbacks: [], error: e.message }, 500);
+  }
+});
+
+/** POST /api/feedbacks — Submit user satisfaction feedback */
+app.post("/feedbacks", async (c) => {
+  try {
+    const body = await c.req.json();
+    const {
+      rating,
+      category,
+      comment,
+      userName,
+      userEmail,
+      userRole,
+      userAvatar,
+      userId,
+    } = body;
+
+    if (!comment || !comment.trim()) {
+      return c.json({ error: "Comment is required" }, 400);
+    }
+
+    const numericRating = Math.max(1, Math.min(5, Number(rating) || 5));
+
+    const db = await getPrisma();
+    
+    // Look up user if userId or userEmail is provided
+    let matchedUserId = userId || null;
+    let fallbackName = userName || "Community Member";
+    let fallbackAvatar = userAvatar || null;
+    let fallbackRole = userRole || "LEARNER";
+
+    if (!matchedUserId && userEmail) {
+      const u = await db.user.findUnique({ where: { email: userEmail } });
+      if (u) {
+        matchedUserId = u.id;
+        fallbackName = u.name || fallbackName;
+        fallbackAvatar = u.avatarUrl || fallbackAvatar;
+        fallbackRole = u.role || fallbackRole;
+      }
+    } else if (matchedUserId) {
+      const u = await db.user.findUnique({ where: { id: matchedUserId } });
+      if (u) {
+        fallbackName = u.name || fallbackName;
+        fallbackAvatar = u.avatarUrl || fallbackAvatar;
+        fallbackRole = u.role || fallbackRole;
+      }
+    }
+
+    const feedback = await db.feedback.create({
+      data: {
+        userId: matchedUserId,
+        userName: fallbackName,
+        userEmail: userEmail || null,
+        userAvatar: fallbackAvatar,
+        userRole: fallbackRole,
+        rating: numericRating,
+        category: category || "Platform Experience",
+        comment: comment.trim(),
+        isFeatured: true,
+        status: "APPROVED",
+      },
+    });
+
+    return c.json({ success: true, feedback }, 201);
+  } catch (e) {
+    console.error("[Submit Feedback Error]:", e);
+    return c.json({ error: "Failed to submit feedback", detail: e.message }, 500);
+  }
+});
+
+/** GET /api/admin/feedbacks — Admin: Fetch all feedbacks with statistics */
+app.get("/admin/feedbacks", async (c) => {
+  try {
+    const db = await getPrisma();
+    const feedbacks = await db.feedback.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    const totalCount = feedbacks.length;
+    const avgRating = totalCount > 0
+      ? (feedbacks.reduce((sum, f) => sum + f.rating, 0) / totalCount).toFixed(1)
+      : "5.0";
+
+    const ratingDistribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    feedbacks.forEach((f) => {
+      if (ratingDistribution[f.rating] !== undefined) {
+        ratingDistribution[f.rating]++;
+      }
+    });
+
+    return c.json({
+      feedbacks,
+      stats: {
+        totalCount,
+        avgRating: Number(avgRating),
+        ratingDistribution,
+        approvedCount: feedbacks.filter((f) => f.status === "APPROVED").length,
+      },
+    });
+  } catch (e) {
+    return c.json({ feedbacks: [], error: e.message }, 500);
+  }
+});
+
+/** PATCH /api/admin/feedbacks/:id — Admin: Toggle featured or update status */
+app.patch("/admin/feedbacks/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const db = await getPrisma();
+
+    const data = {};
+    if (body.isFeatured !== undefined) data.isFeatured = Boolean(body.isFeatured);
+    if (body.status !== undefined) data.status = String(body.status);
+
+    const updated = await db.feedback.update({
+      where: { id },
+      data,
+    });
+
+    return c.json({ success: true, feedback: updated });
+  } catch (e) {
+    return c.json({ error: "Failed to update feedback", detail: e.message }, 500);
+  }
+});
+
+/** DELETE /api/admin/feedbacks/:id — Admin: Delete feedback */
+app.delete("/admin/feedbacks/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const db = await getPrisma();
+    await db.feedback.delete({ where: { id } });
+    return c.json({ success: true, message: "Feedback removed" });
+  } catch (e) {
+    return c.json({ error: "Failed to delete feedback", detail: e.message }, 500);
   }
 });
 

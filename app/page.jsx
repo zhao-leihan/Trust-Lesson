@@ -5,7 +5,6 @@ import {
   Zap,
   Globe,
   ArrowRight,
-  CheckCircle,
   Sparkles,
   Lock,
   Layers,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import Reveal from "../src/components/Reveal";
 import EcosystemLogos from "../src/components/EcosystemLogos";
+import CommunityFeedbacks from "../src/components/CommunityFeedbacks";
 import Footer from "../src/components/Footer";
 
 const monsterCards = [
@@ -44,29 +44,6 @@ const monsterCards = [
     tag: "Escrow Protection",
     title: "100% dispute-safe payments",
     desc: "Zero upfront ghosting or withheld payments. If expectations aren't met, fair mediation protects both mentors and learners.",
-  },
-];
-
-const monsterMoments = [
-  {
-    image: "/monsters/hello.webp",
-    bubble: "Hi there! Ready to build your dream app today?",
-    author: "Frontend Guild",
-  },
-  {
-    image: "/monsters/cool-pose.webp",
-    bubble: "Just passed my system design interview with 5 stars!",
-    author: "Career Accelerator",
-  },
-  {
-    image: "/monsters/suprized.webp",
-    bubble: "Whoa, platform fee is only 5%? Mentors keep the rest!",
-    author: "Mentor Network",
-  },
-  {
-    image: "/monsters/happy.webp",
-    bubble: "My escrow payment unlocked right after our pairing session!",
-    author: "Verified Student",
   },
 ];
 
@@ -205,48 +182,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SECTION 3: COMMUNITY TESTIMONIALS & MASCOTS */}
-      <section className="py-20 bg-purple-50/50 border-y border-purple-100">
-        <div className="max-w-7xl mx-auto px-6 sm:px-12">
-          <Reveal direction="up" className="text-center mb-14">
-            <span className="text-xs font-bold uppercase tracking-wider text-purple-700 bg-purple-100 px-3 py-1 rounded-full border border-purple-200">
-              Community Vibes
-            </span>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-950 mt-2">
-              Why Learners & Mentors Love Trust lesson
-            </h2>
-          </Reveal>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {monsterMoments.map((item, idx) => (
-              <Reveal key={idx} delay={idx * 100} direction="up">
-                <div className="bg-white border border-purple-200 rounded-3xl p-6 flex flex-col justify-between h-full shadow-sm hover:shadow-md hover:border-purple-300 transition-all">
-                  {/* Mascot head */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <img
-                      src={item.image}
-                      alt={item.author}
-                      className="w-12 h-12 object-contain rounded-full bg-purple-50 p-1 border border-purple-200"
-                    />
-                    <div>
-                      <p className="text-slate-900 font-bold text-xs">{item.author}</p>
-                      <span className="text-[10px] text-purple-700 font-semibold flex items-center gap-1">
-                        <CheckCircle size={10} className="text-emerald-500" />
-                        Verified Member
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Speech bubble */}
-                  <div className="relative bg-purple-50 rounded-2xl p-4 border border-purple-200 text-xs text-purple-950 leading-relaxed font-semibold">
-                    "{item.bubble}"
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* SECTION 3: COMMUNITY TESTIMONIALS & AUTHENTIC USER SATISFACTION */}
+      <CommunityFeedbacks />
 
       {/* SECTION 4: HOW TRUST ESCROW WORKS */}
       <section className="bg-white py-24 max-w-6xl mx-auto px-6 sm:px-12">
