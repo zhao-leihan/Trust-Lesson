@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import {
   seedInitialDataIfNeeded,
   getLocalGigs,
@@ -224,62 +224,143 @@ export function AuthProvider({ children }) {
     initDb();
   }, [user?.email, mounted]);
 
+  // ─── EIP-6963: Multi-Injected Provider Discovery (MetaMask vs Coinbase) ──
+  const eip6963ProvidersRef = useRef(new Map());
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const onAnnounceProvider = (event) => {
+      const { info, provider } = event.detail || {};
+      if (info && provider) {
+        eip6963ProvidersRef.current.set(info.rdns || info.name || info.uuid, { info, provider });
+      }
+    };
+
+    window.addEventListener("eip6963:announceProvider", onAnnounceProvider);
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+
+    return () => {
+      window.removeEventListener("eip6963:announceProvider", onAnnounceProvider);
+    };
+  }, []);
+
+  const getWalletProvider = (walletType = "any") => {
+    if (typeof window === "undefined") return null;
+
+    const announced = Array.from(eip6963ProvidersRef.current.values());
+
+    if (walletType === "metamask") {
+      // 1. EIP-6963 Announcement
+      const eipMatch = announced.find(
+        (p) =>
+          p.info?.rdns === "io.metamask" ||
+          p.info?.name?.toLowerCase().includes("metamask")
+      );
+      if (eipMatch?.provider) return eipMatch.provider;
+
+      // 2. window.ethereum.providers array
+      if (window.ethereum?.providers?.length) {
+        const mm = window.ethereum.providers.find(
+          (p) => p.isMetaMask && !p.isCoinbaseWallet && !p.isBraveWallet
+        );
+        if (mm) return mm;
+      }
+
+      // 3. ProviderMap
+      if (window.ethereum?.providerMap?.get?.("MetaMask")) {
+        return window.ethereum.providerMap.get("MetaMask");
+      }
+
+      // 4. Standalone window.ethereum ONLY if it's genuinely MetaMask and NOT Coinbase
+      if (window.ethereum?.isMetaMask && !window.ethereum?.isCoinbaseWallet) {
+        return window.ethereum;
+      }
+
+      return null;
+    }
+
+    if (walletType === "coinbase") {
+      // 1. EIP-6963 Announcement
+      const eipMatch = announced.find(
+        (p) =>
+          p.info?.rdns === "com.coinbase.wallet" ||
+          p.info?.name?.toLowerCase().includes("coinbase")
+      );
+      if (eipMatch?.provider) return eipMatch.provider;
+
+      // 2. Direct Coinbase Wallet extension provider (bypasses evmAsk conflicts)
+      if (window.coinbaseWalletExtension) return window.coinbaseWalletExtension;
+
+      // 3. window.ethereum.providers array
+      if (window.ethereum?.providers?.length) {
+        const cb = window.ethereum.providers.find(
+          (p) => p.isCoinbaseWallet || p.isCoinbaseBrowser
+        );
+        if (cb) return cb;
+      }
+
+      // 4. Standalone window.ethereum if marked as Coinbase
+      if (window.ethereum?.isCoinbaseWallet) return window.ethereum;
+
+      return null;
+    }
+
+    // Default "any"
+    if (window.ethereum?.providers?.length) return window.ethereum.providers[0];
+    return window.ethereum || window.coinbaseWalletExtension || null;
+  };
+
   // ─── Wallet Connection (MetaMask / Coinbase / SIWE) ────────────────────────
   const connectWallet = async (walletType = "any") => {
     let address = null;
+    const targetProvider = getWalletProvider(walletType);
 
-    if (typeof window !== "undefined") {
-      let targetProvider = null;
-
-      if (window.ethereum?.providers?.length) {
-        if (walletType === "coinbase") {
-          targetProvider = window.ethereum.providers.find((p) => p.isCoinbaseWallet) || window.coinbaseWalletExtension;
-        } else if (walletType === "metamask") {
-          targetProvider = window.ethereum.providers.find((p) => p.isMetaMask && !p.isCoinbaseWallet);
+    if (targetProvider) {
+      try {
+        const accounts = await targetProvider.request({ method: "eth_requestAccounts" });
+        if (accounts && accounts[0]) {
+          address = accounts[0];
         }
-        if (!targetProvider) targetProvider = window.ethereum.providers[0];
-      } else if (walletType === "coinbase" && window.coinbaseWalletExtension) {
-        targetProvider = window.coinbaseWalletExtension;
-      } else if (window.ethereum) {
-        targetProvider = window.ethereum;
-      }
-
-      if (targetProvider) {
-        try {
-          const accounts = await targetProvider.request({ method: "eth_requestAccounts" });
-          if (accounts && accounts[0]) address = accounts[0];
-        } catch (err) {
-          console.warn(`[${walletType}] Wallet connection rejected, using simulated wallet`, err);
+      } catch (err) {
+        if (err.code === 4001 || err.message?.includes("User rejected")) {
+          throw new Error("Connection request was cancelled in your wallet.");
         }
+        console.warn(`[${walletType}] Wallet request error:`, err);
+        throw new Error(err.message || `Failed to connect with ${walletType}`);
       }
+    } else if (walletType !== "any") {
+      const name = walletType === "coinbase" ? "Coinbase Wallet" : "MetaMask";
+      throw new Error(
+        `${name} extension is not detected in your browser. Please install or unlock ${name}, or enter your address manually.`
+      );
+    } else {
+      throw new Error("No Web3 wallet extension detected. Please install MetaMask or Coinbase Wallet, or enter your address manually.");
     }
 
     if (!address) {
-      // Dev fallback: simulated wallet with distinct address per wallet provider
-      address =
-        walletType === "coinbase"
-          ? "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
-          : "0x71C35267243395B796b42f654b423984E0F449A";
+      throw new Error("No wallet address returned from provider.");
     }
 
-    setWalletAddress(address);
-    localStorage.setItem("trust_lesson_wallet", address);
+    const cleanAddress = address.trim().toLowerCase();
+    setWalletAddress(cleanAddress);
+    localStorage.setItem("trust_lesson_wallet", cleanAddress);
 
-    // SIWE authentication flow if API is configured
-    if (USE_API) {
+    // Run SIWE login ONLY if no user is currently logged in
+    if (USE_API && !user) {
       try {
         const { nonce } = await apiFetch("/auth/nonce", {
           method: "POST",
-          body: JSON.stringify({ address }),
+          body: JSON.stringify({ address: cleanAddress }),
         });
 
         let signature = "dev-signature";
-        if (typeof window !== "undefined" && targetProvider) {
+        if (targetProvider) {
           try {
-            const message = `Trust Lesson Login\nAddress: ${address}\nNonce: ${nonce}`;
+            const message = `Trust Lesson Login\nAddress: ${cleanAddress}\nNonce: ${nonce}`;
             signature = await targetProvider.request({
               method: "personal_sign",
-              params: [message, address],
+              params: [message, cleanAddress],
             });
           } catch {
             signature = "dev-signature";
@@ -288,18 +369,18 @@ export function AuthProvider({ children }) {
 
         const { token, user: apiUser } = await apiFetch("/auth/verify", {
           method: "POST",
-          body: JSON.stringify({ address, signature, nonce }),
+          body: JSON.stringify({ address: cleanAddress, signature, nonce }),
         });
 
         localStorage.setItem("tl_jwt", token);
 
-        if (apiUser && !user) {
+        if (apiUser) {
           setUser({
-            name: apiUser.name || address.slice(0, 8),
-            email: apiUser.email || `${address.slice(2, 10)}@wallet.eth`,
+            name: apiUser.name || cleanAddress.slice(0, 8),
+            email: apiUser.email || `${cleanAddress.slice(2, 10)}@wallet.eth`,
             role: apiUser.role === "MENTOR" ? "mentor" : "student",
-            avatar: (apiUser.name || address)[0].toUpperCase(),
-            walletAddress: address,
+            avatar: (apiUser.name || cleanAddress)[0].toUpperCase(),
+            walletAddress: cleanAddress,
           });
         }
       } catch (e) {
@@ -307,7 +388,7 @@ export function AuthProvider({ children }) {
       }
     }
 
-    return address;
+    return cleanAddress;
   };
 
   const disconnectWallet = () => {

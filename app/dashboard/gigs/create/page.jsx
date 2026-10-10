@@ -102,7 +102,7 @@ function MilestoneGigIcon({ className = "w-5 h-5" }) {
 }
 
 
-// Official Platform Logos (Google Meet, Zoom, Discord)
+// Official Platform Logos (Google Meet, Zoom)
 function GoogleMeetIcon({ className = "w-7 h-7" }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -125,19 +125,9 @@ function ZoomIcon({ className = "w-7 h-7" }) {
   );
 }
 
-function DiscordIcon({ className = "w-7 h-7" }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="24" height="24" rx="6" fill="#5865F2"/>
-      <path d="M18.1 7.15C17.07 6.67 15.96 6.32 14.81 6.13C14.67 6.38 14.51 6.72 14.4 6.98C13.18 6.8 11.96 6.8 10.76 6.98C10.65 6.72 10.49 6.38 10.35 6.13C9.2 6.32 8.09 6.67 7.06 7.15C5.03 10.15 4.47 13.07 4.74 15.95C6.09 16.95 7.4 17.55 8.68 17.95C9 17.52 9.28 17.05 9.51 16.55C9.05 16.38 8.61 16.16 8.2 15.9C8.31 15.82 8.42 15.74 8.52 15.65C11.14 16.85 13.99 16.85 16.59 15.65C16.69 15.74 16.8 15.82 16.91 15.9C16.5 16.16 16.06 16.38 15.6 16.55C15.83 17.05 16.11 17.52 16.43 17.95C17.71 17.55 19.03 16.95 20.37 15.95C20.69 12.61 19.82 9.72 18.1 7.15ZM9.68 14.28C8.94 14.28 8.33 13.6 8.33 12.77C8.33 11.94 8.92 11.26 9.68 11.26C10.44 11.26 11.05 11.94 11.03 12.77C11.03 13.6 10.44 14.28 9.68 14.28ZM15.44 14.28C14.7 14.28 14.09 13.6 14.09 12.77C14.09 11.94 14.68 11.26 15.44 11.26C16.2 11.26 16.81 11.94 16.79 12.77C16.79 13.6 16.2 14.28 15.44 14.28Z" fill="white"/>
-    </svg>
-  );
-}
-
 const PLATFORMS = [
-  { id: "Google Meet", label: "Google Meet", Icon: GoogleMeetIcon, desc: "Instant GMeet video room link" },
-  { id: "Zoom", label: "Zoom Meetings", Icon: ZoomIcon, desc: "Interactive Zoom meeting or webinar" },
-  { id: "Discord", label: "Discord Voice & Screen", Icon: DiscordIcon, desc: "Community server channel" },
+  { id: "Google Meet", label: "Google Meet", Icon: GoogleMeetIcon, desc: "Auto-generated GMeet room on session acceptance" },
+  { id: "Zoom", label: "Zoom Meetings", Icon: ZoomIcon, desc: "Auto-generated Zoom room on session acceptance" },
 ];
 
 const STEPS = [
@@ -228,18 +218,6 @@ export default function CreateGigPage() {
 
     setIsLockingWallet(true);
     try {
-      let signature = null;
-      if (typeof window !== "undefined" && window.ethereum) {
-        try {
-          const timestamp = Date.now();
-          const message = `Trust Lesson Escrow Payout Binding\nLocking Arbitrum payout address: ${cleanAddr}\nTimestamp: ${timestamp}`;
-          signature = await window.ethereum.request({
-            method: "personal_sign",
-            params: [message, cleanAddr],
-          }).catch(() => null);
-        } catch {}
-      }
-
       const res = await fetch("/api/mentor/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -247,7 +225,6 @@ export default function CreateGigPage() {
           address: cleanAddr,
           userId: user?.id,
           email: user?.email,
-          signature,
         }),
       });
 
@@ -277,6 +254,7 @@ export default function CreateGigPage() {
 
   const handleConnectAndQuickLock = async (provider = "metamask") => {
     setWalletLockError("");
+    setIsLockingWallet(true);
     try {
       if (connectWallet) {
         const addr = await connectWallet(provider);
@@ -287,6 +265,8 @@ export default function CreateGigPage() {
       }
     } catch (err) {
       setWalletLockError(err.message || "Failed to connect wallet.");
+    } finally {
+      setIsLockingWallet(false);
     }
   };
 
@@ -766,8 +746,8 @@ export default function CreateGigPage() {
         description: description.trim(),
         coverImage,
         galleryImages: galleryImages.slice(0, 5),
-        meetingPlatform: hasOnlineMeeting ? meetingPlatform : "None (Asynchronous)",
-        meetingLink: hasOnlineMeeting ? (meetingLink.trim() || null) : null,
+        meetingPlatform: meetingPlatform || "Google Meet",
+        meetingLink: "AUTO_GENERATED",
         packages: effectivePackages,
         modules,
         duration: effectivePackages[0]?.duration || "1 Live Meeting",
@@ -816,7 +796,7 @@ export default function CreateGigPage() {
     mentorName: user?.name || "Verified Mentor",
     mentorPhoto: user?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     packages: packages.slice(0, activeTierCount),
-    meetingPlatform: hasOnlineMeeting ? meetingPlatform : "Asynchronous",
+    meetingPlatform: meetingPlatform || "Google Meet",
   };
 
   return (
@@ -1462,114 +1442,64 @@ export default function CreateGigPage() {
                     </p>
                   </div>
 
-                  {/* Online Live Meeting Toggle (Optional) */}
-                  <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  {/* Live Video Call Platform Selector (Always Included) */}
+                  <div className="space-y-4">
                     <div>
-                      <span className="font-extrabold text-slate-900 text-xs sm:text-sm block">
-                        Include 1-on-1 Online Live Session? (Optional)
-                      </span>
-                      <span className="text-slate-500 text-xs">
-                        Enable if this offering includes live face-to-face mentorship calls. Otherwise, this offering consists of self-paced curriculum modules only.
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 self-stretch sm:self-auto">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setHasOnlineMeeting(true);
-                          if (!meetingPlatform || meetingPlatform === "None (Asynchronous)") {
-                            setMeetingPlatform("Google Meet");
-                          }
-                        }}
-                        className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                          hasOnlineMeeting
-                            ? "bg-purple-600 text-white shadow-xs"
-                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        Provide Live Session
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setHasOnlineMeeting(false);
-                          setMeetingPlatform("None (Asynchronous)");
-                          setMeetingLink("");
-                        }}
-                        className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                          !hasOnlineMeeting
-                            ? "bg-purple-600 text-white shadow-xs"
-                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        Self-Paced / Async Only
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Online Collaboration Platform Selector (Active only when live session enabled) */}
-                  {hasOnlineMeeting ? (
-                    <>
-                      <div>
-                        <label className="block text-slate-800 font-extrabold text-xs mb-2">
-                          Select Live Video Call Platform (Google Meet, Zoom, Discord)
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-slate-800 font-extrabold text-xs">
+                          Select Live Video Call Platform
                         </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          {PLATFORMS.map((plat) => {
-                            const isSelected = meetingPlatform === plat.id;
-                            const IconComp = plat.Icon;
-                            return (
-                              <button
-                                key={plat.id}
-                                type="button"
-                                onClick={() => setMeetingPlatform(plat.id)}
-                                className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                                  isSelected
-                                    ? "bg-purple-50/70 border-purple-600 ring-2 ring-purple-400/20 shadow-xs"
-                                    : "bg-white border-slate-200 hover:border-slate-300"
-                                }`}
-                              >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-1.5">
-                                    <IconComp className="w-7 h-7" />
-                                  </div>
-                                  {isSelected && <CheckCircle2 size={16} className="text-purple-600" />}
-                                </div>
-                                <div>
-                                  <span className="font-extrabold text-slate-950 text-xs sm:text-sm block">{plat.label}</span>
-                                  <span className="text-[11px] text-slate-500">{plat.desc}</span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                          Always Included
+                        </span>
                       </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {PLATFORMS.map((plat) => {
+                          const isSelected = meetingPlatform === plat.id;
+                          const IconComp = plat.Icon;
+                          return (
+                            <button
+                              key={plat.id}
+                              type="button"
+                              onClick={() => setMeetingPlatform(plat.id)}
+                              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                                isSelected
+                                  ? "bg-purple-50/70 border-purple-600 ring-2 ring-purple-400/20 shadow-xs"
+                                  : "bg-white border-slate-200 hover:border-slate-300"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-1.5">
+                                  <IconComp className="w-7 h-7" />
+                                </div>
+                                {isSelected && <CheckCircle2 size={16} className="text-purple-600" />}
+                              </div>
+                              <div>
+                                <span className="font-extrabold text-slate-950 text-xs sm:text-sm block">{plat.label}</span>
+                                <span className="text-[11px] text-slate-500">{plat.desc}</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
 
-                      {/* Meeting Invite Link */}
-                      <div>
-                        <label className="block text-slate-800 font-extrabold text-xs mb-1">
-                          Meeting Room / Invite Link (Optional)
-                        </label>
-                        <input
-                          type="url"
-                          value={meetingLink}
-                          onChange={(e) => setMeetingLink(e.target.value)}
-                          placeholder="https://meet.google.com/xyz-abc-def or https://calendly.com/your-name"
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-mono"
-                        />
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          This link will be unlocked for students once their Arbitrum escrow deposit is confirmed.
+                    {/* Automatic Smart Room Generator Notice */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border border-purple-200 flex items-start gap-3 shadow-2xs">
+                      <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                        <Sparkles size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-slate-900 font-extrabold text-xs flex items-center gap-1.5">
+                          <span>Automatic Smart Meeting Room Generation</span>
+                          <span className="px-2 py-0.2 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">Zero Setup</span>
+                        </h4>
+                        <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
+                          You do not need to create or paste any meeting links manually. As soon as a student books this gig and you click <strong className="text-purple-700">Accept</strong> in your Requests inbox, Trust Lesson will instantly generate a dedicated, secure <strong className="text-slate-900">{meetingPlatform}</strong> meeting room for you and your student!
                         </p>
                       </div>
-                    </>
-                  ) : (
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-center gap-3">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
-                      <span>
-                        <strong>Asynchronous Mode Active:</strong> Students will learn through recorded video modules, practice tasks, and repository links below without live scheduled meetings.
-                      </span>
                     </div>
-                  )}
+                  </div>
 
                   {/* Curriculum Modules & Video Lessons */}
                   <div className="pt-2 space-y-4">
