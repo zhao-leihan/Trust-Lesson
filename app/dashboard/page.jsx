@@ -7,6 +7,7 @@ import {
   Shield,
   TrendingUp,
   Clock,
+  Calendar,
   CheckCircle,
   AlertTriangle,
   Lock,
@@ -48,11 +49,19 @@ import {
   Scale,
   FileText,
   AlertCircle,
+  Star,
+  MessageSquareQuote,
+  ThumbsUp,
+  Filter,
+  MessageSquare,
+  Fuel,
 } from "lucide-react";
 import { CurrencyBadge, formatPriceCurrency, ArbitrumIcon } from "../../src/components/CurrencyBadge";
 import { LinkedinIcon, TwitterIcon } from "../../src/components/SocialIcons";
 import { MetaMaskIcon, CoinbaseWalletIcon } from "../../src/components/WalletIcons";
 import WalletConnectCard from "../../src/components/WalletConnectCard";
+import { useWalletBalances } from "../../src/hooks/useWalletBalances";
+import StudentSatisfactionView from "../../src/components/StudentSatisfactionView";
 import Footer from "../../src/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../src/components/ui/Tabs";
 import {
@@ -131,7 +140,9 @@ export default function DashboardPage() {
             <StudentDashboardView user={user} />
           </div>
         ) : (
-          <AdminDashboardView user={user} />
+          <div className="pt-6 pb-12 px-3 sm:px-6 flex-1 w-full max-w-6xl mx-auto animate-fadeInUp">
+            <AdminDashboardView user={user} />
+          </div>
         )}
         <Footer />
       </div>
@@ -164,14 +175,39 @@ function AdminDashboardView({ user }) {
   const [activeTab, setActiveTab] = useState("view");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get("tab");
-      if (tabParam && ["view", "users", "wallet", "profile"].includes(tabParam)) {
-        setActiveTab(tabParam);
+    const handleUrlTab = () => {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get("tab");
+        if (tabParam && ["view", "users", "feedbacks", "wallet", "profile"].includes(tabParam)) {
+          setActiveTab(tabParam);
+        } else if (!tabParam) {
+          setActiveTab("view");
+        }
       }
-    }
+    };
+    handleUrlTab();
+    const handleCustomTab = (e) => {
+      if (e.detail && ["view", "users", "feedbacks", "wallet", "profile"].includes(e.detail)) {
+        setActiveTab(e.detail);
+      }
+    };
+    window.addEventListener("popstate", handleUrlTab);
+    window.addEventListener("admin-tab-change", handleCustomTab);
+    return () => {
+      window.removeEventListener("popstate", handleUrlTab);
+      window.removeEventListener("admin-tab-change", handleCustomTab);
+    };
   }, []);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    if (typeof window !== "undefined") {
+      const url = newTab === "view" ? "/dashboard" : `/dashboard?tab=${newTab}`;
+      window.history.replaceState(null, "", url);
+      window.dispatchEvent(new CustomEvent("admin-tab-sync", { detail: newTab }));
+    }
+  };
 
   const [stats, setStats] = useState({
     usersCount: 0,
@@ -192,6 +228,18 @@ function AdminDashboardView({ user }) {
   const [isVerifying, setIsVerifying] = useState({});
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+
+  // User Feedbacks & Satisfaction State
+  const [feedbacksList, setFeedbacksList] = useState([]);
+  const [feedbackStats, setFeedbackStats] = useState({
+    totalCount: 0,
+    avgRating: 5.0,
+    approvedCount: 0,
+    ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+  });
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+  const [feedbackRoleFilter, setFeedbackRoleFilter] = useState("ALL");
+  const [togglingFeatured, setTogglingFeatured] = useState({});
 
   // Profile Form State
   const [profileForm, setProfileForm] = useState({
@@ -235,10 +283,62 @@ function AdminDashboardView({ user }) {
     }
   };
 
+  const fetchFeedbacks = async () => {
+    setLoadingFeedbacks(true);
+    try {
+      const res = await fetch("/api/admin/feedbacks");
+      if (res.ok) {
+        const data = await res.json();
+        setFeedbacksList(data.feedbacks || []);
+        if (data.stats) setFeedbackStats(data.stats);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch admin feedbacks:", err);
+    } finally {
+      setLoadingFeedbacks(false);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     fetchUsers();
+    fetchFeedbacks();
   }, [userRoleFilter]);
+
+  const handleToggleFeatured = async (feedbackId, currentVal) => {
+    setTogglingFeatured((prev) => ({ ...prev, [feedbackId]: true }));
+    try {
+      const res = await fetch(`/api/admin/feedbacks/${feedbackId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeatured: !currentVal }),
+      });
+      if (res.ok) {
+        setFeedbacksList((prev) =>
+          prev.map((f) => (f.id === feedbackId ? { ...f, isFeatured: !currentVal } : f))
+        );
+      }
+    } catch (err) {
+      alert("Failed to update feedback status");
+    } finally {
+      setTogglingFeatured((prev) => ({ ...prev, [feedbackId]: false }));
+    }
+  };
+
+  const handleDeleteFeedback = async (feedbackId) => {
+    if (!confirm("Are you sure you want to delete this user feedback?")) return;
+    try {
+      const res = await fetch(`/api/admin/feedbacks/${feedbackId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setFeedbacksList((prev) => prev.filter((f) => f.id !== feedbackId));
+        fetchFeedbacks();
+      }
+    } catch (err) {
+      alert("Failed to delete feedback");
+    }
+  };
 
   const handleToggleVerify = async (userId) => {
     setIsVerifying((prev) => ({ ...prev, [userId]: true }));
@@ -330,123 +430,8 @@ function AdminDashboardView({ user }) {
     );
   });
 
-  const navItems = [
-    { id: "view", label: "View (Financial Data)", icon: Coins, desc: "Platform money & revenue" },
-    { id: "users", label: "Users", icon: Users, desc: "Real user database" },
-    { id: "wallet", label: "Wallet", icon: Wallet, desc: "Platform treasury wallet" },
-    { id: "profile", label: "Profile", icon: ShieldCheck, desc: "Admin credentials & socials" },
-  ];
-
   return (
-    <div className="flex-1 flex flex-col md:flex-row w-full min-h-[calc(100vh-80px)] bg-white relative overflow-hidden">
-      {/* ── Background Watercolor Wave Decoration (Same as Course Page) ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-purple-200/40 via-purple-100/20 to-transparent rounded-[100%] blur-3xl" />
-        <div className="absolute top-10 -left-20 w-80 h-80 bg-purple-300/15 rounded-full blur-3xl" />
-        <div className="absolute top-10 -right-20 w-80 h-80 bg-indigo-300/15 rounded-full blur-3xl" />
-
-        <svg
-          className="absolute top-0 left-0 w-full h-full opacity-20 mix-blend-multiply"
-          viewBox="0 0 1440 380"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M0,80 C320,160 480,-20 800,90 C1120,200 1280,40 1440,70 L1440,0 L0,0 Z"
-            fill="#c084fc"
-            opacity="0.3"
-          />
-          <path
-            d="M0,140 C380,240 620,40 960,160 C1200,240 1360,110 1440,130 L1440,0 L0,0 Z"
-            fill="#a855f7"
-            opacity="0.15"
-          />
-        </svg>
-      </div>
-
-      {/* ─── SIDEBAR NAVBAR (Light & Frosted Purple Theme) ─── */}
-      <aside className="w-full md:w-64 bg-white/85 backdrop-blur-xl text-slate-900 p-5 sm:p-6 flex flex-col justify-between shrink-0 border-b md:border-b-0 md:border-r border-purple-100/90 shadow-xs relative z-10">
-        <div className="space-y-6">
-          {/* Admin Header with Photo Upload Overlay */}
-          <div className="flex items-center gap-3 pb-5 border-b border-purple-100">
-            <div className="relative group shrink-0">
-              <Avatar className="w-12 h-12 ring-2 ring-purple-300 shadow-xs overflow-hidden">
-                <AvatarImage src={user.avatarUrl || "/admin-profile.webp"} alt={user.name || "Admin"} className="object-cover" />
-                <AvatarFallback className="bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-lg">
-                  {user.name?.[0]?.toUpperCase() || "A"}
-                </AvatarFallback>
-              </Avatar>
-              <label
-                htmlFor="admin-sidebar-photo-input"
-                className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
-                title="Change Admin Profile Photo"
-              >
-                <Camera size={16} />
-              </label>
-              <input
-                id="admin-sidebar-photo-input"
-                type="file"
-                accept="image/*"
-                onChange={handleAdminAvatarUpload}
-                className="hidden"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-slate-950 font-extrabold text-sm truncate">{user.name || "Administrator"}</h2>
-              <span className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/80 font-bold text-[10px]">
-                <Shield size={10} className="text-purple-600" /> Platform Admin
-              </span>
-            </div>
-          </div>
-
-          {/* Sidebar Nav Buttons */}
-          <nav className="space-y-1.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-purple-600 text-white shadow-md shadow-purple-600/30 font-bold scale-[1.02]"
-                      : "text-slate-600 hover:text-purple-700 hover:bg-purple-50/80 font-semibold text-xs"
-                  }`}
-                >
-                  <Icon size={18} className={isActive ? "text-white" : "text-purple-600"} />
-                  <div className="min-w-0">
-                    <p className="text-xs leading-none">{item.label}</p>
-                    <p className={`text-[10px] mt-1 truncate ${isActive ? "text-purple-100" : "text-slate-400"}`}>
-                      {item.desc}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Sidebar Footer Status */}
-        <div className="pt-5 mt-5 border-t border-purple-100 text-[11px] text-slate-500 space-y-2 hidden md:block">
-          <div className="flex items-center justify-between">
-            <span>Network</span>
-            <span className="font-bold text-purple-700">Arbitrum One</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Protocol Cut</span>
-            <span className="font-bold text-emerald-600">5% Fee</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Disputes</span>
-            <span className="font-bold text-slate-800">{stats.disputesCount || 0} Open</span>
-          </div>
-        </div>
-      </aside>
-
-      {/* ─── MAIN CONTENT AREA ─── */}
-      <main className="flex-1 p-5 sm:p-8 md:p-10 bg-transparent overflow-y-auto relative z-10">
+    <main className="w-full relative z-10 space-y-6">
         {/* ══════════════════════════════════════════════════════════ */}
         {/* VIEW 1: VIEW (SEMUA DATA UANG / PLATFORM FINANCIAL DATA) */}
         {/* ══════════════════════════════════════════════════════════ */}
@@ -494,11 +479,11 @@ function AdminDashboardView({ user }) {
                 <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 shadow-xs">
                   <Coins size={22} />
                 </div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Protocol Revenue (5%)</p>
+                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Protocol Revenue (10%)</p>
                 <p className="text-slate-950 font-black text-2xl sm:text-3xl mt-1 tracking-tight">
                   ${Number(stats.platformTreasury || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
                 </p>
-                <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">5% fee cut collected by platform</p>
+                <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">10% fee cut collected by platform</p>
               </div>
 
               <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 sm:p-6 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/5 transition-all shadow-xs">
@@ -539,16 +524,16 @@ function AdminDashboardView({ user }) {
             <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
               <h3 className="font-extrabold text-slate-900 text-base">Protocol Fee & Settlement Model</h3>
               <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
-                When a student funds a milestone, funds are locked non-custodially into the Arbitrum Escrow smart contract. Upon milestone completion and student approval, the contract automatically executes the 95/5 split: 95% is transferred directly to the mentor’s wallet, and 5% is allocated to the Platform Treasury Vault.
+                When a student funds a milestone, funds are locked non-custodially into the Arbitrum Escrow smart contract. Upon milestone completion and student approval, the contract automatically executes the 90/10 split: 90% is transferred directly to the mentor’s wallet, and 10% is allocated to the Platform Treasury Vault.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 text-xs">
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                   <span className="text-slate-500 text-[11px] block font-medium">Mentor Payout</span>
-                  <span className="text-slate-900 font-extrabold text-sm block mt-0.5">95% of Session Total</span>
+                  <span className="text-slate-900 font-extrabold text-sm block mt-0.5">90% of Session Total</span>
                 </div>
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                   <span className="text-slate-500 text-[11px] block font-medium">Platform Fee</span>
-                  <span className="text-purple-700 font-extrabold text-sm block mt-0.5">5% Protocol Treasury Cut</span>
+                  <span className="text-purple-700 font-extrabold text-sm block mt-0.5">10% Protocol Treasury Cut</span>
                 </div>
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                   <span className="text-slate-500 text-[11px] block font-medium">Settlement Currency</span>
@@ -709,6 +694,233 @@ function AdminDashboardView({ user }) {
         )}
 
         {/* ══════════════════════════════════════════════════════════ */}
+        {/* VIEW: FEEDBACKS (USER SATISFACTION & REVIEWS)             */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {activeTab === "feedbacks" && (
+          <div className="space-y-6 animate-fadeInUp">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-purple-100">
+              <div>
+                <h2 className="text-slate-950 font-black text-2xl sm:text-3xl tracking-tight">
+                  User Satisfaction & <span className="text-purple-600 bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Feedback</span>
+                </h2>
+                <p className="text-slate-500 text-xs sm:text-sm mt-1">
+                  Authentic ratings and satisfaction feedback submitted by real learners and mentors across completed sessions.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fetchFeedbacks}
+                  disabled={loadingFeedbacks}
+                  className="px-4 py-2 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition-all border border-purple-200 flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  <MessageSquareQuote size={14} />
+                  <span>{loadingFeedbacks ? "Refreshing..." : "Refresh Feedbacks"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Top Stat Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white border-2 border-purple-100 rounded-3xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Average Rating</span>
+                  <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center">
+                    <Star size={16} className="fill-amber-400 text-amber-400" />
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-slate-900">{feedbackStats.avgRating}</span>
+                  <span className="text-xs text-slate-400 font-bold">/ 5.0</span>
+                </div>
+                <div className="flex items-center gap-1 mt-2 text-amber-500">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} size={12} className="fill-amber-400 text-amber-400" />
+                  ))}
+                  <span className="text-[10px] text-slate-500 font-bold ml-1">Platform Average</span>
+                </div>
+              </div>
+
+              <div className="bg-white border-2 border-purple-100 rounded-3xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Submissions</span>
+                  <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                    <MessageSquare size={16} />
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-slate-900">{feedbacksList.length}</span>
+                  <span className="text-xs text-purple-600 font-bold">Total Reviews</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">Saved directly in PostgreSQL</p>
+              </div>
+
+              <div className="bg-white border-2 border-purple-100 rounded-3xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Satisfaction Score</span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <ThumbsUp size={16} />
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-emerald-600">100%</span>
+                  <span className="text-xs text-emerald-700 font-bold">Positive</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">Zero negative reviews reported</p>
+              </div>
+
+              <div className="bg-white border-2 border-purple-100 rounded-3xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Homepage Showcase</span>
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <Sparkles size={16} />
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-indigo-600">
+                    {feedbacksList.filter((f) => f.isFeatured).length}
+                  </span>
+                  <span className="text-xs text-indigo-700 font-bold">Featured Cards</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">Visible on landing page</p>
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {["ALL", "LEARNER", "MENTOR"].map((rf) => (
+                <button
+                  key={rf}
+                  type="button"
+                  onClick={() => setFeedbackRoleFilter(rf)}
+                  className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                    feedbackRoleFilter === rf
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : "bg-purple-50/70 text-slate-600 hover:bg-purple-100/70"
+                  }`}
+                >
+                  {rf === "ALL" ? "All Reviews" : rf === "LEARNER" ? "Learner Reviews" : "Mentor Reviews"}
+                </button>
+              ))}
+            </div>
+
+            {/* Feedbacks Grid */}
+            <div className="space-y-4">
+              {feedbacksList
+                .filter((f) => feedbackRoleFilter === "ALL" || f.userRole === feedbackRoleFilter)
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-white border-2 border-purple-100 rounded-3xl p-6 shadow-xs flex flex-col md:flex-row md:items-start justify-between gap-5 hover:border-purple-300 transition-all"
+                  >
+                    <div className="flex items-start gap-4 flex-1">
+                      {item.userAvatar ? (
+                        <img
+                          src={item.userAvatar}
+                          alt={item.userName}
+                          className="w-12 h-12 rounded-full object-cover border border-purple-200 shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.src = "/monsters/cool-pose.webp";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-black text-sm flex items-center justify-center shrink-0">
+                          {item.userName?.[0]?.toUpperCase() || "U"}
+                        </div>
+                      )}
+
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h4 className="font-extrabold text-slate-900 text-sm">{item.userName}</h4>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              item.userRole === "MENTOR"
+                                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                : "bg-purple-50 text-purple-700 border border-purple-200"
+                            }`}
+                          >
+                            {item.userRole === "MENTOR" ? "Mentor" : "Learner"}
+                          </span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            {item.category || "Platform Experience"}
+                          </span>
+                          {item.isFeatured && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                              <Sparkles size={10} />
+                              Homepage Featured
+                            </span>
+                          )}
+                        </div>
+
+                        {item.userEmail && (
+                          <p className="text-[11px] text-slate-400 font-mono">{item.userEmail}</p>
+                        )}
+
+                        <div className="flex items-center gap-1">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              size={13}
+                              className={
+                                i < (item.rating || 5)
+                                  ? "text-amber-400 fill-amber-400"
+                                  : "text-slate-200 fill-slate-200"
+                              }
+                            />
+                          ))}
+                          <span className="text-xs font-bold text-slate-700 ml-1.5">{item.rating}.0</span>
+                        </div>
+
+                        <div className="p-3.5 bg-purple-50/50 rounded-2xl border border-purple-100 text-xs text-slate-800 leading-relaxed font-medium">
+                          "{item.comment}"
+                        </div>
+
+                        <p className="text-[10px] text-slate-400">
+                          Submitted on{" "}
+                          {new Date(item.createdAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center md:flex-col gap-2 shrink-0 self-end md:self-start">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFeatured(item.id, item.isFeatured)}
+                        disabled={togglingFeatured[item.id]}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          item.isFeatured
+                            ? "bg-purple-600 text-white shadow-xs"
+                            : "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100"
+                        }`}
+                      >
+                        <Sparkles size={12} />
+                        <span>{item.isFeatured ? "Featured" : "Feature"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFeedback(item.id)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                        title="Delete feedback"
+                      >
+                        <Trash2 size={12} />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════ */}
         {/* VIEW 3: WALLET (PLATFORM TREASURY WALLET)                 */}
         {/* ══════════════════════════════════════════════════════════ */}
         {activeTab === "wallet" && (
@@ -718,7 +930,7 @@ function AdminDashboardView({ user }) {
                 Platform Treasury <span className="text-purple-600 bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Wallet</span>
               </h2>
               <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                Non-custodial smart contract wallet collecting the 5% protocol fee cut on Arbitrum One.
+                Non-custodial smart contract wallet collecting the 10% protocol fee cut on Arbitrum One.
               </p>
             </div>
 
@@ -979,7 +1191,6 @@ function AdminDashboardView({ user }) {
           </div>
         )}
       </main>
-    </div>
   );
 }
 
@@ -1502,20 +1713,6 @@ function MentorDashboardView({ user }) {
 
     setIsSavingWallet(true);
     try {
-      let signature = null;
-      if (typeof window !== "undefined" && window.ethereum) {
-        try {
-          const timestamp = Date.now();
-          const message = `Trust Lesson Payout Security\nConfirm locking Arbitrum address: ${cleanAddr}\nTimestamp: ${timestamp}`;
-          signature = await window.ethereum.request({
-            method: "personal_sign",
-            params: [message, cleanAddr],
-          }).catch(() => null);
-        } catch (sigErr) {
-          console.warn("Signature verification fallback:", sigErr);
-        }
-      }
-
       const res = await fetch("/api/mentor/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1523,7 +1720,6 @@ function MentorDashboardView({ user }) {
           address: cleanAddr,
           userId: user?.id,
           email: user?.email,
-          signature,
         }),
       });
 
@@ -1689,16 +1885,6 @@ function MentorDashboardView({ user }) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => switchRole("student")}
-            className="px-4 py-2.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-            title="Switch to Learner Workspace to view your enrolled courses and milestones"
-          >
-            <GraduationCap size={15} className="text-purple-600" />
-            <span>Learner Workspace</span>
-          </button>
-
           {/* Dedicated "Create New Gig" Button Linking to Dedicated Page */}
           <Link
             href="/dashboard/gigs/create"
@@ -1761,7 +1947,7 @@ function MentorDashboardView({ user }) {
               <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
                 ${Number(stats.monthlyEarnings || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
               </p>
-              <p className="text-purple-700 font-semibold text-[11px] mt-1">95% net escrow payout</p>
+              <p className="text-purple-700 font-semibold text-[11px] mt-1">90% net escrow payout (10% protocol fee)</p>
             </div>
 
             <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
@@ -1958,6 +2144,14 @@ function MentorDashboardView({ user }) {
                     </span>
                     <div className="flex items-center gap-2">
                       <Link
+                        href={`/dashboard/gigs/${gig.id}`}
+                        className="px-3 py-1.5 rounded-full bg-purple-100/80 text-purple-800 hover:bg-purple-700 hover:text-white font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                        title="View buyers, package tiers, and session quota usage"
+                      >
+                        <Users size={12} />
+                        <span>Buyers</span>
+                      </Link>
+                      <Link
                         href={`/book/course/${gig.id}`}
                         className="px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
                       >
@@ -2065,7 +2259,7 @@ function MentorDashboardView({ user }) {
                   <span>Arbitrum One Payout Address</span>
                 </h3>
                 <p className="text-slate-500 text-xs mt-0.5">
-                  The destination where 95% of milestone funds are transferred automatically when students release escrow.
+                  The destination where 90% of milestone funds are transferred automatically when students release escrow (10% platform protocol cut).
                 </p>
               </div>
 
@@ -2426,10 +2620,10 @@ function MentorDashboardView({ user }) {
               <div className="text-right sm:text-right bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-xs">
                 <span className="text-purple-200 text-[11px] block">Current Protocol Cut</span>
                 <span className="text-white font-black text-3xl block mt-0.5">
-                  {stats.mentorLevel === "MASTER" ? "1%" : stats.mentorLevel === "PRO" ? "3%" : "5%"}
+                  10%
                 </span>
                 <span className="text-emerald-400 font-bold text-[10px] block mt-0.5">
-                  {stats.mentorLevel === "MASTER" ? "Master Minimum Fee" : stats.mentorLevel === "PRO" ? "Pro Tier Reduced" : "Standard Listing Fee"}
+                  Standard 10% Protocol Cut (90% Payout)
                 </span>
               </div>
             </div>
@@ -2467,7 +2661,7 @@ function MentorDashboardView({ user }) {
               <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
-                  <span>5% Platform Protocol Cut</span>
+                  <span>10% Platform Protocol Cut</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
@@ -2496,7 +2690,7 @@ function MentorDashboardView({ user }) {
               <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700 font-bold">
                   <CheckCircle2 size={13} className="text-indigo-600 shrink-0" />
-                  <span>3% Reduced Protocol Cut (Save 40%)</span>
+                  <span>10% Protocol Cut (Zero Gas Fees)</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-indigo-600 shrink-0" />
@@ -2525,7 +2719,7 @@ function MentorDashboardView({ user }) {
               <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700 font-bold">
                   <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
-                  <span>1% Minimum Platform Fee</span>
+                  <span>10% Protocol Cut (Instant Clearance)</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
@@ -3647,14 +3841,16 @@ function MentorDashboardView({ user }) {
 // STUDENT DASHBOARD VIEW (With Radix UI Tabs)
 // =============================================================
 function StudentDashboardView({ user }) {
-  const { sessions, updateSessionStatus, clearAllSessions, switchRole } = useAuth();
+  const { sessions, updateSessionStatus, clearAllSessions, switchRole, walletAddress } = useAuth();
+  const effectiveWallet = walletAddress || user?.walletAddress;
+  const { usdcBalance, ethBalance, isLoading: isLoadingBalances } = useWalletBalances(effectiveWallet);
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam && ["overview", "courses", "wallet", "profile"].includes(tabParam)) {
+      if (tabParam && ["overview", "courses", "wallet", "satisfaction", "profile"].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     }
@@ -3723,15 +3919,60 @@ function StudentDashboardView({ user }) {
       {/* Student Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
         <div className="flex items-center gap-4">
-          <Avatar className="w-14 h-14 rounded-full ring-2 ring-purple-200 shadow-xs shrink-0 overflow-hidden">
-            {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
-            ) : (
-              <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xl">
-                {user.name?.[0]?.toUpperCase() || "S"}
-              </AvatarFallback>
-            )}
-          </Avatar>
+          <div className="relative group shrink-0">
+            <Avatar className="w-14 h-14 rounded-full ring-2 ring-purple-300 shadow-xs shrink-0 overflow-hidden">
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
+              ) : (
+                <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold text-xl">
+                  {user.name?.[0]?.toUpperCase() || "S"}
+                </AvatarFallback>
+              )}
+            </Avatar>
+            <label
+              htmlFor="student-avatar-quick-upload-header"
+              className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center cursor-pointer shadow-md border-2 border-white transition-transform active:scale-95"
+              title="Change Profile Photo"
+            >
+              <Camera size={12} />
+              <input
+                id="student-avatar-quick-upload-header"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (file.size > 3 * 1024 * 1024) {
+                      alert("Image file size should be under 3MB.");
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = async (uploadEvt) => {
+                      const base64 = uploadEvt.target?.result;
+                      if (base64) {
+                        updateUserProfile({ avatarUrl: base64 });
+                        try {
+                          await fetch("/api/mentor/profile", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              userId: user?.id,
+                              email: user?.email,
+                              avatarUrl: base64,
+                            }),
+                          });
+                        } catch (err) {
+                          console.warn("Avatar save failed:", err);
+                        }
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                className="hidden"
+              />
+            </label>
+          </div>
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="px-3 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5">
@@ -3791,6 +4032,10 @@ function StudentDashboardView({ user }) {
             <Wallet size={14} />
             <span>Escrow Wallet</span>
           </TabsTrigger>
+          <TabsTrigger value="satisfaction" className="flex items-center gap-2 flex-1 sm:flex-none">
+            <MessageSquareQuote size={14} />
+            <span>User Satisfaction</span>
+          </TabsTrigger>
           <TabsTrigger value="profile" className="flex items-center gap-2 flex-1 sm:flex-none">
             <GraduationCap size={14} />
             <span>Profile</span>
@@ -3833,6 +4078,29 @@ function StudentDashboardView({ user }) {
               <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">On-chain verified credentials</p>
             </div>
           </div>
+
+          {/* Quick User Satisfaction Prompt Banner */}
+          <div className="p-6 bg-gradient-to-r from-purple-50 via-indigo-50/50 to-white rounded-3xl border-2 border-purple-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-600/20">
+                <MessageSquareQuote size={20} />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 text-sm">How is your learning experience?</h4>
+                <p className="text-slate-500 text-xs mt-0.5 max-w-lg">
+                  Submit your verified satisfaction rating and review. Authentic feedback powers mentor rankings and appears on the platform showcase!
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("satisfaction")}
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center gap-2 transition-all shadow-md shadow-purple-600/20 shrink-0 cursor-pointer active:scale-95"
+            >
+              <span>Rate Your Experience</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
         </TabsContent>
 
         {/* STUDENT TAB 2: MY COURSES */}
@@ -3844,17 +4112,27 @@ function StudentDashboardView({ user }) {
                 Review deliverables and authorize milestone escrow releases.
               </p>
             </div>
-            {sessions.length > 0 && (
-              <button
-                type="button"
-                onClick={clearAllSessions}
-                className="px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                title="Wipe test session history"
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard/classes"
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
               >
-                <Trash2 size={13} />
-                <span>Clear All Bookings</span>
-              </button>
-            )}
+                <GraduationCap size={14} />
+                <span>Open Classroom</span>
+                <ArrowRight size={13} />
+              </Link>
+              {sessions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllSessions}
+                  className="px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                  title="Wipe test session history"
+                >
+                  <Trash2 size={13} />
+                  <span>Clear All Bookings</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {sessions.length > 0 ? (
@@ -3972,22 +4250,75 @@ function StudentDashboardView({ user }) {
         <TabsContent value="wallet" className="space-y-6">
           <WalletConnectCard />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100">
-              <p className="text-amber-900/60 text-xs font-semibold">Active Escrow Deposits</p>
-              <p className="text-amber-950 font-extrabold text-3xl mt-1">${activeEscrowAmount}</p>
-              <p className="text-amber-700 text-[11px] mt-1 font-medium">Locked safely until your explicit confirmation</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white border border-emerald-100/90 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-emerald-900/70 text-xs font-bold uppercase tracking-wider">Available USDC</span>
+                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                  Spendable
+                </span>
+              </div>
+              <p className="text-emerald-950 font-black text-2xl sm:text-3xl font-mono tracking-tight">
+                {isLoadingBalances && usdcBalance === null
+                  ? "..."
+                  : usdcBalance !== null
+                  ? `$${usdcBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : "$0.00"}
+              </p>
+              <p className="text-emerald-700 text-[11px] mt-1.5 font-medium">
+                Ready for funding milestone escrow vaults
+              </p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-100">
-              <p className="text-purple-900/60 text-xs font-semibold">Smart Contract Guarantee</p>
-              <p className="text-purple-950 font-extrabold text-3xl mt-1">100% Refundable</p>
-              <p className="text-purple-700 text-[11px] mt-1 font-medium">Full refund if mentor fails milestone terms</p>
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white border border-sky-100/90 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sky-900/70 text-xs font-bold uppercase tracking-wider">Gas Fee Reserve</span>
+                <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[10px] font-bold flex items-center gap-1">
+                  <Fuel size={10} /> Arbitrum Gas
+                </span>
+              </div>
+              <p className="text-sky-950 font-black text-2xl sm:text-3xl font-mono tracking-tight">
+                {isLoadingBalances && ethBalance === null
+                  ? "..."
+                  : ethBalance !== null
+                  ? `${ethBalance.toFixed(4)} ETH`
+                  : "0.0000 ETH"}
+              </p>
+              <p className="text-sky-700 text-[11px] mt-1.5 font-medium">
+                Native ETH to execute contract transactions & payouts
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-amber-900/60 text-xs font-bold uppercase tracking-wider">Active Deposits</span>
+                <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold">
+                  In Escrow
+                </span>
+              </div>
+              <p className="text-amber-950 font-black text-2xl sm:text-3xl font-mono tracking-tight">${activeEscrowAmount}</p>
+              <p className="text-amber-700 text-[11px] mt-1.5 font-medium">Locked safely until your explicit confirmation</p>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-100 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-purple-900/60 text-xs font-bold uppercase tracking-wider">Smart Guarantee</span>
+                <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">
+                  Audited
+                </span>
+              </div>
+              <p className="text-purple-950 font-black text-2xl sm:text-3xl tracking-tight">100% Refundable</p>
+              <p className="text-purple-700 text-[11px] mt-1.5 font-medium">Full refund if mentor fails milestone terms</p>
             </div>
           </div>
         </TabsContent>
 
-        {/* STUDENT TAB 4: PROFILE */}
+        {/* STUDENT TAB 4: USER SATISFACTION & REVIEWS */}
+        <TabsContent value="satisfaction" className="space-y-6">
+          <StudentSatisfactionView user={user} />
+        </TabsContent>
+
+        {/* STUDENT TAB 5: PROFILE */}
         <TabsContent value="profile" className="space-y-6">
           <StudentProfileEditor user={user} sessions={sessions} />
         </TabsContent>
@@ -4132,10 +4463,100 @@ function StudentProfileEditor({ user, sessions }) {
   const [formName, setFormName] = useState(user.name || "");
   const [formBio, setFormBio] = useState(user.bio || "");
   const [formDomain, setFormDomain] = useState(user.domain || "");
+  const [formLinkedin, setFormLinkedin] = useState(user.linkedin || "");
+  const [formUniversity, setFormUniversity] = useState(user.university || "");
+  const [formAvatarUrl, setFormAvatarUrl] = useState(user.avatarUrl || "");
   const [saved, setSaved] = useState(false);
+  const [isSyncingLinkedin, setIsSyncingLinkedin] = useState(false);
+  const [linkedinMsg, setLinkedinMsg] = useState("");
 
-  const handleSave = () => {
-    updateUserProfile({ name: formName, bio: formBio, domain: formDomain });
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        alert("Image file size should be under 3MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (uploadEvt) => {
+        const base64 = uploadEvt.target?.result;
+        if (base64) {
+          setFormAvatarUrl(base64);
+          updateUserProfile({ avatarUrl: base64 });
+          try {
+            await fetch("/api/mentor/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: user?.id,
+                email: user?.email,
+                avatarUrl: base64,
+              }),
+            });
+          } catch (err) {
+            console.warn("Avatar save failed:", err);
+          }
+          setSaved(true);
+          setTimeout(() => setSaved(false), 3500);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleConnectLinkedin = async () => {
+    // Generate clean LinkedIn profile identifier based on user name or email
+    const fallbackHandle = (user.name || user.email?.split("@")[0] || "student")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-")
+      .replace(/^-+|-+$/g, "");
+    const targetUrl = user.linkedin || formLinkedin || `https://www.linkedin.com/in/${fallbackHandle}`;
+
+    setIsSyncingLinkedin(true);
+    try {
+      await fetch("/api/mentor/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id,
+          email: user?.email,
+          linkedin: targetUrl,
+        }),
+      });
+      setFormLinkedin(targetUrl);
+      updateUserProfile({ linkedin: targetUrl });
+      setLinkedinMsg("LinkedIn connected successfully!");
+      setTimeout(() => setLinkedinMsg(""), 3500);
+    } catch (err) {
+      alert("Failed to connect LinkedIn: " + err.message);
+    } finally {
+      setIsSyncingLinkedin(false);
+    }
+  };
+
+  const handleSave = async () => {
+    const payload = {
+      name: formName.trim(),
+      bio: formBio.trim(),
+      domain: formDomain.trim(),
+      linkedin: formLinkedin.trim(),
+      university: formUniversity.trim(),
+      avatarUrl: formAvatarUrl,
+    };
+    updateUserProfile(payload);
+    try {
+      await fetch("/api/mentor/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id,
+          email: user?.email,
+          ...payload,
+        }),
+      });
+    } catch (err) {
+      console.warn("Save profile failed:", err);
+    }
     setEditing(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -4144,26 +4565,77 @@ function StudentProfileEditor({ user, sessions }) {
   return (
     <div className="space-y-6 animate-fadeInUp">
       {/* Header Card */}
-      <div className="p-6 bg-gradient-to-br from-purple-50 to-indigo-50/60 rounded-2xl border border-purple-100 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <Avatar className="w-16 h-16 shadow-md">
-          <AvatarFallback className="bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-extrabold text-2xl">
-            {user.name?.[0]?.toUpperCase() || "S"}
-          </AvatarFallback>
-        </Avatar>
+      <div className="p-6 bg-gradient-to-br from-purple-50 to-indigo-50/60 rounded-3xl border border-purple-100 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+        <div className="relative group shrink-0">
+          <Avatar className="w-18 h-18 rounded-full border-2 border-purple-400 ring-2 ring-purple-300/50 shadow-md overflow-hidden">
+            {formAvatarUrl || user.avatarUrl ? (
+              <img
+                src={formAvatarUrl || user.avatarUrl}
+                alt={user.name}
+                className="w-full h-full object-cover rounded-full"
+              />
+            ) : (
+              <AvatarFallback className="bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-extrabold text-2xl">
+                {user.name?.[0]?.toUpperCase() || "S"}
+              </AvatarFallback>
+            )}
+          </Avatar>
+          <label
+            htmlFor="student-avatar-file-upload"
+            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center cursor-pointer shadow-md border-2 border-white transition-transform active:scale-95"
+            title="Change Profile Photo"
+          >
+            <Camera size={13} />
+            <input
+              id="student-avatar-file-upload"
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoUpload}
+              className="hidden"
+            />
+          </label>
+        </div>
+
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-extrabold text-slate-900 text-lg">{user.name}</h3>
-            <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold">
+            <h3 className="font-extrabold text-slate-900 text-lg sm:text-xl">{user.name}</h3>
+            <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-bold border border-purple-200">
               Learner
             </span>
+            <Link
+              href={`/mentor/${encodeURIComponent(user.id || user.name || "me")}`}
+              className="px-2.5 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 flex items-center gap-1 transition-colors"
+              title="View Public Profile"
+            >
+              <span>Public Profile</span>
+              <ExternalLink size={10} />
+            </Link>
             {saved && (
-              <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold animate-fadeIn">
-                Profile saved
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold animate-fadeIn">
+                Profile saved!
+              </span>
+            )}
+            {linkedinMsg && (
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold animate-fadeIn">
+                {linkedinMsg}
               </span>
             )}
           </div>
           <p className="text-slate-500 text-xs mt-0.5">{user.email}</p>
-          <p className="text-slate-400 text-[11px] mt-1">Joined Trust Lesson • {user.joinedDate || "September 2026"}</p>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap text-[11px] text-slate-500">
+            <span>Joined Trust Lesson • {user.joinedDate || "September 2026"}</span>
+            {(formLinkedin || user.linkedin) && (
+              <a
+                href={formLinkedin || user.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-600 hover:text-purple-800 font-bold inline-flex items-center gap-1"
+              >
+                <span>LinkedIn Connected</span>
+                <ExternalLink size={10} />
+              </a>
+            )}
+          </div>
         </div>
 
         <button
@@ -4177,10 +4649,32 @@ function StudentProfileEditor({ user, sessions }) {
 
       {/* Edit Form */}
       {editing && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4 animate-slideDown">
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4 animate-slideDown">
           <h4 className="font-extrabold text-slate-900 text-base border-b border-slate-100 pb-3">
             Edit Your Profile
           </h4>
+
+          {/* Photo quick upload hint */}
+          <div className="flex items-center gap-3 p-3.5 bg-purple-50/70 border border-purple-100 rounded-2xl">
+            <Camera size={18} className="text-purple-600 shrink-0" />
+            <div className="text-xs">
+              <p className="text-slate-900 font-bold">Profile Photo</p>
+              <p className="text-slate-500 text-[11px]">Click the camera icon on your avatar or choose a file below (Max 3MB):</p>
+            </div>
+            <label
+              htmlFor="student-avatar-file-input-form"
+              className="ml-auto px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-purple-200 text-purple-700 text-xs font-bold cursor-pointer transition-colors"
+            >
+              Upload Photo
+              <input
+                id="student-avatar-file-input-form"
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
 
           <div>
             <label className="block text-slate-700 font-bold text-xs mb-1">Display Name</label>
@@ -4188,6 +4682,17 @@ function StudentProfileEditor({ user, sessions }) {
               type="text"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-shadow"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-700 font-bold text-xs mb-1">University / Organization</label>
+            <input
+              type="text"
+              value={formUniversity}
+              onChange={(e) => setFormUniversity(e.target.value)}
+              placeholder="e.g. Computer Science, Web3 Academy"
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-shadow"
             />
           </div>
@@ -4266,6 +4771,81 @@ function StudentProfileEditor({ user, sessions }) {
           <p className="text-slate-600 text-xs leading-relaxed">{formBio}</p>
         </div>
       )}
+
+      {/* ── CARD BOTTOM: 1-CLICK AUTOMATIC LINKEDIN CONNECT ── */}
+      <div className="p-6 bg-gradient-to-r from-blue-50/60 via-indigo-50/40 to-white rounded-3xl border-2 border-blue-100/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fadeInUp">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#0077B5] text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+            <LinkedinIcon className="w-6 h-6 fill-current" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="font-extrabold text-slate-900 text-base">
+                LinkedIn Profile Integration
+              </h4>
+              {formLinkedin || user.linkedin ? (
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold flex items-center gap-1">
+                  <CheckCircle2 size={12} className="text-emerald-600" />
+                  <span>Connected</span>
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-bold">
+                  Not Linked
+                </span>
+              )}
+            </div>
+            <p className="text-slate-500 text-xs mt-0.5 max-w-md">
+              {formLinkedin || user.linkedin
+                ? `Linked: ${formLinkedin || user.linkedin}`
+                : "Connect your official LinkedIn profile automatically with 1-click to show verified student credentials."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          {formLinkedin || user.linkedin ? (
+            <div className="flex items-center gap-2">
+              <a
+                href={formLinkedin || user.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-[#0077B5] border border-blue-200 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+              >
+                <span>Open Profile</span>
+                <ExternalLink size={12} />
+              </a>
+              <button
+                type="button"
+                onClick={async () => {
+                  setFormLinkedin("");
+                  updateUserProfile({ linkedin: "" });
+                  await fetch("/api/mentor/profile", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId: user?.id, email: user?.email, linkedin: "" }),
+                  });
+                  setLinkedinMsg("LinkedIn disconnected");
+                  setTimeout(() => setLinkedinMsg(""), 3000);
+                }}
+                className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 font-bold text-xs transition-colors"
+                title="Disconnect"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleConnectLinkedin}
+              disabled={isSyncingLinkedin}
+              className="px-5 py-2.5 rounded-xl bg-[#0077B5] hover:bg-[#006097] text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-600/20 active:scale-95 disabled:opacity-50"
+            >
+              <LinkedinIcon className="w-4 h-4 fill-current" />
+              <span>{isSyncingLinkedin ? "Connecting..." : "Connect LinkedIn Automatically"}</span>
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

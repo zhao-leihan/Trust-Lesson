@@ -8,26 +8,26 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  walletAddress String?   @unique
-  passwordHash  String?
-  role          String    @default("LEARNER") // "LEARNER" | "MENTOR" | "ADMIN"
-  name          String?
-  nickname      String?
-  email         String?   @unique
-  university    String?
-  avatarUrl     String?
-  bio           String?
-  domain        String?
-  linkedin      String?
-  instagram     String?
-  twitter       String?
-  portfolio     String?
-  hourlyRate    Float     @default(35)
-  stakeAmount   Float     @default(0)
-  isVerified    Boolean   @default(false)
-  isJuror       Boolean   @default(false)
-  walletLocked  Boolean   @default(false)
+  id                String    @id @default(uuid())
+  walletAddress     String?   @unique
+  passwordHash      String?
+  role              String    @default("LEARNER") // "LEARNER" | "MENTOR" | "ADMIN"
+  name              String?
+  nickname          String?
+  email             String?   @unique
+  university        String?
+  avatarUrl         String?
+  bio               String?
+  domain            String?
+  linkedin          String?
+  instagram         String?
+  twitter           String?
+  portfolio         String?
+  hourlyRate        Float     @default(35)
+  stakeAmount       Float     @default(0)
+  isVerified        Boolean   @default(false)
+  isJuror           Boolean   @default(false)
+  walletLocked      Boolean   @default(false)
   mentorLevel       String    @default("RISING") // "RISING" | "PRO" | "MASTER"
   tokenVersion      Int       @default(1)
   birthDate         String?
@@ -42,12 +42,27 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  sessionsAsLearner Session[]      @relation("LearnerSessions")
-  sessionsAsMentor  Session[]      @relation("MentorSessions")
-  videos            Video[]
-  disputes          Dispute[]
-  videoPurchases    VideoPurchase[]
-  certificates      Certificate[]
+  sessionsAsLearner           Session[]                   @relation("LearnerSessions")
+  sessionsAsMentor            Session[]                   @relation("MentorSessions")
+  videos                      Video[]
+  disputes                    Dispute[]
+  videoPurchases              VideoPurchase[]
+  certificates                Certificate[]
+  feedbacks                   Feedback[]
+  enrollmentsAsLearner        Enrollment[]                @relation("LearnerEnrollments")
+  enrollmentsAsMentor         Enrollment[]                @relation("MentorEnrollments")
+  mentorAvailabilitySettings  MentorAvailabilitySettings?
+  availabilityRules           AvailabilityRule[]
+  availabilityExceptions      AvailabilityException[]
+  meetingsAsMentor            Meeting[]                   @relation("MentorMeetings")
+  notifications               Notification[]
+  calendarConnections         CalendarConnection[]
+  reviewsWritten              Review[]                    @relation("LearnerReviews")
+  reviewsReceived             Review[]                    @relation("MentorReviews")
+  learnerAvailabilityWindows  LearnerAvailabilityWindow[]
+  chatParticipants            ChatParticipant[]
+  taskAssignments             TaskAssignment[]
+  ipfsObjects                 IpfsObject[]
 }
 
 model Offering {
@@ -77,6 +92,11 @@ model Offering {
   milestones      String?  // JSON serialized milestones array
   deliverables    String?  // JSON serialized deliverables array
   createdAt       DateTime @default(now())
+
+  enrollments     Enrollment[]
+  meetings        Meeting[]
+  reviews         Review[]
+  taskDefinitions TaskDefinition[]
 }
 
 model Resource {
@@ -204,4 +224,413 @@ model Certificate {
   ipfsUrl              String?
 
   learner              User?    @relation(fields: [learnerAddress], references: [walletAddress])
+}
+
+model Feedback {
+  id         String   @id @default(uuid())
+  userId     String?
+  userName   String
+  userEmail  String?
+  userAvatar String?
+  userRole   String   @default("LEARNER") // "LEARNER" | "MENTOR"
+  rating     Int      @default(5)
+  category   String   @default("Platform Experience")
+  comment    String
+  isFeatured Boolean  @default(true)
+  status     String   @default("APPROVED") // "APPROVED" | "PENDING" | "REJECTED"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ENROLLMENT, SCHEDULING, QUOTA & CLASSROOM MODELS (main.md Phase 1-6)
+// ════════════════════════════════════════════════════════════════════
+
+model Enrollment {
+  id                  String    @id @default(uuid())
+  gigId               String
+  packageId           String?
+  packageName         String?
+  learnerId           String
+  mentorId            String
+  onchainSessionId    BigInt?   @unique
+  escrowStatus        String    @default("FUNDED") // "CREATED" | "FUNDED" | "IN_SESSION" | "COMPLETED" | "DISPUTED" | "RESOLVED" | "CANCELLED"
+  sessionsIncluded    Int       @default(1)
+  sessionDurationMin  Int       @default(60)
+  sessionsReserved    Int       @default(0)
+  sessionsUsed        Int       @default(0)
+  expiresAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  learner             User      @relation("LearnerEnrollments", fields: [learnerId], references: [id], onDelete: Cascade)
+  mentor              User      @relation("MentorEnrollments", fields: [mentorId], references: [id], onDelete: Cascade)
+  gig                 Offering  @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  participants        MeetingParticipant[]
+  quotaLedgers        QuotaLedger[]
+  review              Review?
+  availabilityWindows LearnerAvailabilityWindow[]
+  chatThreads         ChatThread[]
+  taskAssignments     TaskAssignment[]
+
+  @@index([learnerId])
+  @@index([mentorId, gigId])
+}
+
+model MentorAvailabilitySettings {
+  id                 String   @id @default(uuid())
+  mentorId           String   @unique
+  timezone           String   @default("UTC")
+  minNoticeHours     Int      @default(24)
+  maxHorizonDays     Int      @default(30)
+  bufferBeforeMin    Int      @default(0)
+  bufferAfterMin     Int      @default(15)
+  slotStepMin        Int      @default(30)
+  maxSessionsPerDay  Int      @default(4)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  mentor             User     @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+}
+
+model AvailabilityRule {
+  id          String   @id @default(uuid())
+  mentorId    String
+  weekday     Int      // 0-6 (0=Sunday, 1=Monday, ..., 6=Saturday)
+  startMinute Int      // 0-1439 local to mentor timezone
+  endMinute   Int      // 0-1439 local to mentor timezone
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  mentor      User     @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@index([mentorId, weekday])
+}
+
+model AvailabilityException {
+  id        String   @id @default(uuid())
+  mentorId  String
+  startAt   DateTime @db.Timestamptz
+  endAt     DateTime @db.Timestamptz
+  kind      String   // "BLOCK" | "EXTRA"
+  note      String?
+  createdAt DateTime @default(now())
+
+  mentor    User     @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@index([mentorId, startAt, endAt])
+}
+
+model Meeting {
+  id                  String   @id @default(uuid())
+  mentorId            String
+  gigId               String?
+  kind                String   @default("ONE_TO_ONE") // "ONE_TO_ONE" | "GROUP"
+  startAt             DateTime @db.Timestamptz
+  endAt               DateTime @db.Timestamptz
+  status              String   @default("PENDING") // PENDING, ACCEPTED, DECLINED, SUPERSEDED, CANCELLED_BY_LEARNER, CANCELLED_BY_MENTOR, EXPIRED, COMPLETED, NO_SHOW_LEARNER, NO_SHOW_MENTOR
+  platform            String   @default("GOOGLE_MEET") // GOOGLE_MEET | ZOOM | MANUAL
+  roomStatus          String   @default("NONE") // NONE | PENDING | READY | FAILED
+  joinUrl             String?
+  hostUrlEnc          String?
+  externalId          String?
+  requestedByRole     String   @default("LEARNER") // LEARNER | MENTOR
+  agenda              String?
+  capacity            Int?
+  minParticipants     Int?
+  supersedesMeetingId String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  mentor              User     @relation("MentorMeetings", fields: [mentorId], references: [id], onDelete: Cascade)
+  gig                 Offering? @relation(fields: [gigId], references: [id], onDelete: SetNull)
+  participants        MeetingParticipant[]
+  quotaLedgers        QuotaLedger[]
+  chatThreads         ChatThread[]
+
+  @@index([mentorId, startAt, endAt])
+  @@index([status])
+}
+
+model MeetingParticipant {
+  id           String   @id @default(uuid())
+  meetingId    String
+  enrollmentId String
+  status       String   @default("JOINED") // JOINED | WAITLIST | CANCELLED
+  quotaState   String   @default("RESERVED") // RESERVED | USED | RELEASED | FORFEITED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  meeting      Meeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, enrollmentId])
+  @@index([enrollmentId])
+}
+
+model QuotaLedger {
+  id            String     @id @default(uuid())
+  enrollmentId  String
+  meetingId     String?
+  action        String     // RESERVE | RELEASE | CONSUME | FORFEIT
+  deltaReserved Int        @default(0)
+  deltaUsed     Int        @default(0)
+  reason        String
+  createdAt     DateTime   @default(now())
+
+  enrollment    Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  meeting       Meeting?   @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+
+  @@index([enrollmentId])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  type      String
+  payload   String?   // JSON serialized payload
+  dedupeKey String    @unique
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+}
+
+model CalendarConnection {
+  id              String    @id @default(uuid())
+  userId          String
+  provider        String    // GOOGLE | ZOOM
+  accountEmail    String?
+  accessTokenEnc  String?
+  refreshTokenEnc String?
+  expiresAt       DateTime?
+  scopes          String?
+  status          String    @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+}
+
+model Review {
+  id           String     @id @default(uuid())
+  enrollmentId String     @unique
+  learnerId    String
+  mentorId     String
+  gigId        String?
+  rating       Int        // 1-5
+  comment      String?
+  createdAt    DateTime   @default(now())
+
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  learner      User       @relation("LearnerReviews", fields: [learnerId], references: [id], onDelete: Cascade)
+  mentor       User       @relation("MentorReviews", fields: [mentorId], references: [id], onDelete: Cascade)
+  gig          Offering?  @relation(fields: [gigId], references: [id], onDelete: SetNull)
+
+  @@index([mentorId])
+  @@index([gigId])
+}
+
+model LearnerAvailabilityWindow {
+  id           String     @id @default(uuid())
+  learnerId    String
+  enrollmentId String
+  startAt      DateTime   @db.Timestamptz
+  endAt        DateTime   @db.Timestamptz
+  createdAt    DateTime   @default(now())
+
+  learner      User       @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId])
+  @@index([learnerId, startAt, endAt])
+}
+
+// ════════════════════════════════════════════════════════════════════
+// CHAT, TASKS & ANCHORING (PART B)
+// ════════════════════════════════════════════════════════════════════
+
+model ChatThread {
+  id           String            @id @default(uuid())
+  kind         String            @default("DIRECT") // DIRECT | GROUP
+  enrollmentId String?
+  meetingId    String?
+  headHash     String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  enrollment   Enrollment?       @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  meeting      Meeting?          @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  participants ChatParticipant[]
+  messages     ChatMessage[]
+
+  @@index([enrollmentId])
+  @@index([meetingId])
+}
+
+model ChatParticipant {
+  id          String     @id @default(uuid())
+  threadId    String
+  userId      String
+  role        String     @default("MEMBER") // LEARNER | MENTOR | MEMBER
+  mutedAt     DateTime?
+  lastReadSeq Int        @default(0)
+  createdAt   DateTime   @default(now())
+
+  thread      ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+}
+
+model ChatMessage {
+  id          String      @id @default(uuid())
+  threadId    String
+  senderId    String
+  seq         Int
+  kind        String      @default("TEXT") // TEXT | ATTACHMENT | SYSTEM
+  body        String
+  attachments String?     // JSON serialized attachments
+  replyToId   String?
+  editedAt    DateTime?
+  deletedAt   DateTime?
+  prevHash    String?
+  hash        String?
+  createdAt   DateTime    @default(now())
+
+  thread      ChatThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, seq])
+  @@index([threadId, createdAt])
+}
+
+model ChatReport {
+  id          String    @id @default(uuid())
+  messageId   String
+  reporterId  String
+  reason      String
+  status      String    @default("PENDING") // PENDING | REVIEWED | DISMISSED
+  createdAt   DateTime  @default(now())
+}
+
+model TaskDefinition {
+  id               String           @id @default(uuid())
+  gigId            String
+  phase            String           // PRE | DURING | POST
+  type             String           // QUESTIONNAIRE | FILE_UPLOAD | LINK_REPO | QUIZ | TEXT_REFLECTION
+  title            String
+  instructions     String
+  attachments      String?          // JSON serialized attachments
+  dueRule          String?          // JSON or rule string
+  latePolicy       String           @default("ALLOW") // ALLOW | PENALTY_PERCENT | BLOCK
+  maxAttempts      Int              @default(3)
+  rubric           String?          // JSON serialized criteria
+  passingScore     Float            @default(70)
+  blocksScheduling Boolean          @default(false)
+  linkedMilestone  Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  gig              Offering         @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  assignments      TaskAssignment[]
+
+  @@index([gigId, phase])
+}
+
+model TaskTemplate {
+  id           String   @id @default(uuid())
+  mentorId     String?
+  title        String
+  phase        String
+  type         String
+  instructions String
+  rubric       String?
+  createdAt    DateTime @default(now())
+}
+
+model TaskAssignment {
+  id           String            @id @default(uuid())
+  enrollmentId String
+  definitionId String
+  learnerId    String
+  status       String            @default("ASSIGNED") // ASSIGNED | IN_PROGRESS | SUBMITTED | CHANGES_REQUESTED | APPROVED | REJECTED | EXCUSED | OVERDUE
+  dueAt        DateTime?
+  attempt      Int               @default(1)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  enrollment   Enrollment        @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  definition   TaskDefinition    @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  learner      User              @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  submissions  TaskSubmission[]
+
+  @@unique([enrollmentId, definitionId])
+  @@index([learnerId])
+}
+
+model TaskSubmission {
+  id           String         @id @default(uuid())
+  assignmentId String
+  version      Int            @default(1)
+  content      String?        // JSON content or text
+  fileRefs     String?        // JSON file references
+  contentHash  String?
+  signature    String?
+  signedBy     String?
+  score        Float?
+  feedback     String?
+  decision     String?        // APPROVED | CHANGES_REQUESTED | REJECTED
+  reviewedAt   DateTime?
+  submittedAt  DateTime       @default(now())
+
+  assignment   TaskAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId, version])
+}
+
+model IpfsObject {
+  cid         String    @id
+  kind        String    // EVIDENCE_DISPUTE | CREDENTIAL | TASK_BUNDLE
+  encrypted   Boolean   @default(true)
+  sizeBytes   Int?
+  ownerId     String?
+  relatedType String?   // Session | Enrollment | Dispute
+  relatedId   String?
+  pinnedAt    DateTime  @default(now())
+  unpinnedAt  DateTime?
+
+  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([relatedType, relatedId])
+}
+
+model AnchorBatch {
+  id        String       @id @default(uuid())
+  root      String
+  fromSeq   BigInt
+  toSeq     BigInt
+  txHash    String?
+  status    String       @default("PENDING_CHAIN") // PENDING_CHAIN | CONFIRMED
+  createdAt DateTime     @default(now())
+  leaves    AnchorLeaf[]
+}
+
+model AnchorLeaf {
+  id        String      @id @default(uuid())
+  batchId   String
+  leafIndex Int
+  kind      String
+  refId     String
+  hash      String
+  createdAt DateTime    @default(now())
+
+  batch     AnchorBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId, leafIndex])
 }

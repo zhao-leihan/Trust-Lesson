@@ -275,46 +275,34 @@ export default function LeaderboardPage() {
                       <div className="flex items-start justify-between gap-3 mb-4">
                         <div className="flex items-center gap-3">
                           <div className="relative shrink-0">
-                            {activeTab === "mentors" ? (
-                              <Link href={`/mentor/${encodeURIComponent(item.id)}`} className="block group/avatar">
-                                <img
-                                  src={item.avatarUrl}
-                                  alt={item.name}
-                                  className={`w-13 h-13 rounded-full object-cover transition-all cursor-pointer ${
-                                    item.isVerified
-                                      ? "border-2 border-emerald-500 ring-2 ring-emerald-400/50 shadow-xs shadow-emerald-500/20 group-hover/avatar:ring-emerald-500"
-                                      : "border border-slate-200 shadow-xs group-hover/avatar:border-purple-300"
-                                  }`}
-                                />
-                                {item.isVerified && (
-                                  <span
-                                    className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs"
-                                    title="Verified Mentor"
-                                  >
-                                    <CheckCircle2 className="w-3.5 h-3.5 fill-emerald-500 text-white" />
-                                  </span>
-                                )}
-                              </Link>
-                            ) : (
+                            <Link href={`/mentor/${encodeURIComponent(item.id)}`} className="block group/avatar">
                               <img
                                 src={item.avatarUrl}
                                 alt={item.name}
-                                className="w-13 h-13 rounded-full object-cover border border-slate-200 shadow-xs"
+                                className={`w-13 h-13 rounded-full object-cover transition-all cursor-pointer ${
+                                  item.isVerified
+                                    ? "border-2 border-emerald-500 ring-2 ring-emerald-400/50 shadow-xs shadow-emerald-500/20 group-hover/avatar:ring-emerald-500"
+                                    : "border border-slate-200 shadow-xs group-hover/avatar:border-purple-300"
+                                }`}
                               />
-                            )}
+                              {item.isVerified && (
+                                <span
+                                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs"
+                                  title="Verified"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 fill-emerald-500 text-white" />
+                                </span>
+                              )}
+                            </Link>
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              {activeTab === "mentors" ? (
-                                <Link
-                                  href={`/mentor/${encodeURIComponent(item.id)}`}
-                                  className="font-extrabold text-slate-900 text-base hover:text-purple-700 hover:underline transition-colors cursor-pointer"
-                                >
-                                  {item.name}
-                                </Link>
-                              ) : (
-                                <span className="font-extrabold text-slate-900 text-base">{item.name}</span>
-                              )}
+                              <Link
+                                href={`/mentor/${encodeURIComponent(item.id)}`}
+                                className="font-extrabold text-slate-900 text-base hover:text-purple-700 hover:underline transition-colors cursor-pointer"
+                              >
+                                {item.name}
+                              </Link>
                               {activeTab === "mentors" && item.role === "ADMIN" && (
                                 <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[9px] font-black uppercase border border-purple-200">
                                   Admin
@@ -739,16 +727,23 @@ export default function LeaderboardPage() {
                           {/* Student Profile */}
                           <td className="py-4 px-4 sm:px-6">
                             <div className="flex items-center gap-3">
-                              <img
-                                src={s.avatarUrl}
-                                alt={s.name}
-                                className="w-11 h-11 rounded-full object-cover border border-slate-200 ring-2 ring-transparent group-hover:ring-indigo-400 transition-all flex-shrink-0"
-                              />
+                              <div className="relative shrink-0">
+                                <Link href={`/mentor/${encodeURIComponent(s.id)}`} className="block group/avatar">
+                                  <img
+                                    src={s.avatarUrl}
+                                    alt={s.name}
+                                    className="w-11 h-11 rounded-full object-cover border border-slate-200 ring-2 ring-transparent group-hover:ring-indigo-400 transition-all flex-shrink-0 cursor-pointer"
+                                  />
+                                </Link>
+                              </div>
                               <div>
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
+                                  <Link
+                                    href={`/mentor/${encodeURIComponent(s.id)}`}
+                                    className="font-bold text-slate-900 hover:text-indigo-700 hover:underline transition-colors cursor-pointer"
+                                  >
                                     {s.name}
-                                  </span>
+                                  </Link>
                                   {s.nickname && (
                                     <span className="text-xs text-slate-500 font-medium">(@{s.nickname})</span>
                                   )}

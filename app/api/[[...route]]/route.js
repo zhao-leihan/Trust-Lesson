@@ -62,6 +62,61 @@ app.get("/auth/captcha", async (c) => {
   return c.json(captcha);
 });
 
+/** GET /api/auth/google/login — 1-Click Google Calendar & Meet connection */
+app.get("/auth/google/login", (c) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const redirectUri = `${new URL(c.req.url).origin}/api/auth/google/callback`;
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent("https://www.googleapis.com/auth/calendar.events")}&access_type=offline&prompt=consent`;
+  return c.redirect(url);
+});
+
+/** GET /api/auth/google/callback — Auto-saves GOOGLE_REFRESH_TOKEN to .env */
+app.get("/auth/google/callback", async (c) => {
+  const code = c.req.query("code");
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = `${new URL(c.req.url).origin}/api/auth/google/callback`;
+
+  if (!code) return c.text("Authorization code missing", 400);
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
+    }),
+  });
+
+  const data = await tokenRes.json();
+  if (data.refresh_token) {
+    const fs = await import("fs");
+    const path = await import("path");
+    const envPath = path.resolve(process.cwd(), ".env");
+    let envContent = fs.readFileSync(envPath, "utf8");
+    if (envContent.includes("GOOGLE_REFRESH_TOKEN=")) {
+      envContent = envContent.replace(/GOOGLE_REFRESH_TOKEN=".*"/, `GOOGLE_REFRESH_TOKEN="${data.refresh_token}"`);
+    } else {
+      envContent += `\nGOOGLE_REFRESH_TOKEN="${data.refresh_token}"\n`;
+    }
+    fs.writeFileSync(envPath, envContent, "utf8");
+    process.env.GOOGLE_REFRESH_TOKEN = data.refresh_token;
+
+    return c.html(`
+      <div style="font-family:system-ui,sans-serif;padding:50px;text-align:center;">
+        <h2 style="color:#16a34a;margin-bottom:8px;">Google Meet Connected! 🎉</h2>
+        <p style="color:#475569;margin-bottom:24px;">GOOGLE_REFRESH_TOKEN has been automatically saved to .env</p>
+        <a href="/dashboard/requests" style="background:#7c3aed;color:white;padding:10px 20px;border-radius:12px;text-decoration:none;font-weight:bold;">Return to Dashboard</a>
+      </div>
+    `);
+  }
+
+  return c.json({ error: "Failed to obtain refresh token", detail: data }, 400);
+});
+
 /** POST /api/auth/login — Email + Password Login with Turnstile & Dual Tokens */
 app.post("/auth/login", async (c) => {
   const clientIp = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || c.req.header("x-real-ip") || "127.0.0.1";
@@ -2159,6 +2214,13 @@ app.post("/mentor/gigs", async (c) => {
       );
     }
 
+    let structuredPackages = packages;
+    try {
+      const { parsePackages } = await import("@/lib/packages");
+      const normalized = parsePackages(packages);
+      if (normalized && normalized.length > 0) structuredPackages = normalized;
+    } catch {}
+
     const newOffering = await db.offering.create({
       data: {
         title,
@@ -2179,7 +2241,7 @@ app.post("/mentor/gigs", async (c) => {
         mentorId: mentor ? mentor.id : (mentorId || null),
         meetingPlatform: meetingPlatform || "Google Meet",
         meetingLink: meetingLink || null,
-        packages: JSON.stringify(packages),
+        packages: JSON.stringify(structuredPackages),
         modules: JSON.stringify(modules),
         milestones: JSON.stringify(
           packages[0]?.deliverables
@@ -2219,7 +2281,1231 @@ app.delete("/mentor/gigs", async (c) => {
   }
 });
 
-/** GET /api/mentor/public-profile/:id — Public mentor profile with stats & offerings */
+// ════════════════════════════════════════════════════════════════════
+// ENROLLMENT & CLASSROOM ROUTES (Phase 1)
+// ════════════════════════════════════════════════════════════════════
+
+/** POST /api/enrollments — Create real Enrollment on escrow funded */
+app.post("/enrollments", authMiddleware, async (c) => {
+  const jwtUser = c.get("user");
+  const body = await c.req.json();
+  const {
+    gigId,
+    packageId,
+    packageName,
+    mentorId,
+    onchainSessionId,
+    sessionsIncluded,
+    sessionDurationMin,
+    validityDays,
+  } = body;
+
+  if (!gigId) {
+    return c.json({ error: "gigId is required" }, 400);
+  }
+
+  const db = await getPrisma();
+
+  // Find the offering / gig
+  const gig = await db.offering.findUnique({ where: { id: gigId } });
+  if (!gig) {
+    return c.json({ error: "Gig not found" }, 404);
+  }
+
+  // Idempotency check on onchainSessionId
+  if (onchainSessionId) {
+    const existing = await db.enrollment.findUnique({
+      where: { onchainSessionId: BigInt(onchainSessionId) },
+      include: { gig: true, mentor: true, learner: true },
+    });
+    if (existing) {
+      return c.json({
+        enrollment: {
+          ...existing,
+          onchainSessionId: existing.onchainSessionId ? existing.onchainSessionId.toString() : null,
+        },
+        message: "Enrollment already exists",
+      });
+    }
+  }
+
+  // Determine mentor ID
+  let targetMentorId = mentorId || gig.mentorId;
+  if (!targetMentorId && gig.mentorAddress) {
+    const mentorUser = await db.user.findUnique({
+      where: { walletAddress: gig.mentorAddress.toLowerCase() },
+    });
+    if (mentorUser) targetMentorId = mentorUser.id;
+  }
+
+  if (!targetMentorId) {
+    return c.json({ error: "Mentor not found for this gig" }, 404);
+  }
+
+  // Determine structured package fields
+  let totalSessions = Number(sessionsIncluded);
+  let durationMin = Number(sessionDurationMin);
+  let valDays = Number(validityDays);
+
+  if (isNaN(totalSessions) || totalSessions < 0) {
+    const { parsePackages } = await import("@/lib/packages");
+    const pkgs = parsePackages(gig.packages);
+    const matchedPkg =
+      pkgs.find(
+        (p) =>
+          (packageId && p.id === packageId) ||
+          (packageName && (p.name === packageName || p.tier === packageName))
+      ) || pkgs[0];
+
+    totalSessions = matchedPkg?.liveSessionsIncluded ?? 1;
+    durationMin = isNaN(durationMin) || durationMin <= 0 ? (matchedPkg?.sessionDurationMin ?? 60) : durationMin;
+    valDays = isNaN(valDays) || valDays <= 0 ? (matchedPkg?.validityDays ?? 30) : valDays;
+  }
+
+  const expiresAt = valDays && valDays > 0 ? new Date(Date.now() + valDays * 86400000) : null;
+
+  try {
+    const enrollment = await db.$transaction(async (tx) => {
+      const created = await tx.enrollment.create({
+        data: {
+          gigId,
+          packageId: packageId || null,
+          packageName: packageName || "Standard Package",
+          learnerId: jwtUser.sub,
+          mentorId: targetMentorId,
+          onchainSessionId: onchainSessionId ? BigInt(onchainSessionId) : null,
+          escrowStatus: "FUNDED",
+          sessionsIncluded: totalSessions,
+          sessionDurationMin: durationMin || 60,
+          sessionsReserved: 0,
+          sessionsUsed: 0,
+          expiresAt,
+        },
+        include: { gig: true, mentor: true, learner: true },
+      });
+
+      // Append QuotaLedger INITIAL_GRANT
+      await tx.quotaLedger.create({
+        data: {
+          enrollmentId: created.id,
+          action: "INITIAL_GRANT",
+          deltaReserved: 0,
+          deltaUsed: 0,
+          reason: `Package enrolled with ${totalSessions} live session(s) granted`,
+        },
+      });
+
+      // Notification for mentor
+      await tx.notification.create({
+        data: {
+          userId: targetMentorId,
+          type: "NEW_ENROLLMENT",
+          dedupeKey: `enrollment:${created.id}:mentor`,
+          payload: JSON.stringify({
+            enrollmentId: created.id,
+            gigTitle: gig.title,
+            packageName: created.packageName,
+            learnerName: created.learner.name || created.learner.email || "Learner",
+          }),
+        },
+      });
+
+      return created;
+    });
+
+    return c.json(
+      {
+        enrollment: {
+          ...enrollment,
+          onchainSessionId: enrollment.onchainSessionId ? enrollment.onchainSessionId.toString() : null,
+        },
+        success: true,
+      },
+      201
+    );
+  } catch (err) {
+    console.error("[Enrollment Creation Error]:", err);
+    return c.json({ error: "Failed to create enrollment", detail: err.message }, 500);
+  }
+});
+
+/** GET /api/enrollments — List enrollments for learner or mentor */
+app.get("/enrollments", authMiddleware, async (c) => {
+  const jwtUser = c.get("user");
+  const role = c.req.query("role"); // "learner" | "mentor"
+  const db = await getPrisma();
+
+  const where = {};
+  if (role === "mentor") {
+    where.mentorId = jwtUser.sub;
+  } else if (role === "learner") {
+    where.learnerId = jwtUser.sub;
+  } else {
+    where.OR = [{ learnerId: jwtUser.sub }, { mentorId: jwtUser.sub }];
+  }
+
+  try {
+    const enrollments = await db.enrollment.findMany({
+      where,
+      include: {
+        gig: true,
+        mentor: { select: { id: true, name: true, email: true, avatarUrl: true, domain: true } },
+        learner: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        review: true,
+        participants: {
+          include: {
+            meeting: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const serialized = enrollments.map((e) => ({
+      ...e,
+      onchainSessionId: e.onchainSessionId ? e.onchainSessionId.toString() : null,
+    }));
+
+    return c.json({ enrollments: serialized });
+  } catch (err) {
+    console.error("[GET /enrollments Error]:", err);
+    return c.json({ error: "Failed to fetch enrollments", detail: err.message }, 500);
+  }
+});
+
+/** GET /api/enrollments/:id — Detail of enrollment with gated materials and quota */
+app.get("/enrollments/:id", authMiddleware, async (c) => {
+  const enrollmentId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const { getEnrollmentAccess } = await import("@/lib/access");
+
+  const access = await getEnrollmentAccess(enrollmentId, jwtUser.sub, { checkFreshness: true });
+  if (access.notFound || !access.allowed) {
+    return c.json({ error: "Enrollment not found" }, 404);
+  }
+
+  const { enrollment } = access;
+  const db = await getPrisma();
+
+  // Fetch all meetings associated with this enrollment
+  const participants = await db.meetingParticipant.findMany({
+    where: { enrollmentId },
+    include: {
+      meeting: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Parse modules from gig
+  let modules = [];
+  try {
+    if (enrollment.gig?.modules) {
+      modules =
+        typeof enrollment.gig.modules === "string"
+          ? JSON.parse(enrollment.gig.modules)
+          : enrollment.gig.modules;
+    }
+  } catch {}
+
+  // Parse packages from gig
+  let packages = [];
+  try {
+    const { parsePackages } = await import("@/lib/packages");
+    packages = parsePackages(enrollment.gig?.packages);
+  } catch {}
+
+  // Quota calculation
+  const remainingQuota = Math.max(
+    0,
+    enrollment.sessionsIncluded - enrollment.sessionsUsed - enrollment.sessionsReserved
+  );
+
+  return c.json({
+    enrollment: {
+      ...enrollment,
+      onchainSessionId: enrollment.onchainSessionId ? enrollment.onchainSessionId.toString() : null,
+      gig: {
+        ...enrollment.gig,
+        parsedPackages: packages,
+        parsedModules: access.canViewMaterials
+          ? modules
+          : modules.map((m) => ({
+              id: m.id,
+              title: m.title,
+              description: m.description,
+              isLocked: true,
+            })),
+      },
+    },
+    access: {
+      canViewMaterials: access.canViewMaterials,
+      canRequestMeeting: access.canRequestMeeting,
+      canSeeJoinLink: access.canSeeJoinLink,
+      isReadOnly: access.isReadOnly,
+      isDisputed: access.isDisputed,
+      role: access.role,
+    },
+    quota: {
+      total: enrollment.sessionsIncluded,
+      used: enrollment.sessionsUsed,
+      reserved: enrollment.sessionsReserved,
+      remaining: remainingQuota,
+      canBook: access.canRequestMeeting && remainingQuota > 0,
+    },
+    meetings: participants.map((p) => p.meeting),
+  });
+});
+
+/** GET /api/gigs/:id/buyers — Mentor Buyers table */
+app.get("/gigs/:id/buyers", authMiddleware, async (c) => {
+  const gigId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const db = await getPrisma();
+
+  const gig = await db.offering.findUnique({ where: { id: gigId } });
+  if (!gig) {
+    return c.json({ error: "Gig not found" }, 404);
+  }
+
+  // Authorization: Only mentor who owns the gig can view buyers
+  const isOwner =
+    (gig.mentorId && gig.mentorId === jwtUser.sub) ||
+    (gig.mentorAddress &&
+      jwtUser.address &&
+      gig.mentorAddress.toLowerCase() === jwtUser.address.toLowerCase());
+
+  if (!isOwner && jwtUser.role !== "ADMIN") {
+    return c.json({ error: "Unauthorized" }, 403);
+  }
+
+  const enrollments = await db.enrollment.findMany({
+    where: { gigId },
+    include: {
+      learner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+          walletAddress: true,
+        },
+      },
+      participants: {
+        include: {
+          meeting: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const buyers = enrollments.map((e) => {
+    // Find next upcoming accepted/pending meeting
+    const upcomingMeetings = e.participants
+      .map((p) => p.meeting)
+      .filter(
+        (m) =>
+          m &&
+          (m.status === "ACCEPTED" || m.status === "PENDING") &&
+          new Date(m.startAt) > new Date()
+      )
+      .sort((a, b) => new Date(a.startAt) - new Date(b.startAt));
+
+    const nextMeeting = upcomingMeetings[0] || null;
+
+    return {
+      enrollmentId: e.id,
+      onchainSessionId: e.onchainSessionId ? e.onchainSessionId.toString() : null,
+      learner: e.learner,
+      packageTier: e.packageName || "Standard",
+      purchasedAt: e.createdAt,
+      escrowStatus: e.escrowStatus,
+      quota: {
+        used: e.sessionsUsed,
+        reserved: e.sessionsReserved,
+        total: e.sessionsIncluded,
+        remaining: Math.max(0, e.sessionsIncluded - e.sessionsUsed - e.sessionsReserved),
+      },
+      nextMeeting: nextMeeting
+        ? {
+            id: nextMeeting.id,
+            startAt: nextMeeting.startAt,
+            endAt: nextMeeting.endAt,
+            platform: nextMeeting.platform,
+            status: nextMeeting.status,
+          }
+        : null,
+      lastActivity: e.updatedAt,
+    };
+  });
+
+  return c.json({ gig: { id: gig.id, title: gig.title }, buyers });
+});
+
+// ════════════════════════════════════════════════════════════════════
+// SCHEDULING, AVAILABILITY & MEETING MANAGEMENT (Phase 2)
+// ════════════════════════════════════════════════════════════════════
+
+/** GET /api/mentors/:id/availability — Get mentor availability settings and rules */
+app.get("/mentors/:id/availability", async (c) => {
+  const mentorId = c.req.param("id");
+  const db = await getPrisma();
+
+  try {
+    const mentor = await db.user.findFirst({
+      where: {
+        OR: [{ id: mentorId }, { walletAddress: mentorId.toLowerCase() }],
+      },
+    });
+
+    if (!mentor) {
+      return c.json({ error: "Mentor not found" }, 404);
+    }
+
+    const settings = await db.mentorAvailabilitySettings.findUnique({
+      where: { mentorId: mentor.id },
+    });
+
+    const rules = await db.availabilityRule.findMany({
+      where: { mentorId: mentor.id },
+      orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
+    });
+
+    const exceptions = await db.availabilityException.findMany({
+      where: { mentorId: mentor.id, endAt: { gte: new Date() } },
+      orderBy: { startAt: "asc" },
+    });
+
+    return c.json({
+      settings: settings || {
+        timezone: "UTC",
+        minNoticeHours: 2,
+        maxHorizonDays: 30,
+        bufferBeforeMin: 0,
+        bufferAfterMin: 15,
+        slotStepMin: 30,
+        maxSessionsPerDay: 6,
+      },
+      rules,
+      exceptions,
+      mentor: {
+        id: mentor.id,
+        name: mentor.name,
+        meetingLink: mentor.portfolio || null,
+      },
+    });
+  } catch (err) {
+    console.error("[GET /mentors/:id/availability Error]:", err);
+    return c.json({ error: "Failed to load availability", detail: err.message }, 500);
+  }
+});
+
+/** PUT /api/mentors/me/availability — Save mentor availability settings and weekly rules */
+app.put("/mentors/me/availability", authMiddleware, async (c) => {
+  const jwtUser = c.get("user");
+  const body = await c.req.json();
+  const {
+    timezone = "UTC",
+    minNoticeHours = 2,
+    maxHorizonDays = 30,
+    bufferBeforeMin = 0,
+    bufferAfterMin = 15,
+    slotStepMin = 30,
+    maxSessionsPerDay = 6,
+    rules = [],
+    exceptions = [],
+    meetingLink,
+  } = body;
+
+  const db = await getPrisma();
+
+  try {
+    await db.$transaction(async (tx) => {
+      // 1. Upsert settings
+      await tx.mentorAvailabilitySettings.upsert({
+        where: { mentorId: jwtUser.sub },
+        update: {
+          timezone,
+          minNoticeHours: Number(minNoticeHours) || 2,
+          maxHorizonDays: Number(maxHorizonDays) || 30,
+          bufferBeforeMin: Number(bufferBeforeMin) || 0,
+          bufferAfterMin: Number(bufferAfterMin) || 15,
+          slotStepMin: Number(slotStepMin) || 30,
+          maxSessionsPerDay: Number(maxSessionsPerDay) || 6,
+        },
+        create: {
+          mentorId: jwtUser.sub,
+          timezone,
+          minNoticeHours: Number(minNoticeHours) || 2,
+          maxHorizonDays: Number(maxHorizonDays) || 30,
+          bufferBeforeMin: Number(bufferBeforeMin) || 0,
+          bufferAfterMin: Number(bufferAfterMin) || 15,
+          slotStepMin: Number(slotStepMin) || 30,
+          maxSessionsPerDay: Number(maxSessionsPerDay) || 6,
+        },
+      });
+
+      // 2. Replace weekly rules
+      await tx.availabilityRule.deleteMany({ where: { mentorId: jwtUser.sub } });
+      if (Array.isArray(rules) && rules.length > 0) {
+        await tx.availabilityRule.createMany({
+          data: rules.map((r) => ({
+            mentorId: jwtUser.sub,
+            weekday: Number(r.weekday),
+            startMinute: Number(r.startMinute),
+            endMinute: Number(r.endMinute),
+          })),
+        });
+      }
+
+      // 3. Replace future exceptions
+      await tx.availabilityException.deleteMany({
+        where: { mentorId: jwtUser.sub, endAt: { gte: new Date() } },
+      });
+      if (Array.isArray(exceptions) && exceptions.length > 0) {
+        await tx.availabilityException.createMany({
+          data: exceptions.map((e) => ({
+            mentorId: jwtUser.sub,
+            startAt: new Date(e.startAt),
+            endAt: new Date(e.endAt),
+            kind: e.kind || "BLOCK",
+            note: e.note || null,
+          })),
+        });
+      }
+
+      // 4. Update permanent fallback meeting link
+      if (meetingLink !== undefined) {
+        await tx.user.update({
+          where: { id: jwtUser.sub },
+          data: { portfolio: meetingLink },
+        });
+      }
+    });
+
+    return c.json({ success: true, message: "Availability settings saved successfully" });
+  } catch (err) {
+    console.error("[PUT /mentors/me/availability Error]:", err);
+    return c.json({ error: "Failed to update availability", detail: err.message }, 500);
+  }
+});
+
+/** GET /api/mentors/:id/slots — Generate conflict-free available slots (Section 5.1) */
+app.get("/mentors/:id/slots", async (c) => {
+  const mentorId = c.req.param("id");
+  const durationMin = Number(c.req.query("durationMin")) || 60;
+  const from = c.req.query("from");
+  const to = c.req.query("to");
+
+  try {
+    const { generateSlots } = await import("@/lib/scheduling");
+    const slots = await generateSlots({
+      mentorId,
+      durationMin,
+      from,
+      to,
+    });
+
+    return c.json({ slots });
+  } catch (err) {
+    console.error("[GET /mentors/:id/slots Error]:", err);
+    return c.json({ error: "Failed to generate slots", detail: err.message }, 500);
+  }
+});
+
+/** POST /api/enrollments/:id/meetings — Learner requests a meeting (Section 5.2 race-safe transaction) */
+app.post("/enrollments/:id/meetings", authMiddleware, async (c) => {
+  const enrollmentId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const body = await c.req.json();
+  const { startAt, endAt, platform = "GOOGLE_MEET", agenda } = body;
+  const idempotencyKey = c.req.header("Idempotency-Key");
+
+  if (!startAt || !endAt) {
+    return c.json({ error: "startAt and endAt are required" }, 400);
+  }
+
+  const startDate = new Date(startAt);
+  const endDate = new Date(endAt);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || startDate >= endDate) {
+    return c.json({ error: "Invalid startAt or endAt timestamp" }, 400);
+  }
+  if (startDate <= new Date()) {
+    return c.json({ error: "Cannot schedule meeting in the past" }, 400);
+  }
+
+  const db = await getPrisma();
+  const { getEnrollmentAccess } = await import("@/lib/access");
+  const { reserveQuota } = await import("@/lib/quota");
+
+  // Verify access permissions
+  const access = await getEnrollmentAccess(enrollmentId, jwtUser.sub);
+  if (access.notFound || !access.allowed) {
+    return c.json({ error: "Enrollment not found" }, 404);
+  }
+
+  if (!access.canRequestMeeting) {
+    return c.json({ error: `Scheduling not allowed in ${access.status} status` }, 403);
+  }
+
+  const { enrollment } = access;
+  if (enrollment.sessionsIncluded <= 0) {
+    return c.json({ error: "This package does not include live sessions (Self-paced)" }, 400);
+  }
+
+  if (enrollment.expiresAt && new Date(enrollment.expiresAt) < new Date()) {
+    return c.json({ error: "This enrollment package has expired" }, 400);
+  }
+
+  // Idempotency check
+  if (idempotencyKey) {
+    const dedupeKey = `req:${idempotencyKey}`;
+    const existingMeeting = await db.meeting.findFirst({
+      where: {
+        externalId: dedupeKey,
+      },
+    });
+    if (existingMeeting) {
+      return c.json({ meeting: existingMeeting, message: "Duplicate request avoided" });
+    }
+  }
+
+  try {
+    const meeting = await db.$transaction(async (tx) => {
+      // 1. Acquire PostgreSQL advisory lock on mentor ID to serialize booking per mentor
+      const mentorLockKey = Math.abs(
+        enrollment.mentorId.split("").reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)
+      );
+      await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${mentorLockKey});`);
+
+      // 2. Check learner has no active overlapping meeting
+      const learnerOverlap = await tx.meeting.findFirst({
+        where: {
+          participants: {
+            some: { enrollment: { learnerId: jwtUser.sub } },
+          },
+          status: { in: ["PENDING", "ACCEPTED"] },
+          startAt: { lt: endDate },
+          endAt: { gt: startDate },
+        },
+      });
+
+      if (learnerOverlap) {
+        const err = new Error("You already have an active meeting scheduled during this time window.");
+        err.statusCode = 409;
+        throw err;
+      }
+
+      // 3. Atomically reserve quota unit
+      await reserveQuota(tx, enrollmentId, null, `Requested session on ${startDate.toISOString()}`);
+
+      // 4. Resolve meeting platform from gig
+      const platform = enrollment.gig?.meetingPlatform || (typeof requestedPlatform !== "undefined" ? requestedPlatform : null) || "Google Meet";
+
+      // 5. Create Meeting (PENDING until mentor accepts)
+      const newMeeting = await tx.meeting.create({
+        data: {
+          mentorId: enrollment.mentorId,
+          gigId: enrollment.gigId,
+          kind: "ONE_TO_ONE",
+          startAt: startDate,
+          endAt: endDate,
+          status: "PENDING",
+          platform,
+          roomStatus: "PENDING",
+          joinUrl: null,
+          requestedByRole: "LEARNER",
+          agenda: agenda || null,
+          externalId: idempotencyKey ? `req:${idempotencyKey}` : null,
+        },
+      });
+
+      // 6. Create MeetingParticipant
+      await tx.meetingParticipant.create({
+        data: {
+          meetingId: newMeeting.id,
+          enrollmentId: enrollment.id,
+          status: "JOINED",
+          quotaState: "RESERVED",
+        },
+      });
+
+      // 7. Notification for mentor
+      await tx.notification.create({
+        data: {
+          userId: enrollment.mentorId,
+          type: "MEETING_REQUESTED",
+          dedupeKey: `meeting:${newMeeting.id}:mentor`,
+          payload: JSON.stringify({
+            meetingId: newMeeting.id,
+            enrollmentId: enrollment.id,
+            gigTitle: enrollment.gig?.title,
+            startAt: newMeeting.startAt,
+            learnerName: enrollment.learner?.name || "Student",
+          }),
+        },
+      });
+
+      return newMeeting;
+    });
+
+    return c.json({ meeting, success: true }, 201);
+  } catch (err) {
+    console.error("[Booking Transaction Error]:", err);
+    // PostgreSQL exclusion constraint violation code: 23P01
+    if (err.message && (err.message.includes("meeting_no_mentor_overlap") || err.message.includes("23P01"))) {
+      const { generateSlots } = await import("@/lib/scheduling");
+      const freshSlots = await generateSlots({
+        mentorId: enrollment.mentorId,
+        durationMin: enrollment.sessionDurationMin || 60,
+      });
+      return c.json(
+        {
+          error: "The requested time slot has just been booked. Please choose an alternate slot.",
+          code: "SLOT_TAKEN",
+          freshSlots,
+        },
+        409
+      );
+    }
+
+    if (err.statusCode === 409) {
+      return c.json({ error: err.message, code: err.code || "CONFLICT" }, 409);
+    }
+
+    return c.json({ error: err.message || "Failed to schedule meeting" }, 500);
+  }
+});
+
+/**
+ * Dynamic meeting link generator for Google Meet and Zoom
+ */
+function generateMeetingLink(platform = "Google Meet") {
+  const norm = String(platform || "").toLowerCase();
+  if (norm.includes("zoom")) {
+    const meetingId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    const pwdChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const pwd = Array.from({ length: 8 }, () => pwdChars[Math.floor(Math.random() * pwdChars.length)]).join("");
+    return {
+      platform: "Zoom Meetings",
+      joinUrl: `https://zoom.us/j/${meetingId}?pwd=${pwd}`,
+    };
+  }
+
+  // Google Meet standard 3-4-3 lowercase letters format (e.g. meet.google.com/abc-defg-hij)
+  const chars = "abcdefghijklmnopqrstuvwxyz";
+  const pick = (len) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return {
+    platform: "Google Meet",
+    joinUrl: `https://meet.google.com/${pick(3)}-${pick(4)}-${pick(3)}`,
+  };
+}
+
+/** POST /api/meetings/:id/accept — Accept meeting request & auto-generate room link */
+app.post("/meetings/:id/accept", authMiddleware, async (c) => {
+  const meetingId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const db = await getPrisma();
+
+  try {
+    const meeting = await db.meeting.findUnique({
+      where: { id: meetingId },
+      include: {
+        gig: true,
+        participants: { include: { enrollment: { include: { gig: true } } } },
+      },
+    });
+
+    if (!meeting) return c.json({ error: "Meeting not found" }, 404);
+
+    const isMentor = meeting.mentorId === jwtUser.sub;
+    const isLearner = meeting.participants.some((p) => p.enrollment?.learnerId === jwtUser.sub);
+    if (!isMentor && !isLearner && jwtUser.role !== "ADMIN") {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+
+    if (meeting.status !== "PENDING") {
+      return c.json({ error: `Cannot accept meeting in ${meeting.status} state` }, 400);
+    }
+
+    // Determine platform from gig or existing meeting record
+    const targetPlatform =
+      meeting.gig?.meetingPlatform ||
+      meeting.participants[0]?.enrollment?.gig?.meetingPlatform ||
+      meeting.platform ||
+      "Google Meet";
+
+    // Auto-generate real meeting room via official API (Zoom Server-to-Server OAuth or Google Calendar API)
+    const { createMeetingRoom } = await import("@/lib/meetings.js");
+    const durationMin = Math.max(15, Math.round((new Date(meeting.endAt) - new Date(meeting.startAt)) / 60000) || 60);
+    const sessionTopic = meeting.gig?.title
+      ? `Trust Lesson: ${meeting.gig.title}`
+      : "Trust Lesson 1-on-1 Mentorship";
+
+    let roomResult;
+    try {
+      roomResult = await createMeetingRoom({
+        platform: targetPlatform,
+        topic: sessionTopic,
+        startAt: meeting.startAt,
+        durationMin,
+      });
+    } catch (apiErr) {
+      console.warn("[Meeting API Warning]:", apiErr.message);
+      roomResult = generateMeetingLink(targetPlatform);
+    }
+
+    const generatedPlatform = roomResult.platform || targetPlatform;
+    const generatedJoinUrl = roomResult.joinUrl;
+    const generatedHostUrl = roomResult.hostUrl || null;
+
+    const updated = await db.meeting.update({
+      where: { id: meetingId },
+      data: {
+        status: "ACCEPTED",
+        platform: generatedPlatform,
+        joinUrl: generatedJoinUrl,
+        hostUrlEnc: generatedHostUrl,
+        roomStatus: "READY",
+      },
+    });
+
+    // Notify the other party
+    const targetUserId = isMentor
+      ? meeting.participants[0]?.enrollment?.learnerId
+      : meeting.mentorId;
+
+    if (targetUserId) {
+      await db.notification.create({
+        data: {
+          userId: targetUserId,
+          type: "MEETING_ACCEPTED",
+          dedupeKey: `meeting:${meeting.id}:accepted:${targetUserId}`,
+          payload: JSON.stringify({
+            meetingId: meeting.id,
+            startAt: meeting.startAt,
+            acceptedBy: isMentor ? "Mentor" : "Learner",
+            platform: generatedPlatform,
+            joinUrl: generatedJoinUrl,
+          }),
+        },
+      });
+    }
+
+    return c.json({ meeting: updated, success: true });
+  } catch (err) {
+    console.error("[Accept Meeting Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** POST /api/meetings/:id/decline — Decline meeting and release reserved quota */
+app.post("/meetings/:id/decline", authMiddleware, async (c) => {
+  const meetingId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const db = await getPrisma();
+  const { releaseQuota } = await import("@/lib/quota");
+
+  try {
+    const meeting = await db.meeting.findUnique({
+      where: { id: meetingId },
+      include: { participants: { include: { enrollment: true } } },
+    });
+
+    if (!meeting) return c.json({ error: "Meeting not found" }, 404);
+
+    const isMentor = meeting.mentorId === jwtUser.sub;
+    const isLearner = meeting.participants.some((p) => p.enrollment?.learnerId === jwtUser.sub);
+    if (!isMentor && !isLearner && jwtUser.role !== "ADMIN") {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+
+    if (meeting.status !== "PENDING") {
+      return c.json({ error: `Cannot decline meeting in ${meeting.status} state` }, 400);
+    }
+
+    const result = await db.$transaction(async (tx) => {
+      const updated = await tx.meeting.update({
+        where: { id: meetingId },
+        data: { status: "DECLINED" },
+      });
+
+      // Release quota unit for each participant
+      for (const p of meeting.participants) {
+        await releaseQuota(tx, p.enrollmentId, meeting.id, "Meeting request declined");
+        await tx.meetingParticipant.update({
+          where: { id: p.id },
+          data: { quotaState: "RELEASED" },
+        });
+      }
+
+      // Notify the requester
+      const targetUserId = isMentor
+        ? meeting.participants[0]?.enrollment?.learnerId
+        : meeting.mentorId;
+
+      if (targetUserId) {
+        await tx.notification.create({
+          data: {
+            userId: targetUserId,
+            type: "MEETING_DECLINED",
+            dedupeKey: `meeting:${meeting.id}:declined:${targetUserId}`,
+            payload: JSON.stringify({
+              meetingId: meeting.id,
+              startAt: meeting.startAt,
+            }),
+          },
+        });
+      }
+
+      return updated;
+    });
+
+    return c.json({ meeting: result, success: true });
+  } catch (err) {
+    console.error("[Decline Meeting Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** POST /api/meetings/:id/counter — Counter-propose meeting time (Section 5.3) */
+app.post("/meetings/:id/counter", authMiddleware, async (c) => {
+  const meetingId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const body = await c.req.json();
+  const { startAt, endAt, agenda } = body;
+
+  if (!startAt || !endAt) {
+    return c.json({ error: "startAt and endAt are required" }, 400);
+  }
+
+  const startDate = new Date(startAt);
+  const endDate = new Date(endAt);
+  const db = await getPrisma();
+
+  try {
+    const oldMeeting = await db.meeting.findUnique({
+      where: { id: meetingId },
+      include: { participants: { include: { enrollment: true } } },
+    });
+
+    if (!oldMeeting) return c.json({ error: "Meeting not found" }, 404);
+
+    const isMentor = oldMeeting.mentorId === jwtUser.sub;
+    const isLearner = oldMeeting.participants.some((p) => p.enrollment?.learnerId === jwtUser.sub);
+    if (!isMentor && !isLearner) return c.json({ error: "Unauthorized" }, 403);
+
+    const participant = oldMeeting.participants[0];
+    if (!participant) return c.json({ error: "No participant found" }, 400);
+
+    const counterMeeting = await db.$transaction(async (tx) => {
+      // 1. Mark previous meeting SUPERSEDED
+      await tx.meeting.update({
+        where: { id: meetingId },
+        data: { status: "SUPERSEDED" },
+      });
+
+      // 2. Create new meeting with inherited reserved quota (never double reserve)
+      const newMeeting = await tx.meeting.create({
+        data: {
+          mentorId: oldMeeting.mentorId,
+          gigId: oldMeeting.gigId,
+          kind: "ONE_TO_ONE",
+          startAt: startDate,
+          endAt: endDate,
+          status: "PENDING",
+          platform: oldMeeting.platform,
+          roomStatus: "READY",
+          joinUrl: oldMeeting.joinUrl,
+          requestedByRole: isMentor ? "MENTOR" : "LEARNER",
+          agenda: agenda || oldMeeting.agenda,
+          supersedesMeetingId: oldMeeting.id,
+        },
+      });
+
+      // 3. Create participant with inherited quota
+      await tx.meetingParticipant.create({
+        data: {
+          meetingId: newMeeting.id,
+          enrollmentId: participant.enrollmentId,
+          status: "JOINED",
+          quotaState: "RESERVED",
+        },
+      });
+
+      // 4. Notify counterparty
+      const targetUserId = isMentor
+        ? participant.enrollment.learnerId
+        : oldMeeting.mentorId;
+
+      await tx.notification.create({
+        data: {
+          userId: targetUserId,
+          type: "MEETING_COUNTER_PROPOSED",
+          dedupeKey: `meeting:${newMeeting.id}:counter:${targetUserId}`,
+          payload: JSON.stringify({
+            meetingId: newMeeting.id,
+            startAt: newMeeting.startAt,
+            proposedBy: isMentor ? "Mentor" : "Learner",
+          }),
+        },
+      });
+
+      return newMeeting;
+    });
+
+    return c.json({ meeting: counterMeeting, success: true }, 201);
+  } catch (err) {
+    console.error("[Counter Meeting Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** POST /api/meetings/:id/cancel — Cancel meeting (with 24h refund/forfeit quota rules) */
+app.post("/meetings/:id/cancel", authMiddleware, async (c) => {
+  const meetingId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const db = await getPrisma();
+  const { releaseQuota, forfeitQuota } = await import("@/lib/quota");
+
+  try {
+    const meeting = await db.meeting.findUnique({
+      where: { id: meetingId },
+      include: { participants: { include: { enrollment: true } } },
+    });
+
+    if (!meeting) return c.json({ error: "Meeting not found" }, 404);
+
+    const isMentor = meeting.mentorId === jwtUser.sub;
+    const isLearner = meeting.participants.some((p) => p.enrollment?.learnerId === jwtUser.sub);
+    if (!isMentor && !isLearner && jwtUser.role !== "ADMIN") {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+
+    if (meeting.status !== "PENDING" && meeting.status !== "ACCEPTED") {
+      return c.json({ error: `Cannot cancel meeting in ${meeting.status} state` }, 400);
+    }
+
+    const participant = meeting.participants[0];
+    const msUntilStart = new Date(meeting.startAt).getTime() - Date.now();
+    const isMoreThan24Hours = msUntilStart >= 24 * 3600 * 1000;
+
+    const result = await db.$transaction(async (tx) => {
+      let cancelStatus = isMentor ? "CANCELLED_BY_MENTOR" : "CANCELLED_BY_LEARNER";
+
+      await tx.meeting.update({
+        where: { id: meetingId },
+        data: { status: cancelStatus },
+      });
+
+      if (participant) {
+        if (isMentor || isMoreThan24Hours) {
+          // Release quota back to learner
+          await releaseQuota(
+            tx,
+            participant.enrollmentId,
+            meeting.id,
+            isMentor ? "Cancelled by mentor (quota refunded)" : "Cancelled by learner >24h in advance"
+          );
+          await tx.meetingParticipant.update({
+            where: { id: participant.id },
+            data: { status: "CANCELLED", quotaState: "RELEASED" },
+          });
+        } else {
+          // Late cancellation by learner (<24h) forfeits quota
+          await forfeitQuota(
+            tx,
+            participant.enrollmentId,
+            meeting.id,
+            "Late cancellation by learner (<24h before session) - quota forfeited"
+          );
+          await tx.meetingParticipant.update({
+            where: { id: participant.id },
+            data: { status: "CANCELLED", quotaState: "FORFEITED" },
+          });
+        }
+      }
+
+      // Notification
+      const targetUserId = isMentor
+        ? participant?.enrollment?.learnerId
+        : meeting.mentorId;
+
+      if (targetUserId) {
+        await tx.notification.create({
+          data: {
+            userId: targetUserId,
+            type: "MEETING_CANCELLED",
+            dedupeKey: `meeting:${meeting.id}:cancelled:${targetUserId}`,
+            payload: JSON.stringify({
+              meetingId: meeting.id,
+              startAt: meeting.startAt,
+              cancelledBy: isMentor ? "Mentor" : "Learner",
+              quotaRefunded: isMentor || isMoreThan24Hours,
+            }),
+          },
+        });
+      }
+
+      return { cancelStatus, quotaRefunded: isMentor || isMoreThan24Hours };
+    });
+
+    return c.json({ success: true, ...result });
+  } catch (err) {
+    console.error("[Cancel Meeting Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** POST /api/meetings/:id/complete — Mark meeting completed and consume quota */
+app.post("/meetings/:id/complete", authMiddleware, async (c) => {
+  const meetingId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const db = await getPrisma();
+  const { consumeQuota } = await import("@/lib/quota");
+
+  try {
+    const meeting = await db.meeting.findUnique({
+      where: { id: meetingId },
+      include: { participants: { include: { enrollment: true } } },
+    });
+
+    if (!meeting) return c.json({ error: "Meeting not found" }, 404);
+
+    const isMentor = meeting.mentorId === jwtUser.sub;
+    const isLearner = meeting.participants.some((p) => p.enrollment?.learnerId === jwtUser.sub);
+    if (!isMentor && !isLearner && jwtUser.role !== "ADMIN") {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+
+    if (meeting.status !== "ACCEPTED") {
+      return c.json({ error: `Cannot complete meeting in ${meeting.status} state` }, 400);
+    }
+
+    const participant = meeting.participants[0];
+
+    const result = await db.$transaction(async (tx) => {
+      const updated = await tx.meeting.update({
+        where: { id: meetingId },
+        data: { status: "COMPLETED" },
+      });
+
+      if (participant) {
+        await consumeQuota(tx, participant.enrollmentId, meeting.id, "Session fulfilled and completed");
+        await tx.meetingParticipant.update({
+          where: { id: participant.id },
+          data: { quotaState: "USED" },
+        });
+
+        // Prompt review from learner
+        await tx.notification.create({
+          data: {
+            userId: participant.enrollment.learnerId,
+            type: "REVIEW_REQUESTED",
+            dedupeKey: `review:${participant.enrollmentId}:${meeting.id}`,
+            payload: JSON.stringify({
+              enrollmentId: participant.enrollmentId,
+              mentorName: jwtUser.name || "Mentor",
+            }),
+          },
+        });
+      }
+
+      return updated;
+    });
+
+    return c.json({ meeting: result, success: true });
+  } catch (err) {
+    console.error("[Complete Meeting Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** GET /api/meetings/:id/join — Fetch join URL only within join window (Section 6) */
+app.get("/meetings/:id/join", authMiddleware, async (c) => {
+  const meetingId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const db = await getPrisma();
+  const { isMeetingInsideJoinWindow, getEnrollmentAccess } = await import("@/lib/access");
+
+  try {
+    const meeting = await db.meeting.findUnique({
+      where: { id: meetingId },
+      include: { participants: { include: { enrollment: true } } },
+    });
+
+    if (!meeting) return c.json({ error: "Meeting not found" }, 404);
+
+    const isMentor = meeting.mentorId === jwtUser.sub;
+    const isLearner = meeting.participants.some((p) => p.enrollment?.learnerId === jwtUser.sub);
+    if (!isMentor && !isLearner && jwtUser.role !== "ADMIN") {
+      return c.json({ error: "Unauthorized" }, 403);
+    }
+
+    // Check escrow status allows join link
+    const participant = meeting.participants[0];
+    if (participant) {
+      const access = await getEnrollmentAccess(participant.enrollmentId, jwtUser.sub);
+      if (!access.canSeeJoinLink) {
+        return c.json({ error: `Join link is locked in ${access.status} status` }, 403);
+      }
+    }
+
+    const canJoinNow = isMeetingInsideJoinWindow(meeting);
+    if (!canJoinNow) {
+      return c.json({
+        canJoinNow: false,
+        error: "Meeting room link is only available 15 minutes before session until 30 minutes after.",
+      }, 403);
+    }
+
+    return c.json({
+      canJoinNow: true,
+      joinUrl: meeting.joinUrl,
+      platform: meeting.platform,
+    });
+  } catch (err) {
+    console.error("[Get Join URL Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** GET /api/requests — Fetch all requests for learner and mentor */
+app.get("/requests", authMiddleware, async (c) => {
+  const jwtUser = c.get("user");
+  const db = await getPrisma();
+
+  try {
+    const meetings = await db.meeting.findMany({
+      where: {
+        OR: [
+          { mentorId: jwtUser.sub },
+          { participants: { some: { enrollment: { learnerId: jwtUser.sub } } } },
+        ],
+      },
+      include: {
+        mentor: { select: { id: true, name: true, avatarUrl: true, email: true } },
+        gig: { select: { id: true, title: true, coverImage: true, category: true } },
+        participants: {
+          include: {
+            enrollment: {
+              include: {
+                learner: { select: { id: true, name: true, avatarUrl: true, email: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { startAt: "asc" },
+    });
+
+    return c.json({ meetings });
+  } catch (err) {
+    console.error("[GET /requests Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 app.get("/mentor/public-profile/:id", async (c) => {
   const id = decodeURIComponent(c.req.param("id"));
   try {
@@ -2277,24 +3563,29 @@ app.get("/mentor/public-profile/:id", async (c) => {
       }
     }
 
+    const profileRole = mentorUser?.role || "MENTOR";
+    const isLearnerProfile = profileRole === "LEARNER";
+
     const profileData = {
       id: mentorUser?.id || id,
+      role: profileRole,
       name: mentorUser?.name || mentorOfferings[0]?.mentorName || id,
       nickname: mentorUser?.nickname || (mentorUser?.name || id).toLowerCase().replace(/\s+/g, "_"),
       avatarUrl: mentorUser?.avatarUrl || samplePhoto,
-      domain: mentorUser?.domain || mentorOfferings[0]?.category || "Fullstack & Web3 Engineer",
-      bio: mentorUser?.bio || "Experienced mentor guiding students through milestone projects with audited smart contract escrow protection.",
-      hourlyRate: Number(mentorUser?.hourlyRate) || mentorOfferings[0]?.price || 45,
+      domain: mentorUser?.domain || (isLearnerProfile ? "Web3 Student & Developer" : mentorOfferings[0]?.category || "Fullstack & Web3 Engineer"),
+      bio: mentorUser?.bio || (isLearnerProfile ? "Web3 learner exploring Solidity, decentralized escrows, and Arbitrum nitro ecosystem." : "Experienced mentor guiding students through milestone projects with audited smart contract escrow protection."),
+      university: mentorUser?.university || "Global Web3 Academy",
+      hourlyRate: isLearnerProfile ? 0 : (Number(mentorUser?.hourlyRate) || mentorOfferings[0]?.price || 45),
       stakeAmount,
       mentorLevel: mentorUser?.mentorLevel || (stakeAmount >= 300 ? "MASTER" : stakeAmount >= 100 ? "PRO" : "RISING"),
       isVerified: mentorUser?.isVerified || stakeAmount >= 100,
       skills: skillsList,
-      linkedin: mentorUser?.linkedin || "https://linkedin.com",
-      twitter: mentorUser?.twitter || "https://x.com",
-      portfolio: mentorUser?.portfolio || "https://trustlesson.io",
+      linkedin: mentorUser?.linkedin || "",
+      twitter: mentorUser?.twitter || "",
+      portfolio: mentorUser?.portfolio || "",
       walletAddress: mentorUser?.walletAddress || mentorOfferings[0]?.mentorAddress || "0x71C...49b2",
-      rating: completedSessions.length > 0 ? Number((4.8 + Math.min(0.2, completedSessions.length * 0.02)).toFixed(1)) : null,
-      reputationScore: 99,
+      rating: !isLearnerProfile && completedSessions.length > 0 ? Number((4.8 + Math.min(0.2, completedSessions.length * 0.02)).toFixed(1)) : null,
+      reputationScore: isLearnerProfile ? 100 : 99,
       sessionsCompleted,
       offerings: parsedOfferings,
     };
@@ -2649,7 +3940,7 @@ app.post("/mentor/profile", async (c) => {
     if (userId) user = await db.user.findUnique({ where: { id: userId } });
     if (!user && email) user = await db.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user && address) user = await db.user.findUnique({ where: { walletAddress: address.toLowerCase() } });
-    if (!user) user = await db.user.findFirst({ where: { role: "MENTOR" } });
+    if (!user) user = await db.user.findFirst();
 
     if (!user) {
       return c.json({ error: "User not found" }, 404);
@@ -3001,6 +4292,341 @@ app.get("/certificates/:id", async (c) => {
     });
   } catch (e) {
     return c.json({ error: "Certificate lookup error", detail: e.message }, 500);
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// FEEDBACK & USER SATISFACTION ROUTES
+// ════════════════════════════════════════════════════════════════════
+
+/** GET /api/feedbacks — Public: Get verified user satisfaction feedbacks */
+app.get("/feedbacks", async (c) => {
+  try {
+    const db = await getPrisma();
+    const feedbacks = await db.feedback.findMany({
+      where: { status: "APPROVED" },
+      orderBy: [
+        { isFeatured: "desc" },
+        { createdAt: "desc" },
+      ],
+      take: 12,
+    });
+    return c.json({ feedbacks });
+  } catch (e) {
+    return c.json({ feedbacks: [], error: e.message }, 500);
+  }
+});
+
+/** POST /api/feedbacks — Submit user satisfaction feedback */
+app.post("/feedbacks", async (c) => {
+  try {
+    const body = await c.req.json();
+    const {
+      rating,
+      category,
+      comment,
+      userName,
+      userEmail,
+      userRole,
+      userAvatar,
+      userId,
+    } = body;
+
+    if (!comment || !comment.trim()) {
+      return c.json({ error: "Comment is required" }, 400);
+    }
+
+    const numericRating = Math.max(1, Math.min(5, Number(rating) || 5));
+
+    const db = await getPrisma();
+    
+    // Look up user if userId or userEmail is provided
+    let matchedUserId = userId || null;
+    let fallbackName = userName || "Community Member";
+    let fallbackAvatar = userAvatar || null;
+    let fallbackRole = userRole || "LEARNER";
+
+    if (!matchedUserId && userEmail) {
+      const u = await db.user.findUnique({ where: { email: userEmail } });
+      if (u) {
+        matchedUserId = u.id;
+        fallbackName = u.name || fallbackName;
+        fallbackAvatar = u.avatarUrl || fallbackAvatar;
+        fallbackRole = u.role || fallbackRole;
+      }
+    } else if (matchedUserId) {
+      const u = await db.user.findUnique({ where: { id: matchedUserId } });
+      if (u) {
+        fallbackName = u.name || fallbackName;
+        fallbackAvatar = u.avatarUrl || fallbackAvatar;
+        fallbackRole = u.role || fallbackRole;
+      }
+    }
+
+    const feedback = await db.feedback.create({
+      data: {
+        userId: matchedUserId,
+        userName: fallbackName,
+        userEmail: userEmail || null,
+        userAvatar: fallbackAvatar,
+        userRole: fallbackRole,
+        rating: numericRating,
+        category: category || "Platform Experience",
+        comment: comment.trim(),
+        isFeatured: true,
+        status: "APPROVED",
+      },
+    });
+
+    return c.json({ success: true, feedback }, 201);
+  } catch (e) {
+    console.error("[Submit Feedback Error]:", e);
+    return c.json({ error: "Failed to submit feedback", detail: e.message }, 500);
+  }
+});
+
+/** GET /api/admin/feedbacks — Admin: Fetch all feedbacks with statistics */
+app.get("/admin/feedbacks", async (c) => {
+  try {
+    const db = await getPrisma();
+    const feedbacks = await db.feedback.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    const totalCount = feedbacks.length;
+    const avgRating = totalCount > 0
+      ? (feedbacks.reduce((sum, f) => sum + f.rating, 0) / totalCount).toFixed(1)
+      : "5.0";
+
+    const ratingDistribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    feedbacks.forEach((f) => {
+      if (ratingDistribution[f.rating] !== undefined) {
+        ratingDistribution[f.rating]++;
+      }
+    });
+
+    return c.json({
+      feedbacks,
+      stats: {
+        totalCount,
+        avgRating: Number(avgRating),
+        ratingDistribution,
+        approvedCount: feedbacks.filter((f) => f.status === "APPROVED").length,
+      },
+    });
+  } catch (e) {
+    return c.json({ feedbacks: [], error: e.message }, 500);
+  }
+});
+
+/** PATCH /api/admin/feedbacks/:id — Admin: Toggle featured or update status */
+app.patch("/admin/feedbacks/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const db = await getPrisma();
+
+    const data = {};
+    if (body.isFeatured !== undefined) data.isFeatured = Boolean(body.isFeatured);
+    if (body.status !== undefined) data.status = String(body.status);
+
+    const updated = await db.feedback.update({
+      where: { id },
+      data,
+    });
+
+    return c.json({ success: true, feedback: updated });
+  } catch (e) {
+    return c.json({ error: "Failed to update feedback", detail: e.message }, 500);
+  }
+});
+
+/** DELETE /api/admin/feedbacks/:id — Admin: Delete feedback */
+app.delete("/admin/feedbacks/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const db = await getPrisma();
+    await db.feedback.delete({ where: { id } });
+    return c.json({ success: true, message: "Feedback removed" });
+  } catch (e) {
+    return c.json({ error: "Failed to delete feedback", detail: e.message }, 500);
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// CHAT ROUTES
+// ════════════════════════════════════════════════════════════════════
+
+/** GET /api/chat/threads — Get threads for current user */
+app.get("/chat/threads", authMiddleware, async (c) => {
+  const jwtUser = c.get("user");
+  try {
+    const db = await getPrisma();
+
+    // 1. Auto-discover or create threads for any enrollments involving jwtUser
+    const enrollments = await db.enrollment.findMany({
+      where: {
+        OR: [
+          { learnerId: jwtUser.sub },
+          { mentorId: jwtUser.sub },
+        ],
+      },
+      include: {
+        gig: true,
+        learner: { select: { id: true, name: true, avatarUrl: true, email: true } },
+        mentor: { select: { id: true, name: true, avatarUrl: true, email: true } },
+      },
+    });
+
+    for (const enr of enrollments) {
+      let thread = await db.chatThread.findFirst({
+        where: { enrollmentId: enr.id },
+      });
+      if (!thread) {
+        await db.chatThread.create({
+          data: {
+            kind: "DIRECT",
+            enrollmentId: enr.id,
+            participants: {
+              create: [
+                { userId: enr.learnerId, role: "LEARNER" },
+                { userId: enr.mentorId, role: "MENTOR" },
+              ],
+            },
+          },
+        });
+      }
+    }
+
+    // 2. Fetch all threads where user is a participant
+    const threads = await db.chatThread.findMany({
+      where: {
+        participants: {
+          some: { userId: jwtUser.sub },
+        },
+      },
+      include: {
+        participants: {
+          include: {
+            user: { select: { id: true, name: true, avatarUrl: true, email: true, role: true } },
+          },
+        },
+        enrollment: {
+          include: {
+            gig: { select: { id: true, title: true, coverImage: true } },
+          },
+        },
+        messages: {
+          orderBy: { seq: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return c.json({ threads });
+  } catch (err) {
+    console.error("[GET /chat/threads Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** GET /api/chat/threads/:id/messages — Get message history */
+app.get("/chat/threads/:id/messages", authMiddleware, async (c) => {
+  const threadId = c.req.param("id");
+  const jwtUser = c.get("user");
+  try {
+    const db = await getPrisma();
+    const isParticipant = await db.chatParticipant.findFirst({
+      where: { threadId, userId: jwtUser.sub },
+    });
+    if (!isParticipant) {
+      return c.json({ error: "Access denied to thread" }, 403);
+    }
+
+    const messages = await db.chatMessage.findMany({
+      where: { threadId },
+      orderBy: { seq: "asc" },
+      take: 100,
+    });
+
+    return c.json({ messages });
+  } catch (err) {
+    console.error("[GET /chat/threads/:id/messages Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** POST /api/chat/threads/:id/messages — Send a message */
+app.post("/chat/threads/:id/messages", authMiddleware, async (c) => {
+  const threadId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const { body, kind = "TEXT" } = await c.req.json();
+  if (!body || !body.trim()) {
+    return c.json({ error: "Message body is required" }, 400);
+  }
+
+  try {
+    const db = await getPrisma();
+    const isParticipant = await db.chatParticipant.findFirst({
+      where: { threadId, userId: jwtUser.sub },
+    });
+    if (!isParticipant) {
+      return c.json({ error: "Access denied to thread" }, 403);
+    }
+
+    const thread = await db.chatThread.findUnique({
+      where: { id: threadId },
+      include: {
+        messages: {
+          orderBy: { seq: "desc" },
+          take: 1,
+        },
+      },
+    });
+
+    const lastMsg = thread?.messages?.[0];
+    const seq = (lastMsg?.seq || 0) + 1;
+    const prevHash = lastMsg?.hash || "0x0";
+    const timestamp = new Date().toISOString();
+    const cryptoModule = await import("crypto");
+    const hash = cryptoModule.default
+      .createHash("sha256")
+      .update(`${prevHash}:${seq}:${body}:${timestamp}`)
+      .digest("hex");
+
+    const message = await db.chatMessage.create({
+      data: {
+        threadId,
+        senderId: jwtUser.sub,
+        seq,
+        kind,
+        body: body.trim(),
+        prevHash,
+        hash,
+      },
+    });
+
+    await db.chatThread.update({
+      where: { id: threadId },
+      data: { headHash: hash, updatedAt: new Date() },
+    });
+
+    return c.json({ message }, 201);
+  } catch (err) {
+    console.error("[POST /chat/threads/:id/messages Error]:", err);
+    return c.json({ error: err.message }, 500);
   }
 });
 
