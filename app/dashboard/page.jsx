@@ -7,6 +7,7 @@ import {
   Shield,
   TrendingUp,
   Clock,
+  Calendar,
   CheckCircle,
   AlertTriangle,
   Lock,
@@ -53,11 +54,13 @@ import {
   ThumbsUp,
   Filter,
   MessageSquare,
+  Fuel,
 } from "lucide-react";
 import { CurrencyBadge, formatPriceCurrency, ArbitrumIcon } from "../../src/components/CurrencyBadge";
 import { LinkedinIcon, TwitterIcon } from "../../src/components/SocialIcons";
 import { MetaMaskIcon, CoinbaseWalletIcon } from "../../src/components/WalletIcons";
 import WalletConnectCard from "../../src/components/WalletConnectCard";
+import { useWalletBalances } from "../../src/hooks/useWalletBalances";
 import StudentSatisfactionView from "../../src/components/StudentSatisfactionView";
 import Footer from "../../src/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../src/components/ui/Tabs";
@@ -137,7 +140,9 @@ export default function DashboardPage() {
             <StudentDashboardView user={user} />
           </div>
         ) : (
-          <AdminDashboardView user={user} />
+          <div className="pt-6 pb-12 px-3 sm:px-6 flex-1 w-full max-w-6xl mx-auto animate-fadeInUp">
+            <AdminDashboardView user={user} />
+          </div>
         )}
         <Footer />
       </div>
@@ -170,14 +175,39 @@ function AdminDashboardView({ user }) {
   const [activeTab, setActiveTab] = useState("view");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get("tab");
-      if (tabParam && ["view", "users", "feedbacks", "wallet", "profile"].includes(tabParam)) {
-        setActiveTab(tabParam);
+    const handleUrlTab = () => {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get("tab");
+        if (tabParam && ["view", "users", "feedbacks", "wallet", "profile"].includes(tabParam)) {
+          setActiveTab(tabParam);
+        } else if (!tabParam) {
+          setActiveTab("view");
+        }
       }
-    }
+    };
+    handleUrlTab();
+    const handleCustomTab = (e) => {
+      if (e.detail && ["view", "users", "feedbacks", "wallet", "profile"].includes(e.detail)) {
+        setActiveTab(e.detail);
+      }
+    };
+    window.addEventListener("popstate", handleUrlTab);
+    window.addEventListener("admin-tab-change", handleCustomTab);
+    return () => {
+      window.removeEventListener("popstate", handleUrlTab);
+      window.removeEventListener("admin-tab-change", handleCustomTab);
+    };
   }, []);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    if (typeof window !== "undefined") {
+      const url = newTab === "view" ? "/dashboard" : `/dashboard?tab=${newTab}`;
+      window.history.replaceState(null, "", url);
+      window.dispatchEvent(new CustomEvent("admin-tab-sync", { detail: newTab }));
+    }
+  };
 
   const [stats, setStats] = useState({
     usersCount: 0,
@@ -400,124 +430,8 @@ function AdminDashboardView({ user }) {
     );
   });
 
-  const navItems = [
-    { id: "view", label: "View (Financial Data)", icon: Coins, desc: "Platform money & revenue" },
-    { id: "users", label: "Users", icon: Users, desc: "Real user database" },
-    { id: "feedbacks", label: "Feedback & Reviews", icon: MessageSquareQuote, desc: "User satisfaction & sentiment" },
-    { id: "wallet", label: "Wallet", icon: Wallet, desc: "Platform treasury wallet" },
-    { id: "profile", label: "Profile", icon: ShieldCheck, desc: "Admin credentials & socials" },
-  ];
-
   return (
-    <div className="flex-1 flex flex-col md:flex-row w-full min-h-[calc(100vh-80px)] bg-white relative overflow-hidden">
-      {/* ── Background Watercolor Wave Decoration (Same as Course Page) ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-purple-200/40 via-purple-100/20 to-transparent rounded-[100%] blur-3xl" />
-        <div className="absolute top-10 -left-20 w-80 h-80 bg-purple-300/15 rounded-full blur-3xl" />
-        <div className="absolute top-10 -right-20 w-80 h-80 bg-indigo-300/15 rounded-full blur-3xl" />
-
-        <svg
-          className="absolute top-0 left-0 w-full h-full opacity-20 mix-blend-multiply"
-          viewBox="0 0 1440 380"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M0,80 C320,160 480,-20 800,90 C1120,200 1280,40 1440,70 L1440,0 L0,0 Z"
-            fill="#c084fc"
-            opacity="0.3"
-          />
-          <path
-            d="M0,140 C380,240 620,40 960,160 C1200,240 1360,110 1440,130 L1440,0 L0,0 Z"
-            fill="#a855f7"
-            opacity="0.15"
-          />
-        </svg>
-      </div>
-
-      {/* ─── SIDEBAR NAVBAR (Light & Frosted Purple Theme) ─── */}
-      <aside className="w-full md:w-64 bg-white/85 backdrop-blur-xl text-slate-900 p-5 sm:p-6 flex flex-col justify-between shrink-0 border-b md:border-b-0 md:border-r border-purple-100/90 shadow-xs relative z-10">
-        <div className="space-y-6">
-          {/* Admin Header with Photo Upload Overlay */}
-          <div className="flex items-center gap-3 pb-5 border-b border-purple-100">
-            <div className="relative group shrink-0">
-              <Avatar className="w-12 h-12 ring-2 ring-purple-300 shadow-xs overflow-hidden">
-                <AvatarImage src={user.avatarUrl || "/admin-profile.webp"} alt={user.name || "Admin"} className="object-cover" />
-                <AvatarFallback className="bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-lg">
-                  {user.name?.[0]?.toUpperCase() || "A"}
-                </AvatarFallback>
-              </Avatar>
-              <label
-                htmlFor="admin-sidebar-photo-input"
-                className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
-                title="Change Admin Profile Photo"
-              >
-                <Camera size={16} />
-              </label>
-              <input
-                id="admin-sidebar-photo-input"
-                type="file"
-                accept="image/*"
-                onChange={handleAdminAvatarUpload}
-                className="hidden"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-slate-950 font-extrabold text-sm truncate">{user.name || "Administrator"}</h2>
-              <span className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/80 font-bold text-[10px]">
-                <Shield size={10} className="text-purple-600" /> Platform Admin
-              </span>
-            </div>
-          </div>
-
-          {/* Sidebar Nav Buttons */}
-          <nav className="space-y-1.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-purple-600 text-white shadow-md shadow-purple-600/30 font-bold scale-[1.02]"
-                      : "text-slate-600 hover:text-purple-700 hover:bg-purple-50/80 font-semibold text-xs"
-                  }`}
-                >
-                  <Icon size={18} className={isActive ? "text-white" : "text-purple-600"} />
-                  <div className="min-w-0">
-                    <p className="text-xs leading-none">{item.label}</p>
-                    <p className={`text-[10px] mt-1 truncate ${isActive ? "text-purple-100" : "text-slate-400"}`}>
-                      {item.desc}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Sidebar Footer Status */}
-        <div className="pt-5 mt-5 border-t border-purple-100 text-[11px] text-slate-500 space-y-2 hidden md:block">
-          <div className="flex items-center justify-between">
-            <span>Network</span>
-            <span className="font-bold text-purple-700">Arbitrum One</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Protocol Cut</span>
-            <span className="font-bold text-emerald-600">5% Fee</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Disputes</span>
-            <span className="font-bold text-slate-800">{stats.disputesCount || 0} Open</span>
-          </div>
-        </div>
-      </aside>
-
-      {/* ─── MAIN CONTENT AREA ─── */}
-      <main className="flex-1 p-5 sm:p-8 md:p-10 bg-transparent overflow-y-auto relative z-10">
+    <main className="w-full relative z-10 space-y-6">
         {/* ══════════════════════════════════════════════════════════ */}
         {/* VIEW 1: VIEW (SEMUA DATA UANG / PLATFORM FINANCIAL DATA) */}
         {/* ══════════════════════════════════════════════════════════ */}
@@ -565,11 +479,11 @@ function AdminDashboardView({ user }) {
                 <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 shadow-xs">
                   <Coins size={22} />
                 </div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Protocol Revenue (5%)</p>
+                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Protocol Revenue (10%)</p>
                 <p className="text-slate-950 font-black text-2xl sm:text-3xl mt-1 tracking-tight">
                   ${Number(stats.platformTreasury || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
                 </p>
-                <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">5% fee cut collected by platform</p>
+                <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">10% fee cut collected by platform</p>
               </div>
 
               <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 sm:p-6 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/5 transition-all shadow-xs">
@@ -610,16 +524,16 @@ function AdminDashboardView({ user }) {
             <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
               <h3 className="font-extrabold text-slate-900 text-base">Protocol Fee & Settlement Model</h3>
               <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
-                When a student funds a milestone, funds are locked non-custodially into the Arbitrum Escrow smart contract. Upon milestone completion and student approval, the contract automatically executes the 95/5 split: 95% is transferred directly to the mentor’s wallet, and 5% is allocated to the Platform Treasury Vault.
+                When a student funds a milestone, funds are locked non-custodially into the Arbitrum Escrow smart contract. Upon milestone completion and student approval, the contract automatically executes the 90/10 split: 90% is transferred directly to the mentor’s wallet, and 10% is allocated to the Platform Treasury Vault.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 text-xs">
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                   <span className="text-slate-500 text-[11px] block font-medium">Mentor Payout</span>
-                  <span className="text-slate-900 font-extrabold text-sm block mt-0.5">95% of Session Total</span>
+                  <span className="text-slate-900 font-extrabold text-sm block mt-0.5">90% of Session Total</span>
                 </div>
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                   <span className="text-slate-500 text-[11px] block font-medium">Platform Fee</span>
-                  <span className="text-purple-700 font-extrabold text-sm block mt-0.5">5% Protocol Treasury Cut</span>
+                  <span className="text-purple-700 font-extrabold text-sm block mt-0.5">10% Protocol Treasury Cut</span>
                 </div>
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                   <span className="text-slate-500 text-[11px] block font-medium">Settlement Currency</span>
@@ -1016,7 +930,7 @@ function AdminDashboardView({ user }) {
                 Platform Treasury <span className="text-purple-600 bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Wallet</span>
               </h2>
               <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                Non-custodial smart contract wallet collecting the 5% protocol fee cut on Arbitrum One.
+                Non-custodial smart contract wallet collecting the 10% protocol fee cut on Arbitrum One.
               </p>
             </div>
 
@@ -1277,7 +1191,6 @@ function AdminDashboardView({ user }) {
           </div>
         )}
       </main>
-    </div>
   );
 }
 
@@ -1800,20 +1713,6 @@ function MentorDashboardView({ user }) {
 
     setIsSavingWallet(true);
     try {
-      let signature = null;
-      if (typeof window !== "undefined" && window.ethereum) {
-        try {
-          const timestamp = Date.now();
-          const message = `Trust Lesson Payout Security\nConfirm locking Arbitrum address: ${cleanAddr}\nTimestamp: ${timestamp}`;
-          signature = await window.ethereum.request({
-            method: "personal_sign",
-            params: [message, cleanAddr],
-          }).catch(() => null);
-        } catch (sigErr) {
-          console.warn("Signature verification fallback:", sigErr);
-        }
-      }
-
       const res = await fetch("/api/mentor/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1821,7 +1720,6 @@ function MentorDashboardView({ user }) {
           address: cleanAddr,
           userId: user?.id,
           email: user?.email,
-          signature,
         }),
       });
 
@@ -1987,16 +1885,6 @@ function MentorDashboardView({ user }) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => switchRole("student")}
-            className="px-4 py-2.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-            title="Switch to Learner Workspace to view your enrolled courses and milestones"
-          >
-            <GraduationCap size={15} className="text-purple-600" />
-            <span>Learner Workspace</span>
-          </button>
-
           {/* Dedicated "Create New Gig" Button Linking to Dedicated Page */}
           <Link
             href="/dashboard/gigs/create"
@@ -2059,7 +1947,7 @@ function MentorDashboardView({ user }) {
               <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
                 ${Number(stats.monthlyEarnings || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
               </p>
-              <p className="text-purple-700 font-semibold text-[11px] mt-1">95% net escrow payout</p>
+              <p className="text-purple-700 font-semibold text-[11px] mt-1">90% net escrow payout (10% protocol fee)</p>
             </div>
 
             <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
@@ -2256,6 +2144,14 @@ function MentorDashboardView({ user }) {
                     </span>
                     <div className="flex items-center gap-2">
                       <Link
+                        href={`/dashboard/gigs/${gig.id}`}
+                        className="px-3 py-1.5 rounded-full bg-purple-100/80 text-purple-800 hover:bg-purple-700 hover:text-white font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                        title="View buyers, package tiers, and session quota usage"
+                      >
+                        <Users size={12} />
+                        <span>Buyers</span>
+                      </Link>
+                      <Link
                         href={`/book/course/${gig.id}`}
                         className="px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
                       >
@@ -2363,7 +2259,7 @@ function MentorDashboardView({ user }) {
                   <span>Arbitrum One Payout Address</span>
                 </h3>
                 <p className="text-slate-500 text-xs mt-0.5">
-                  The destination where 95% of milestone funds are transferred automatically when students release escrow.
+                  The destination where 90% of milestone funds are transferred automatically when students release escrow (10% platform protocol cut).
                 </p>
               </div>
 
@@ -2724,10 +2620,10 @@ function MentorDashboardView({ user }) {
               <div className="text-right sm:text-right bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-xs">
                 <span className="text-purple-200 text-[11px] block">Current Protocol Cut</span>
                 <span className="text-white font-black text-3xl block mt-0.5">
-                  {stats.mentorLevel === "MASTER" ? "1%" : stats.mentorLevel === "PRO" ? "3%" : "5%"}
+                  10%
                 </span>
                 <span className="text-emerald-400 font-bold text-[10px] block mt-0.5">
-                  {stats.mentorLevel === "MASTER" ? "Master Minimum Fee" : stats.mentorLevel === "PRO" ? "Pro Tier Reduced" : "Standard Listing Fee"}
+                  Standard 10% Protocol Cut (90% Payout)
                 </span>
               </div>
             </div>
@@ -2765,7 +2661,7 @@ function MentorDashboardView({ user }) {
               <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
-                  <span>5% Platform Protocol Cut</span>
+                  <span>10% Platform Protocol Cut</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
@@ -2794,7 +2690,7 @@ function MentorDashboardView({ user }) {
               <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700 font-bold">
                   <CheckCircle2 size={13} className="text-indigo-600 shrink-0" />
-                  <span>3% Reduced Protocol Cut (Save 40%)</span>
+                  <span>10% Protocol Cut (Zero Gas Fees)</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-indigo-600 shrink-0" />
@@ -2823,7 +2719,7 @@ function MentorDashboardView({ user }) {
               <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700 font-bold">
                   <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
-                  <span>1% Minimum Platform Fee</span>
+                  <span>10% Protocol Cut (Instant Clearance)</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
@@ -3945,7 +3841,9 @@ function MentorDashboardView({ user }) {
 // STUDENT DASHBOARD VIEW (With Radix UI Tabs)
 // =============================================================
 function StudentDashboardView({ user }) {
-  const { sessions, updateSessionStatus, clearAllSessions, switchRole } = useAuth();
+  const { sessions, updateSessionStatus, clearAllSessions, switchRole, walletAddress } = useAuth();
+  const effectiveWallet = walletAddress || user?.walletAddress;
+  const { usdcBalance, ethBalance, isLoading: isLoadingBalances } = useWalletBalances(effectiveWallet);
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
@@ -4214,17 +4112,27 @@ function StudentDashboardView({ user }) {
                 Review deliverables and authorize milestone escrow releases.
               </p>
             </div>
-            {sessions.length > 0 && (
-              <button
-                type="button"
-                onClick={clearAllSessions}
-                className="px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                title="Wipe test session history"
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard/classes"
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
               >
-                <Trash2 size={13} />
-                <span>Clear All Bookings</span>
-              </button>
-            )}
+                <GraduationCap size={14} />
+                <span>Open Classroom</span>
+                <ArrowRight size={13} />
+              </Link>
+              {sessions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllSessions}
+                  className="px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                  title="Wipe test session history"
+                >
+                  <Trash2 size={13} />
+                  <span>Clear All Bookings</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {sessions.length > 0 ? (
@@ -4342,17 +4250,65 @@ function StudentDashboardView({ user }) {
         <TabsContent value="wallet" className="space-y-6">
           <WalletConnectCard />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100">
-              <p className="text-amber-900/60 text-xs font-semibold">Active Escrow Deposits</p>
-              <p className="text-amber-950 font-extrabold text-3xl mt-1">${activeEscrowAmount}</p>
-              <p className="text-amber-700 text-[11px] mt-1 font-medium">Locked safely until your explicit confirmation</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white border border-emerald-100/90 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-emerald-900/70 text-xs font-bold uppercase tracking-wider">Available USDC</span>
+                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                  Spendable
+                </span>
+              </div>
+              <p className="text-emerald-950 font-black text-2xl sm:text-3xl font-mono tracking-tight">
+                {isLoadingBalances && usdcBalance === null
+                  ? "..."
+                  : usdcBalance !== null
+                  ? `$${usdcBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : "$0.00"}
+              </p>
+              <p className="text-emerald-700 text-[11px] mt-1.5 font-medium">
+                Ready for funding milestone escrow vaults
+              </p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-100">
-              <p className="text-purple-900/60 text-xs font-semibold">Smart Contract Guarantee</p>
-              <p className="text-purple-950 font-extrabold text-3xl mt-1">100% Refundable</p>
-              <p className="text-purple-700 text-[11px] mt-1 font-medium">Full refund if mentor fails milestone terms</p>
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white border border-sky-100/90 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sky-900/70 text-xs font-bold uppercase tracking-wider">Gas Fee Reserve</span>
+                <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[10px] font-bold flex items-center gap-1">
+                  <Fuel size={10} /> Arbitrum Gas
+                </span>
+              </div>
+              <p className="text-sky-950 font-black text-2xl sm:text-3xl font-mono tracking-tight">
+                {isLoadingBalances && ethBalance === null
+                  ? "..."
+                  : ethBalance !== null
+                  ? `${ethBalance.toFixed(4)} ETH`
+                  : "0.0000 ETH"}
+              </p>
+              <p className="text-sky-700 text-[11px] mt-1.5 font-medium">
+                Native ETH to execute contract transactions & payouts
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-amber-900/60 text-xs font-bold uppercase tracking-wider">Active Deposits</span>
+                <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold">
+                  In Escrow
+                </span>
+              </div>
+              <p className="text-amber-950 font-black text-2xl sm:text-3xl font-mono tracking-tight">${activeEscrowAmount}</p>
+              <p className="text-amber-700 text-[11px] mt-1.5 font-medium">Locked safely until your explicit confirmation</p>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-100 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-purple-900/60 text-xs font-bold uppercase tracking-wider">Smart Guarantee</span>
+                <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">
+                  Audited
+                </span>
+              </div>
+              <p className="text-purple-950 font-black text-2xl sm:text-3xl tracking-tight">100% Refundable</p>
+              <p className="text-purple-700 text-[11px] mt-1.5 font-medium">Full refund if mentor fails milestone terms</p>
             </div>
           </div>
         </TabsContent>

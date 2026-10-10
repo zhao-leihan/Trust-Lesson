@@ -46,7 +46,7 @@ export default function SessionDetail({ mentor, onBack, onBook }) {
   }
 
   const basePrice = packageType === "pack" ? mentor.price * 5 * 0.9 : mentor.price;
-  const fee = basePrice * 0.07;
+  const fee = basePrice * 0.10;
   const total = basePrice + fee;
 
   const handleBook = () => {
@@ -255,7 +255,7 @@ export default function SessionDetail({ mentor, onBack, onBook }) {
               <span>${(packageType === "pack" ? mentor.price * 5 * 0.9 : mentor.price).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-navy/60 text-xs">
-              <span>Platform fee (7%)</span>
+              <span>Platform fee (10%)</span>
               <span>${fee.toFixed(2)}</span>
             </div>
             <div className="border-t border-navy/10 my-1" />

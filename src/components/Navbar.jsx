@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { LogOut, ArrowRight, Menu, X, LayoutDashboard } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/Avatar";
 
-const navLinks = [
+const DEFAULT_NAV_LINKS = [
   { to: "/", label: "Home" },
   { to: "/explore", label: "Course" },
   { to: "/leaderboard", label: "Leaderboard" },
@@ -37,6 +37,58 @@ export default function Navbar() {
       user.roleType === "MENTOR");
 
   const currentRole = activeRole || (isAdmin ? "admin" : user?.role?.toLowerCase() || "student");
+
+  const isMentor = user && currentRole === "mentor";
+  const isLearner = user && (currentRole === "student" || (!isAdmin && !isMentor && (user?.role === "LEARNER" || user?.role === "student")));
+
+  const [adminTab, setAdminTab] = useState("view");
+
+  useEffect(() => {
+    const syncAdminTab = () => {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        setAdminTab(params.get("tab") || "view");
+      }
+    };
+    syncAdminTab();
+    const handleAdminSync = (e) => {
+      if (e.detail) setAdminTab(e.detail);
+    };
+    window.addEventListener("popstate", syncAdminTab);
+    window.addEventListener("admin-tab-sync", handleAdminSync);
+    return () => {
+      window.removeEventListener("popstate", syncAdminTab);
+      window.removeEventListener("admin-tab-sync", handleAdminSync);
+    };
+  }, [pathname]);
+
+  let navLinks = DEFAULT_NAV_LINKS;
+
+  if (isAdmin && currentRole === "admin") {
+    navLinks = [
+      { to: "/dashboard", label: "Dashboard", tab: "view" },
+      { to: "/dashboard?tab=users", label: "Users", tab: "users" },
+      { to: "/dashboard?tab=feedbacks", label: "Feedback & Reviews", tab: "feedbacks" },
+      { to: "/dashboard?tab=wallet", label: "Wallet", tab: "wallet" },
+      { to: "/dashboard?tab=profile", label: "Profile", tab: "profile" },
+    ];
+  } else if (isMentor) {
+    navLinks = [
+      { to: "/dashboard", label: "Dashboard" },
+      { to: "/dashboard/requests", label: "Requests" },
+      { to: "/leaderboard", label: "Leaderboard" },
+      { to: "/dashboard/availability", label: "Availability" },
+      { to: "/dashboard/chat", label: "Chat" },
+    ];
+  } else if (isLearner) {
+    navLinks = [
+      { to: "/dashboard", label: "Dashboard" },
+      { to: "/explore", label: "Course" },
+      { to: "/leaderboard", label: "Leaderboard" },
+      { to: "/dashboard/classes", label: "My Classes" },
+      { to: "/dashboard/requests", label: "Requests" },
+    ];
+  }
 
   // Close mobile drawer on route transition
   useEffect(() => {
@@ -96,12 +148,22 @@ export default function Navbar() {
 
         {/* Center Navigation Links */}
         <nav className="hidden md:flex items-center gap-7">
-          {navLinks.map(({ to, label }) => {
-            const isActive = pathname === to;
+          {navLinks.map(({ to, label, tab }) => {
+            const isActive =
+              isAdmin && currentRole === "admin"
+                ? pathname === "/dashboard" && (tab ? adminTab === tab : adminTab === "view")
+                : pathname === to || (to !== "/" && to !== "/dashboard" && pathname.startsWith(to));
             return (
               <Link
                 key={to}
                 href={to}
+                onClick={() => {
+                  if (isAdmin && currentRole === "admin") {
+                    const targetTab = tab || "view";
+                    setAdminTab(targetTab);
+                    window.dispatchEvent(new CustomEvent("admin-tab-change", { detail: targetTab }));
+                  }
+                }}
                 className={`text-sm font-semibold tracking-wide transition-all relative py-1 ${
                   isWhiteTheme
                     ? isActive
@@ -452,13 +514,23 @@ export default function Navbar() {
 
           {/* Navigation Links */}
           <nav className="flex flex-col space-y-1">
-            {navLinks.map(({ to, label }) => {
-              const isActive = pathname === to;
+            {navLinks.map(({ to, label, tab }) => {
+              const isActive =
+                isAdmin && currentRole === "admin"
+                  ? pathname === "/dashboard" && (tab ? adminTab === tab : adminTab === "view")
+                  : pathname === to || (to !== "/" && to !== "/dashboard" && pathname.startsWith(to));
               return (
                 <Link
                   key={to}
                   href={to}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (isAdmin && currentRole === "admin") {
+                      const targetTab = tab || "view";
+                      setAdminTab(targetTab);
+                      window.dispatchEvent(new CustomEvent("admin-tab-change", { detail: targetTab }));
+                    }
+                  }}
                   className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-between ${
                     isWhiteTheme
                       ? isActive
