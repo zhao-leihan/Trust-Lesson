@@ -7,7 +7,29 @@ import { getCloudflareUploadUrl, getSignedPlaybackUrl, getSignedPlaybackToken } 
 import { uploadResourceToR2, getPresignedR2DownloadUrl, verifyAndGetDevResource } from "@/lib/cloudflareR2";
 import { uploadToIpfs, uploadJsonToIpfs } from "@/lib/ipfs";
 import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, PLATFORM_SPONSOR_WALLET } from "@/lib/gasSponsor";
-import { calculateMentorScore, isJurorEligible, calculateStudentScore } from "@/lib/leaderboardScore";
+
+// Leaderboard Scoring & Juror Sortition Helpers (Inlined for zero-dependency Vercel production builds)
+function calculateMentorScore({ stakeAmount = 0, completedSessions = 0, rating = null }) {
+  const stake = Number(stakeAmount) || 0;
+  const sessions = Number(completedSessions) || 0;
+  const stakeBonus = Math.min(stake, 250) * 0.1;
+  const ratingVal = (sessions > 0 && rating !== null && rating !== undefined) ? Number(rating) : 0;
+  const ratingScore = ratingVal * 20;
+  return Math.round(stakeBonus + (sessions * 25) + ratingScore);
+}
+
+function isJurorEligible({ stakeAmount = 0, completedSessions = 0, rating = null }) {
+  const stake = Number(stakeAmount) || 0;
+  const sessions = Number(completedSessions) || 0;
+  const r = (sessions > 0 && rating !== null && rating !== undefined) ? Number(rating) : null;
+  return stake >= 100 && sessions >= 5 && r !== null && r >= 4.8;
+}
+
+function calculateStudentScore({ completedSessions = 0 }) {
+  const sessions = Number(completedSessions) || 0;
+  return sessions * 80;
+}
+
 import { generateCaptcha, verifyCaptcha } from "@/lib/captcha";
 import {
   sendWelcomeEmail,
