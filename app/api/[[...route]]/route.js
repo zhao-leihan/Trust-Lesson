@@ -7,10 +7,19 @@ import { getCloudflareUploadUrl, getSignedPlaybackUrl, getSignedPlaybackToken } 
 import { uploadResourceToR2, getPresignedR2DownloadUrl, verifyAndGetDevResource } from "@/lib/cloudflareR2";
 import { uploadToIpfs, uploadJsonToIpfs } from "@/lib/ipfs";
 import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, PLATFORM_SPONSOR_WALLET } from "@/lib/gasSponsor";
-import { getActiveNetwork } from "@/lib/networkConfig";
 import { calculateMentorScore, isJurorEligible, calculateStudentScore } from "@/lib/leaderboardScore";
-import { sendWelcomeEmail, sendTransactionReceiptEmail, sendNewMaterialEmail } from "@/lib/resend";
 import { generateCaptcha, verifyCaptcha } from "@/lib/captcha";
+import {
+  sendWelcomeEmail,
+  sendGigOrderReceiptEmail,
+  sendMentorNewBookingEmail,
+  sendChatNotificationEmail,
+  sendNewAssignmentEmail,
+  sendCertificateEmail,
+  sendFeedbackThankYouEmail,
+  sendDeadlineWarningEmail,
+  generateCertificatePdf,
+} from "@/lib/mail";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { checkRateLimit, recordFailedAttempt, resetRateLimit } from "@/lib/rateLimit";
 
@@ -785,6 +794,16 @@ app.post("/auth/register", async (c) => {
       maxAge: 30 * 24 * 60 * 60,
     });
 
+    // Dispatch automated welcome email asynchronously
+    if (newUser.email) {
+      sendWelcomeEmail({
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role,
+        walletAddress: newUser.walletAddress,
+      }).catch((mailErr) => console.warn("[Welcome Email Error]:", mailErr.message));
+    }
+
     return c.json(
       {
         token,
@@ -1047,6 +1066,16 @@ app.post("/users/onboarding", authMiddleware, async (c) => {
   try {
     const db = await getPrisma();
     const user = await db.user.update({ where: { id: jwtUser.sub }, data: updates });
+
+    if (updates.email && updates.email.includes("@")) {
+      sendWelcomeEmail({
+        email: updates.email,
+        name: user.name,
+        role: user.role,
+        walletAddress: user.walletAddress,
+      }).catch((err) => console.warn("[Onboarding Welcome Email Warning]:", err.message));
+    }
+
     return c.json({ user });
   } catch (e) {
     return c.json({ error: e.message }, 400);
@@ -2509,6 +2538,37 @@ app.post("/enrollments", authMiddleware, async (c) => {
       return created;
     });
 
+    // Trigger automated emails asynchronously
+    const learnerEmail = enrollment.learner?.email;
+    const mentorEmail = enrollment.mentor?.email;
+    const gigTitle = gig.title || "Mentorship Gig";
+
+    if (learnerEmail) {
+      sendGigOrderReceiptEmail({
+        email: learnerEmail,
+        learnerName: enrollment.learner?.name || "Learner",
+        mentorName: enrollment.mentor?.name || "Mentor",
+        gigTitle,
+        orderId: enrollment.id,
+        totalAmount: Number(gig.priceUsdc || 50),
+        sessionsCount: enrollment.sessionsIncluded || 1,
+        durationMin: enrollment.sessionDurationMin || 60,
+        txHash: enrollment.onchainSessionId ? String(enrollment.onchainSessionId) : null,
+      }).catch((e) => console.warn("[Order Receipt Email Error]:", e.message));
+    }
+
+    if (mentorEmail) {
+      sendMentorNewBookingEmail({
+        email: mentorEmail,
+        mentorName: enrollment.mentor?.name || "Mentor",
+        learnerName: enrollment.learner?.name || "Learner",
+        gigTitle,
+        orderId: enrollment.id,
+        totalAmount: Number(gig.priceUsdc || 50),
+        sessionsCount: enrollment.sessionsIncluded || 1,
+      }).catch((e) => console.warn("[Mentor Booking Email Error]:", e.message));
+    }
+
     return c.json(
       {
         enrollment: {
@@ -2761,6 +2821,28 @@ app.post("/enrollments/:id/assignments", authMiddleware, async (c) => {
         submissions: true,
       },
     });
+
+    // Dispatch automated assignment email asynchronously
+    (async () => {
+      try {
+        const fullEnrollment = await db.enrollment.findUnique({
+          where: { id: enrollmentId },
+          include: { learner: true, mentor: true, gig: true },
+        });
+        if (fullEnrollment?.learner?.email) {
+          sendNewAssignmentEmail({
+            learnerEmail: fullEnrollment.learner.email,
+            learnerName: fullEnrollment.learner.name || "Learner",
+            mentorName: fullEnrollment.mentor?.name || "Mentor",
+            gigTitle: fullEnrollment.gig?.title || "Mentorship Gig",
+            taskTitle: title.trim(),
+            instructions: instructions.trim(),
+            dueDate: dueAt || null,
+            classroomUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/classes/${enrollmentId}`,
+          }).catch((err) => console.warn("[New Assignment Email Error]:", err.message));
+        }
+      } catch (e) {}
+    })();
 
     return c.json({ assignment, success: true }, 201);
   } catch (err) {
@@ -3040,6 +3122,33 @@ app.post("/enrollments/:id/complete-and-release", authMiddleware, async (c) => {
         ipfsUrl,
       },
     });
+
+    // Dispatch automated certificate email with attached PDF asynchronously
+    if (enrollment.learner?.email) {
+      (async () => {
+        try {
+          const pdfBuffer = await generateCertificatePdf({
+            learnerName,
+            mentorName,
+            gigTitle: skillTitle,
+            certificateId: createdCert.id,
+            transactionHash: onChainResult.txHash,
+          });
+
+          await sendCertificateEmail({
+            learnerEmail: enrollment.learner.email,
+            learnerName,
+            mentorName,
+            gigTitle: skillTitle,
+            certificateId: createdCert.id,
+            certificateUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/certificate/${createdCert.id}`,
+            pdfBuffer,
+          });
+        } catch (mailErr) {
+          console.warn("[Certificate Email Error]:", mailErr.message);
+        }
+      })();
+    }
 
     return c.json({
       success: true,
@@ -3445,6 +3554,34 @@ app.post("/gigs/:id/assignments", authMiddleware, async (c) => {
         })
       )
     );
+
+    // Dispatch automated assignment emails to enrolled learners asynchronously
+    (async () => {
+      try {
+        const fullEnrollments = await db.enrollment.findMany({
+          where: {
+            gigId,
+            ...(targetLearnerId && targetLearnerId !== "ALL" ? { learnerId: targetLearnerId } : {}),
+          },
+          include: { learner: true, mentor: true },
+        });
+
+        for (const enr of fullEnrollments) {
+          if (enr.learner?.email) {
+            sendNewAssignmentEmail({
+              learnerEmail: enr.learner.email,
+              learnerName: enr.learner.name || "Learner",
+              mentorName: enr.mentor?.name || "Mentor",
+              gigTitle: gig.title,
+              taskTitle: title.trim(),
+              instructions: instructions.trim(),
+              dueDate: dueAt || null,
+              classroomUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/classes/${enr.id}`,
+            }).catch((err) => console.warn("[Gig Assignment Email Error]:", err.message));
+          }
+        }
+      } catch (e) {}
+    })();
 
     return c.json({ assignments: createdAssignments, success: true }, 201);
   } catch (err) {
@@ -5229,6 +5366,18 @@ app.post("/feedbacks", async (c) => {
       },
     });
 
+    // Send automated thank you email asynchronously
+    const targetEmail = userEmail || (matchedUserId ? (await db.user.findUnique({ where: { id: matchedUserId } }))?.email : null);
+    if (targetEmail) {
+      sendFeedbackThankYouEmail({
+        userEmail: targetEmail,
+        userName: fallbackName,
+        gigTitle: category || "Platform Experience",
+        rating: numericRating,
+        feedbackComment: comment.trim(),
+      }).catch((err) => console.warn("[Feedback Email Warning]:", err.message));
+    }
+
     return c.json({ success: true, feedback }, 201);
   } catch (e) {
     console.error("[Submit Feedback Error]:", e);
@@ -5590,6 +5739,26 @@ app.post("/chat/threads/:id/messages", authMiddleware, async (c) => {
       data: { headHash: hash, updatedAt: new Date() },
     });
 
+    // Notify other participant asynchronously via automated email
+    (async () => {
+      try {
+        const otherParticipant = await db.chatParticipant.findFirst({
+          where: { threadId, userId: { not: jwtUser.sub } },
+          include: { user: true },
+        });
+        if (otherParticipant?.user?.email) {
+          const senderUser = await db.user.findUnique({ where: { id: jwtUser.sub } });
+          sendChatNotificationEmail({
+            recipientEmail: otherParticipant.user.email,
+            recipientName: otherParticipant.user.name || "Peer",
+            senderName: senderUser?.name || "Peer",
+            messageSnippet: body.trim().slice(0, 160),
+            chatUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/chat`,
+          }).catch((err) => console.warn("[Chat Notification Email Error]:", err.message));
+        }
+      } catch (e) {}
+    })();
+
     return c.json({ message }, 201);
   } catch (err) {
     console.error("[POST /chat/threads/:id/messages Error]:", err);
@@ -5624,6 +5793,27 @@ app.post("/webrtc/signal", authMiddleware, async (c) => {
   });
 
   webrtcSignalStore.set(storeKey, existing);
+
+  // If chat message signal, trigger email notification asynchronously
+  if ((type === "chat" || type === "message") && recipientId) {
+    (async () => {
+      try {
+        const db = await getPrisma();
+        const recipientUser = await db.user.findUnique({ where: { id: recipientId } });
+        if (recipientUser?.email) {
+          const senderUser = await db.user.findUnique({ where: { id: senderId } });
+          const textSnippet = typeof data === "string" ? data : (data?.text || data?.body || "Sent you a message.");
+          sendChatNotificationEmail({
+            recipientEmail: recipientUser.email,
+            recipientName: recipientUser.name || "Peer",
+            senderName: senderUser?.name || "Peer",
+            messageSnippet: String(textSnippet).slice(0, 160),
+            chatUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/chat`,
+          }).catch((err) => console.warn("[WebRTC Chat Email Warning]:", err.message));
+        }
+      } catch (e) {}
+    })();
+  }
   return c.json({ success: true });
 });
 
@@ -5648,6 +5838,87 @@ app.get("/webrtc/signals", authMiddleware, async (c) => {
 
   const combined = [...userSignals, ...relevantBroadcast];
   return c.json({ signals: combined });
+});
+
+// ════════════════════════════════════════════════════════════════════
+// DEADLINE WARNING AUTOMATION & CRON
+// ════════════════════════════════════════════════════════════════════
+
+/** POST /api/cron/check-deadlines — Scan upcoming assignment deadlines and dispatch reminders */
+app.post("/cron/check-deadlines", async (c) => {
+  const db = await getPrisma();
+  const body = await c.req.json().catch(() => ({}));
+  const testEmail = body?.testEmail;
+
+  if (testEmail) {
+    try {
+      const sent = await sendDeadlineWarningEmail({
+        recipientEmail: testEmail,
+        recipientName: "Learner",
+        taskTitle: "Curriculum Milestone Deliverable",
+        gigTitle: "Mentorship Masterclass",
+        dueDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        daysRemaining: 1,
+        classroomUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/classes`,
+      });
+      return c.json({ success: true, testSent: true, result: sent });
+    } catch (err) {
+      return c.json({ error: err.message }, 500);
+    }
+  }
+
+  try {
+    const now = new Date();
+    const in48Hours = new Date(Date.now() + 48 * 3600 * 1000);
+
+    const upcomingAssignments = await db.taskAssignment.findMany({
+      where: {
+        status: "ASSIGNED",
+        dueAt: {
+          not: null,
+          gt: now,
+          lte: in48Hours,
+        },
+      },
+      include: {
+        learner: true,
+        definition: {
+          include: {
+            gig: true,
+          },
+        },
+      },
+    });
+
+    let sentCount = 0;
+    for (const assignment of upcomingAssignments) {
+      if (assignment.learner?.email) {
+        const msRemaining = new Date(assignment.dueAt).getTime() - now.getTime();
+        const daysRemaining = Math.max(1, Math.round(msRemaining / (24 * 3600 * 1000)));
+
+        await sendDeadlineWarningEmail({
+          recipientEmail: assignment.learner.email,
+          recipientName: assignment.learner.name || "Learner",
+          taskTitle: assignment.definition.title,
+          gigTitle: assignment.definition.gig?.title || "Mentorship Gig",
+          dueDate: assignment.dueAt.toISOString(),
+          daysRemaining,
+          classroomUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/classes/${assignment.enrollmentId}`,
+        }).catch((err) => console.warn("[Cron Deadline Alert Warning]:", err.message));
+
+        sentCount++;
+      }
+    }
+
+    return c.json({
+      success: true,
+      processed: upcomingAssignments.length,
+      emailsDispatched: sentCount,
+    });
+  } catch (err) {
+    console.error("[Cron Check Deadlines Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
 });
 
 // ════════════════════════════════════════════════════════════════════
