@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Video,
+  History,
+  Award,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 
@@ -47,6 +49,7 @@ export default function MyClassesPage() {
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState("active");
 
   const fetchEnrollments = async () => {
     try {
@@ -66,6 +69,27 @@ export default function MyClassesPage() {
       fetchEnrollments();
     }
   }, [user, authLoading]);
+
+  const activeClasses = enrollments.filter(
+    (e) => !["COMPLETED", "RESOLVED"].includes(e.escrowStatus)
+  );
+  const completedClasses = enrollments.filter(
+    (e) => ["COMPLETED", "RESOLVED"].includes(e.escrowStatus)
+  );
+
+  // If there are no active classes but there are completed classes, default to history
+  useEffect(() => {
+    if (enrollments.length > 0) {
+      const activeCount = enrollments.filter(
+        (e) => !["COMPLETED", "RESOLVED"].includes(e.escrowStatus)
+      ).length;
+      if (activeCount === 0) {
+        setActiveTab("history");
+      }
+    }
+  }, [enrollments]);
+
+  const displayedEnrollments = activeTab === "active" ? activeClasses : completedClasses;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
@@ -99,6 +123,51 @@ export default function MyClassesPage() {
               <ArrowRight size={14} />
             </Link>
           </div>
+
+          {/* Navigation Tabs: Active Classes vs Class History */}
+          {!loading && !error && enrollments.length > 0 && (
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab("active")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === "active"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200"
+                }`}
+              >
+                <BookOpen size={14} />
+                <span>Active Classes</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                    activeTab === "active" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  {activeClasses.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("history")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === "history"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200"
+                }`}
+              >
+                <History size={14} />
+                <span>Class History</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                    activeTab === "history" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-800"
+                  }`}
+                >
+                  {completedClasses.length}
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* Loading Skeleton */}
           {loading && (
@@ -137,7 +206,7 @@ export default function MyClassesPage() {
             </div>
           )}
 
-          {/* Empty State */}
+          {/* Completely Empty State */}
           {!loading && !error && enrollments.length === 0 && (
             <div className="bg-white rounded-3xl p-12 sm:p-16 border border-slate-200/80 shadow-xs text-center flex flex-col items-center max-w-lg mx-auto space-y-5">
               <div className="w-16 h-16 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
@@ -159,10 +228,57 @@ export default function MyClassesPage() {
             </div>
           )}
 
+          {/* Empty Tab: Active tab with 0 classes */}
+          {!loading && !error && enrollments.length > 0 && activeTab === "active" && activeClasses.length === 0 && (
+            <div className="bg-white rounded-3xl p-10 border border-slate-200/80 shadow-xs text-center flex flex-col items-center max-w-lg mx-auto space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                <CheckCircle2 size={28} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">No Active Ongoing Classes</h3>
+                <p className="text-slate-500 text-xs max-w-sm">
+                  You have completed your active classes. All finalized coursework and Soulbound certificates are archived in your Class History.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("history")}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <History size={13} />
+                  <span>View Class History</span>
+                </button>
+                <Link
+                  href="/explore"
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-colors flex items-center gap-1.5"
+                >
+                  <span>Explore Gigs</span>
+                  <ArrowRight size={13} />
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Empty Tab: History tab with 0 classes */}
+          {!loading && !error && enrollments.length > 0 && activeTab === "history" && completedClasses.length === 0 && (
+            <div className="bg-white rounded-3xl p-10 border border-slate-200/80 shadow-xs text-center flex flex-col items-center max-w-lg mx-auto space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
+                <History size={28} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">No Completed Classes Yet</h3>
+                <p className="text-slate-500 text-xs max-w-sm">
+                  Once your mentorship is completed and escrow released, your verifiable graduation credentials and archived classrooms will appear here.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Enrollments Grid */}
-          {!loading && !error && enrollments.length > 0 && (
+          {!loading && !error && displayedEnrollments.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {enrollments.map((enrollment) => {
+              {displayedEnrollments.map((enrollment) => {
                 const gig = enrollment.gig;
                 const mentor = enrollment.mentor;
                 const sessionsTotal = enrollment.sessionsIncluded || 1;
@@ -170,6 +286,7 @@ export default function MyClassesPage() {
                 const sessionsReserved = enrollment.sessionsReserved || 0;
                 const sessionsRemaining = Math.max(0, sessionsTotal - sessionsUsed - sessionsReserved);
                 const percentUsed = Math.min(100, Math.round((sessionsUsed / sessionsTotal) * 100));
+                const isCompleted = ["COMPLETED", "RESOLVED"].includes(enrollment.escrowStatus);
 
                 return (
                   <div
@@ -226,18 +343,23 @@ export default function MyClassesPage() {
                         {sessionsTotal > 0 && (
                           <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
                             <div className="flex justify-between items-center text-[11px]">
-                              <span className="font-semibold text-slate-600">Live Quota Usage</span>
+                              <span className="font-semibold text-slate-600">
+                                {isCompleted ? "Course Status" : "Live Quota Usage"}
+                              </span>
                               <span className="font-bold text-slate-900">
-                                {sessionsUsed} / {sessionsTotal} used
-                                {sessionsReserved > 0 && ` (${sessionsReserved} pending)`}
+                                {isCompleted
+                                  ? "All sessions completed"
+                                  : `${sessionsUsed} / ${sessionsTotal} used ${sessionsReserved > 0 ? `(${sessionsReserved} pending)` : ""}`}
                               </span>
                             </div>
                             <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden flex">
                               <div
-                                className="bg-purple-600 h-full transition-all duration-300"
-                                style={{ width: `${percentUsed}%` }}
+                                className={`h-full transition-all duration-300 ${
+                                  isCompleted ? "bg-emerald-500" : "bg-purple-600"
+                                }`}
+                                style={{ width: isCompleted ? "100%" : `${percentUsed}%` }}
                               />
-                              {sessionsReserved > 0 && (
+                              {!isCompleted && sessionsReserved > 0 && (
                                 <div
                                   className="bg-amber-400 h-full transition-all duration-300"
                                   style={{
@@ -248,7 +370,9 @@ export default function MyClassesPage() {
                             </div>
                             <div className="flex justify-between text-[10px] text-slate-500">
                               <span>Duration: {enrollment.sessionDurationMin || 60}m per session</span>
-                              <span className="font-bold text-purple-700">{sessionsRemaining} left</span>
+                              <span className={`font-bold ${isCompleted ? "text-emerald-700" : "text-purple-700"}`}>
+                                {isCompleted ? "Graduated" : `${sessionsRemaining} left`}
+                              </span>
                             </div>
                           </div>
                         )}
@@ -257,13 +381,23 @@ export default function MyClassesPage() {
 
                     {/* Footer Button */}
                     <div className="p-5 pt-0">
-                      <Link
-                        href={`/dashboard/classes/${enrollment.id}`}
-                        className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-purple-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 group-hover:bg-purple-600 shadow-xs"
-                      >
-                        <span>Enter Classroom</span>
-                        <ArrowRight size={14} />
-                      </Link>
+                      {isCompleted ? (
+                        <Link
+                          href={`/dashboard/classes/${enrollment.id}`}
+                          className="w-full py-3 rounded-2xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                        >
+                          <Award size={14} className="text-amber-300 shrink-0" />
+                          <span>Enter Classroom & Certificate</span>
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/dashboard/classes/${enrollment.id}`}
+                          className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-purple-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 group-hover:bg-purple-600 shadow-xs cursor-pointer"
+                        >
+                          <span>Enter Classroom</span>
+                          <ArrowRight size={14} />
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );

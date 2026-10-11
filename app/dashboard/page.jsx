@@ -4524,6 +4524,7 @@ function StudentProfileEditor({ user, sessions }) {
   const [formDomain, setFormDomain] = useState(user.domain || "");
   const [formLinkedin, setFormLinkedin] = useState(user.linkedin || "");
   const [formUniversity, setFormUniversity] = useState(user.university || "");
+  const [formAvatarUrl, setFormAvatarUrl] = useState(user.avatarUrl || "");
   const [saved, setSaved] = useState(false);
   const [isSyncingLinkedin, setIsSyncingLinkedin] = useState(false);
   const [linkedinMsg, setLinkedinMsg] = useState("");
