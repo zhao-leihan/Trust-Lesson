@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ethers } from "ethers";
-import { useAuth } from "@/src/context/AuthContext";
+import { useAuth, apiFetch } from "@/src/context/AuthContext";
 import {
   Shield,
   Clock,
@@ -55,14 +55,7 @@ function ZoomIcon({ className = "w-6 h-6" }) {
   );
 }
 
-function DiscordIcon({ className = "w-6 h-6" }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="24" height="24" rx="6" fill="#5865F2"/>
-      <path d="M18.1 7.15C17.07 6.67 15.96 6.32 14.81 6.13C14.67 6.38 14.51 6.72 14.4 6.98C13.18 6.8 11.96 6.8 10.76 6.98C10.65 6.72 10.49 6.38 10.35 6.13C9.2 6.32 8.09 6.67 7.06 7.15C5.03 10.15 4.47 13.07 4.74 15.95C6.09 16.95 7.4 17.55 8.68 17.95C9 17.52 9.28 17.05 9.51 16.55C9.05 16.38 8.61 16.16 8.2 15.9C8.31 15.82 8.42 15.74 8.52 15.65C11.14 16.85 13.99 16.85 16.59 15.65C16.69 15.74 16.8 15.82 16.91 15.9C16.5 16.16 16.06 16.38 15.6 16.55C15.83 17.05 16.11 17.52 16.43 17.95C17.71 17.55 19.03 16.95 20.37 15.95C20.69 12.61 19.82 9.72 18.1 7.15ZM9.68 14.28C8.94 14.28 8.33 13.6 8.33 12.77C8.33 11.94 8.92 11.26 9.68 11.26C10.44 11.26 11.05 11.94 11.03 12.77C11.03 13.6 10.44 14.28 9.68 14.28ZM15.44 14.28C14.7 14.28 14.09 13.6 14.09 12.77C14.09 11.94 14.68 11.26 15.44 11.26C16.2 11.26 16.81 11.94 16.79 12.77C16.79 13.6 16.2 14.28 15.44 14.28Z" fill="white"/>
-    </svg>
-  );
-}
+
 
 const timeSlots = [
   "09:00 AM",
@@ -386,6 +379,42 @@ export default function BookingPage() {
         );
       }
 
+      // Helper function to build safe Arbitrum gas fee overrides with buffer
+      const getArbitrumGasOverrides = async () => {
+        try {
+          const feeData = await provider.getFeeData();
+          const overrides = {};
+
+          if (feeData.maxFeePerGas) {
+            // Buffer by 80% to absorb rapid Arbitrum block baseFee fluctuations
+            overrides.maxFeePerGas = (feeData.maxFeePerGas * 180n) / 100n;
+          } else if (feeData.gasPrice) {
+            overrides.gasPrice = (feeData.gasPrice * 180n) / 100n;
+          }
+
+          if (feeData.maxPriorityFeePerGas) {
+            overrides.maxPriorityFeePerGas = (feeData.maxPriorityFeePerGas * 150n) / 100n;
+          }
+
+          // Ensure minimum safe floor for Arbitrum Sepolia (0.1 gwei = 100,000,000 wei)
+          const MIN_FEE = 100000000n;
+          if (!overrides.maxFeePerGas || overrides.maxFeePerGas < MIN_FEE) {
+            overrides.maxFeePerGas = MIN_FEE;
+          }
+          if (!overrides.maxPriorityFeePerGas || overrides.maxPriorityFeePerGas < 10000000n) {
+            overrides.maxPriorityFeePerGas = 10000000n;
+          }
+
+          return overrides;
+        } catch (feeErr) {
+          console.warn("[Gas Fee Estimation Fallback]:", feeErr);
+          return {
+            maxFeePerGas: 150000000n, // 0.15 gwei safe floor
+            maxPriorityFeePerGas: 20000000n,
+          };
+        }
+      };
+
       // 6. Check Allowance and Approve USDC
       const allowance = await usdcContract.allowance(studentAddress, routerAddress);
       if (allowance < totalUnits) {
@@ -393,7 +422,14 @@ export default function BookingPage() {
         setWeb3StatusMessage(
           `Step 1/2: Please approve ${(Number(totalUnits) / 1e6).toFixed(2)} USDC in MetaMask...`
         );
-        const approveTx = await usdcContract.approve(routerAddress, totalUnits);
+        const approveOverrides = await getArbitrumGasOverrides();
+        try {
+          const estApprove = await usdcContract.approve.estimateGas(routerAddress, totalUnits);
+          approveOverrides.gasLimit = (estApprove * 130n) / 100n;
+        } catch {
+          approveOverrides.gasLimit = 100000n;
+        }
+        const approveTx = await usdcContract.approve(routerAddress, totalUnits, approveOverrides);
         setWeb3Step("confirming_approval");
         setWeb3StatusMessage("USDC Approval broadcasted. Waiting for confirmation on Arbitrum...");
         await approveTx.wait(1);
@@ -417,7 +453,16 @@ export default function BookingPage() {
       setWeb3Step("depositing");
       setWeb3StatusMessage(`Step 2/2: Confirming Escrow Vault Deposit in MetaMask...`);
 
-      const createTx = await routerContract.createSession(targetMentorAddress, [subtotalUnits]);
+      const createOverrides = await getArbitrumGasOverrides();
+      try {
+        const estGas = await routerContract.createSession.estimateGas(targetMentorAddress, [subtotalUnits]);
+        createOverrides.gasLimit = (estGas * 140n) / 100n;
+      } catch (estErr) {
+        console.warn("[Gas Estimate Fallback]:", estErr.message);
+        createOverrides.gasLimit = 450000n;
+      }
+
+      const createTx = await routerContract.createSession(targetMentorAddress, [subtotalUnits], createOverrides);
 
       setWeb3Step("mining");
       setWeb3StatusMessage("Escrow transaction broadcasted! Waiting for block confirmation on Arbitrum...");
@@ -447,36 +492,89 @@ export default function BookingPage() {
       };
       setConfirmedTx(txDetails);
 
-      // 9. Store Real Authenticated Session
+      // 9. Store Real Authenticated Session & Database Enrollment
+      try {
+        const enrollData = await apiFetch("/enrollments", {
+          method: "POST",
+          body: JSON.stringify({
+            gigId: item?.id,
+            packageId: selectedPackage?.id || null,
+            packageName: selectedPackage?.name || selectedPackage?.tier || (hasPackages ? `Package ${selectedPkgIndex + 1}` : "Standard"),
+            mentorId: item?.mentorId || null,
+            onchainSessionId: parsedSessionId || null,
+            sessionsIncluded: selectedPackage?.liveSessionsIncluded || (hasPackages ? (selectedPkgIndex === 0 ? 1 : selectedPkgIndex === 1 ? 3 : 8) : 1),
+            sessionDurationMin: selectedPackage?.sessionDurationMin || 60,
+            validityDays: selectedPackage?.validityDays || 30,
+            txHash: receipt.hash,
+          }),
+        });
+        if (enrollData?.enrollment?.id) {
+          setConfirmedTx((prev) => ({ ...prev, enrollmentId: enrollData.enrollment.id }));
+
+          // Automatically send meeting request if student picked a date and time slot
+          if (selectedDate !== null && selectedSlot !== null) {
+            try {
+              const slotStr = timeSlots[selectedSlot] || "09:00 AM";
+              const dateObj = new Date();
+              dateObj.setDate(dateObj.getDate() + (selectedDate + 1));
+              const [timePart, modifier] = slotStr.split(" ");
+              let [hours, minutes] = timePart.split(":").map(Number);
+              if (modifier === "PM" && hours < 12) hours += 12;
+              if (modifier === "AM" && hours === 12) hours = 0;
+              dateObj.setHours(hours, minutes, 0, 0);
+
+              const startAt = dateObj.toISOString();
+              const sessionDurMin = selectedPackage?.sessionDurationMin || 60;
+              const endAt = new Date(dateObj.getTime() + sessionDurMin * 60000).toISOString();
+
+              await apiFetch(`/enrollments/${enrollData.enrollment.id}/meetings`, {
+                method: "POST",
+                body: JSON.stringify({
+                  startAt,
+                  endAt,
+                  platform: item?.meetingPlatform || "Google Meet",
+                  agenda: `Initial onboarding session for ${item?.title || "mentorship"}`,
+                }),
+              });
+            } catch (meetReqErr) {
+              console.warn("[Auto-Meeting Request Warning]:", meetReqErr);
+            }
+          }
+        }
+      } catch (enrollErr) {
+        console.warn("[Enrollment Sync Warning]:", enrollErr.message);
+      }
+
       const newSession = {
-        id: parsedSessionId ? `session-onchain-${parsedSessionId}` : `session-${Date.now()}`,
-        onChainId: parsedSessionId,
+        id: parsedSessionId ? `session-${parsedSessionId}` : `sess-${Date.now()}`,
+        onchainSessionId: parsedSessionId || null,
+        title: item?.title || "Mentorship Session",
+        mentor: item?.mentorName || item?.name || "Verified Mentor",
+        mentorAddress: item?.mentorAddress || "",
+        mentorAvatar: item?.mentorPhoto || item?.avatarUrl || "",
+        price: grandTotal,
+        date: selectedDate !== null ? (availableDates[selectedDate]?.date || "TBD") : "TBD",
+        time: selectedSlot !== null ? (timeSlots[selectedSlot] || "TBD") : "TBD",
+        status: "Funded",
         txHash: receipt.hash,
-        blockNumber: receipt.blockNumber,
-        mentor: isMentor ? item.name : item.mentorName,
-        mentorAddress: targetMentorAddress,
-        learnerAddress: studentAddress,
-        skill: isMentor ? item.skill : item.title,
-        date: isMentor ? selectedDate : "Kickoff This Week",
-        time: hasPackages ? selectedPackage?.duration : (isMentor ? selectedSlot : item.duration),
-        price: Number((Number(totalUnits) / 1e6).toFixed(2)),
-        currency: "USDC",
-        status: "locked",
-        escrowStatus: "Locked",
-        type: isMentor ? "session" : "course",
-        note: studentNote,
-        contractAddress: routerAddress,
-        explorerUrl: txDetails.explorerUrl,
-        createdAt: new Date().toISOString(),
+        milestones: item?.milestones || [
+          { title: "Intro & Goal Alignment", percentage: 50, amount: grandTotal * 0.5, status: "Locked" },
+          { title: "Project Delivery & Review", percentage: 50, amount: grandTotal * 0.5, status: "Locked" },
+        ],
+        meetingPlatform: item?.meetingPlatform || "Google Meet",
       };
 
-      addSession(newSession);
+      if (addSession) {
+        addSession(newSession);
+      }
       setIsBooked(true);
     } catch (err) {
       console.error("Escrow deposit error:", err);
       let errorMsg = err.message || "Failed to process escrow deposit on Arbitrum.";
       if (err.code === 4001 || err.code === "ACTION_REJECTED" || err.info?.error?.code === 4001) {
         errorMsg = "Transaction was cancelled or rejected in MetaMask.";
+      } else if (err.message && err.message.includes("max fee per gas less than block base fee")) {
+        errorMsg = "Arbitrum gas fee fluctuated on the network. Please click Deposit again.";
       }
       setWeb3Error(errorMsg);
     } finally {
@@ -585,10 +683,10 @@ export default function BookingPage() {
 
             <div className="flex flex-col sm:flex-row gap-3 w-full">
               <Link
-                href="/dashboard"
+                href={confirmedTx?.enrollmentId ? `/dashboard/classes/${confirmedTx.enrollmentId}` : "/dashboard/classes"}
                 className="flex-1 py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-md shadow-purple-500/25"
               >
-                <span>View in Dashboard</span>
+                <span>Enter Classroom</span>
                 <ArrowRight size={14} />
               </Link>
               {confirmedTx?.explorerUrl ? (
@@ -734,8 +832,6 @@ export default function BookingPage() {
                     <div className="w-9 h-9 rounded-xl bg-white shadow-xs border border-purple-100 flex items-center justify-center shrink-0">
                       {item.meetingPlatform.toLowerCase().includes("zoom") ? (
                         <ZoomIcon className="w-5 h-5 text-blue-500" />
-                      ) : item.meetingPlatform.toLowerCase().includes("discord") ? (
-                        <DiscordIcon className="w-5 h-5 text-indigo-500" />
                       ) : (
                         <GoogleMeetIcon className="w-5 h-5" />
                       )}

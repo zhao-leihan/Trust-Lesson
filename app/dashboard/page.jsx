@@ -7,6 +7,7 @@ import {
   Shield,
   TrendingUp,
   Clock,
+  Calendar,
   CheckCircle,
   AlertTriangle,
   Lock,
@@ -53,11 +54,13 @@ import {
   ThumbsUp,
   Filter,
   MessageSquare,
+  Fuel,
 } from "lucide-react";
 import { CurrencyBadge, formatPriceCurrency, ArbitrumIcon } from "../../src/components/CurrencyBadge";
 import { LinkedinIcon, TwitterIcon } from "../../src/components/SocialIcons";
 import { MetaMaskIcon, CoinbaseWalletIcon } from "../../src/components/WalletIcons";
 import WalletConnectCard from "../../src/components/WalletConnectCard";
+import { useWalletBalances } from "../../src/hooks/useWalletBalances";
 import StudentSatisfactionView from "../../src/components/StudentSatisfactionView";
 import Footer from "../../src/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../src/components/ui/Tabs";
@@ -137,7 +140,9 @@ export default function DashboardPage() {
             <StudentDashboardView user={user} />
           </div>
         ) : (
-          <AdminDashboardView user={user} />
+          <div className="pt-6 pb-12 px-3 sm:px-6 flex-1 w-full max-w-6xl mx-auto animate-fadeInUp">
+            <AdminDashboardView user={user} />
+          </div>
         )}
         <Footer />
       </div>
@@ -170,14 +175,39 @@ function AdminDashboardView({ user }) {
   const [activeTab, setActiveTab] = useState("view");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get("tab");
-      if (tabParam && ["view", "users", "feedbacks", "wallet", "profile"].includes(tabParam)) {
-        setActiveTab(tabParam);
+    const handleUrlTab = () => {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get("tab");
+        if (tabParam && ["view", "users", "feedbacks", "wallet", "profile"].includes(tabParam)) {
+          setActiveTab(tabParam);
+        } else if (!tabParam) {
+          setActiveTab("view");
+        }
       }
-    }
+    };
+    handleUrlTab();
+    const handleCustomTab = (e) => {
+      if (e.detail && ["view", "users", "feedbacks", "wallet", "profile"].includes(e.detail)) {
+        setActiveTab(e.detail);
+      }
+    };
+    window.addEventListener("popstate", handleUrlTab);
+    window.addEventListener("admin-tab-change", handleCustomTab);
+    return () => {
+      window.removeEventListener("popstate", handleUrlTab);
+      window.removeEventListener("admin-tab-change", handleCustomTab);
+    };
   }, []);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    if (typeof window !== "undefined") {
+      const url = newTab === "view" ? "/dashboard" : `/dashboard?tab=${newTab}`;
+      window.history.replaceState(null, "", url);
+      window.dispatchEvent(new CustomEvent("admin-tab-sync", { detail: newTab }));
+    }
+  };
 
   const [stats, setStats] = useState({
     usersCount: 0,
@@ -400,124 +430,8 @@ function AdminDashboardView({ user }) {
     );
   });
 
-  const navItems = [
-    { id: "view", label: "View (Financial Data)", icon: Coins, desc: "Platform money & revenue" },
-    { id: "users", label: "Users", icon: Users, desc: "Real user database" },
-    { id: "feedbacks", label: "Feedback & Reviews", icon: MessageSquareQuote, desc: "User satisfaction & sentiment" },
-    { id: "wallet", label: "Wallet", icon: Wallet, desc: "Platform treasury wallet" },
-    { id: "profile", label: "Profile", icon: ShieldCheck, desc: "Admin credentials & socials" },
-  ];
-
   return (
-    <div className="flex-1 flex flex-col md:flex-row w-full min-h-[calc(100vh-80px)] bg-white relative overflow-hidden">
-      {/* ── Background Watercolor Wave Decoration (Same as Course Page) ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-purple-200/40 via-purple-100/20 to-transparent rounded-[100%] blur-3xl" />
-        <div className="absolute top-10 -left-20 w-80 h-80 bg-purple-300/15 rounded-full blur-3xl" />
-        <div className="absolute top-10 -right-20 w-80 h-80 bg-indigo-300/15 rounded-full blur-3xl" />
-
-        <svg
-          className="absolute top-0 left-0 w-full h-full opacity-20 mix-blend-multiply"
-          viewBox="0 0 1440 380"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M0,80 C320,160 480,-20 800,90 C1120,200 1280,40 1440,70 L1440,0 L0,0 Z"
-            fill="#c084fc"
-            opacity="0.3"
-          />
-          <path
-            d="M0,140 C380,240 620,40 960,160 C1200,240 1360,110 1440,130 L1440,0 L0,0 Z"
-            fill="#a855f7"
-            opacity="0.15"
-          />
-        </svg>
-      </div>
-
-      {/* ─── SIDEBAR NAVBAR (Light & Frosted Purple Theme) ─── */}
-      <aside className="w-full md:w-64 bg-white/85 backdrop-blur-xl text-slate-900 p-5 sm:p-6 flex flex-col justify-between shrink-0 border-b md:border-b-0 md:border-r border-purple-100/90 shadow-xs relative z-10">
-        <div className="space-y-6">
-          {/* Admin Header with Photo Upload Overlay */}
-          <div className="flex items-center gap-3 pb-5 border-b border-purple-100">
-            <div className="relative group shrink-0">
-              <Avatar className="w-12 h-12 ring-2 ring-purple-300 shadow-xs overflow-hidden">
-                <AvatarImage src={user.avatarUrl || "/admin-profile.webp"} alt={user.name || "Admin"} className="object-cover" />
-                <AvatarFallback className="bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-lg">
-                  {user.name?.[0]?.toUpperCase() || "A"}
-                </AvatarFallback>
-              </Avatar>
-              <label
-                htmlFor="admin-sidebar-photo-input"
-                className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
-                title="Change Admin Profile Photo"
-              >
-                <Camera size={16} />
-              </label>
-              <input
-                id="admin-sidebar-photo-input"
-                type="file"
-                accept="image/*"
-                onChange={handleAdminAvatarUpload}
-                className="hidden"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-slate-950 font-extrabold text-sm truncate">{user.name || "Administrator"}</h2>
-              <span className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/80 font-bold text-[10px]">
-                <Shield size={10} className="text-purple-600" /> Platform Admin
-              </span>
-            </div>
-          </div>
-
-          {/* Sidebar Nav Buttons */}
-          <nav className="space-y-1.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-purple-600 text-white shadow-md shadow-purple-600/30 font-bold scale-[1.02]"
-                      : "text-slate-600 hover:text-purple-700 hover:bg-purple-50/80 font-semibold text-xs"
-                  }`}
-                >
-                  <Icon size={18} className={isActive ? "text-white" : "text-purple-600"} />
-                  <div className="min-w-0">
-                    <p className="text-xs leading-none">{item.label}</p>
-                    <p className={`text-[10px] mt-1 truncate ${isActive ? "text-purple-100" : "text-slate-400"}`}>
-                      {item.desc}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Sidebar Footer Status */}
-        <div className="pt-5 mt-5 border-t border-purple-100 text-[11px] text-slate-500 space-y-2 hidden md:block">
-          <div className="flex items-center justify-between">
-            <span>Network</span>
-            <span className="font-bold text-purple-700">Arbitrum One</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Protocol Cut</span>
-            <span className="font-bold text-emerald-600">5% Fee</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Disputes</span>
-            <span className="font-bold text-slate-800">{stats.disputesCount || 0} Open</span>
-          </div>
-        </div>
-      </aside>
-
-      {/* ─── MAIN CONTENT AREA ─── */}
-      <main className="flex-1 p-5 sm:p-8 md:p-10 bg-transparent overflow-y-auto relative z-10">
+    <main className="w-full relative z-10 space-y-6">
         {/* ══════════════════════════════════════════════════════════ */}
         {/* VIEW 1: VIEW (SEMUA DATA UANG / PLATFORM FINANCIAL DATA) */}
         {/* ══════════════════════════════════════════════════════════ */}
@@ -565,11 +479,11 @@ function AdminDashboardView({ user }) {
                 <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 shadow-xs">
                   <Coins size={22} />
                 </div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Protocol Revenue (5%)</p>
+                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Protocol Revenue (10%)</p>
                 <p className="text-slate-950 font-black text-2xl sm:text-3xl mt-1 tracking-tight">
                   ${Number(stats.platformTreasury || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
                 </p>
-                <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">5% fee cut collected by platform</p>
+                <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">10% fee cut collected by platform</p>
               </div>
 
               <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 sm:p-6 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/5 transition-all shadow-xs">
@@ -610,16 +524,16 @@ function AdminDashboardView({ user }) {
             <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
               <h3 className="font-extrabold text-slate-900 text-base">Protocol Fee & Settlement Model</h3>
               <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
-                When a student funds a milestone, funds are locked non-custodially into the Arbitrum Escrow smart contract. Upon milestone completion and student approval, the contract automatically executes the 95/5 split: 95% is transferred directly to the mentor’s wallet, and 5% is allocated to the Platform Treasury Vault.
+                When a student funds a milestone, funds are locked non-custodially into the Arbitrum Escrow smart contract. Upon milestone completion and student approval, the contract automatically executes the 90/10 split: 90% is transferred directly to the mentor’s wallet, and 10% is allocated to the Platform Treasury Vault.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 text-xs">
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                   <span className="text-slate-500 text-[11px] block font-medium">Mentor Payout</span>
-                  <span className="text-slate-900 font-extrabold text-sm block mt-0.5">95% of Session Total</span>
+                  <span className="text-slate-900 font-extrabold text-sm block mt-0.5">90% of Session Total</span>
                 </div>
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                   <span className="text-slate-500 text-[11px] block font-medium">Platform Fee</span>
-                  <span className="text-purple-700 font-extrabold text-sm block mt-0.5">5% Protocol Treasury Cut</span>
+                  <span className="text-purple-700 font-extrabold text-sm block mt-0.5">10% Protocol Treasury Cut</span>
                 </div>
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                   <span className="text-slate-500 text-[11px] block font-medium">Settlement Currency</span>
@@ -1016,7 +930,7 @@ function AdminDashboardView({ user }) {
                 Platform Treasury <span className="text-purple-600 bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Wallet</span>
               </h2>
               <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                Non-custodial smart contract wallet collecting the 5% protocol fee cut on Arbitrum One.
+                Non-custodial smart contract wallet collecting the 10% protocol fee cut on Arbitrum One.
               </p>
             </div>
 
@@ -1277,7 +1191,6 @@ function AdminDashboardView({ user }) {
           </div>
         )}
       </main>
-    </div>
   );
 }
 
@@ -1800,20 +1713,6 @@ function MentorDashboardView({ user }) {
 
     setIsSavingWallet(true);
     try {
-      let signature = null;
-      if (typeof window !== "undefined" && window.ethereum) {
-        try {
-          const timestamp = Date.now();
-          const message = `Trust Lesson Payout Security\nConfirm locking Arbitrum address: ${cleanAddr}\nTimestamp: ${timestamp}`;
-          signature = await window.ethereum.request({
-            method: "personal_sign",
-            params: [message, cleanAddr],
-          }).catch(() => null);
-        } catch (sigErr) {
-          console.warn("Signature verification fallback:", sigErr);
-        }
-      }
-
       const res = await fetch("/api/mentor/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1821,7 +1720,6 @@ function MentorDashboardView({ user }) {
           address: cleanAddr,
           userId: user?.id,
           email: user?.email,
-          signature,
         }),
       });
 
@@ -1987,16 +1885,6 @@ function MentorDashboardView({ user }) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => switchRole("student")}
-            className="px-4 py-2.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-            title="Switch to Learner Workspace to view your enrolled courses and milestones"
-          >
-            <GraduationCap size={15} className="text-purple-600" />
-            <span>Learner Workspace</span>
-          </button>
-
           {/* Dedicated "Create New Gig" Button Linking to Dedicated Page */}
           <Link
             href="/dashboard/gigs/create"
@@ -2059,7 +1947,7 @@ function MentorDashboardView({ user }) {
               <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
                 ${Number(stats.monthlyEarnings || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
               </p>
-              <p className="text-purple-700 font-semibold text-[11px] mt-1">95% net escrow payout</p>
+              <p className="text-purple-700 font-semibold text-[11px] mt-1">90% net escrow payout (10% protocol fee)</p>
             </div>
 
             <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
@@ -2187,11 +2075,15 @@ function MentorDashboardView({ user }) {
                 >
                   <div>
                     {/* Cover Preview Image */}
-                    <div className="w-full h-36 rounded-2xl overflow-hidden mb-3.5 bg-slate-900 relative">
+                    <Link
+                      href={`/dashboard/gigs/${gig.id}`}
+                      className="block w-full h-36 rounded-2xl overflow-hidden mb-3.5 bg-slate-900 relative group cursor-pointer"
+                      title="Open Classroom Area"
+                    >
                       <img
                         src={gig.coverImage || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80"}
                         alt={gig.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                         <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/95 text-purple-900 shadow-xs">
@@ -2204,10 +2096,15 @@ function MentorDashboardView({ user }) {
                       <div className="absolute bottom-2.5 right-2.5">
                         <CurrencyBadge currency={gig.currency || "USDC"} size="sm" />
                       </div>
-                    </div>
+                    </Link>
 
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <h3 className="font-extrabold text-slate-950 text-base leading-snug">{gig.title}</h3>
+                      <Link
+                        href={`/dashboard/gigs/${gig.id}`}
+                        className="hover:text-purple-700 transition-colors cursor-pointer"
+                      >
+                        <h3 className="font-extrabold text-slate-950 text-base leading-snug">{gig.title}</h3>
+                      </Link>
                       <span className="text-slate-950 font-black text-sm shrink-0">
                         {formatPriceCurrency(gig.price, gig.currency || "USDC")}
                       </span>
@@ -2255,6 +2152,14 @@ function MentorDashboardView({ user }) {
                       <span>{gig.duration || "1 Live Meeting"}</span>
                     </span>
                     <div className="flex items-center gap-2">
+                      <Link
+                        href={`/dashboard/gigs/${gig.id}`}
+                        className="px-3.5 py-1.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        title="Enter Classroom Area for this gig"
+                      >
+                        <BookOpen size={12} />
+                        <span>Class Area</span>
+                      </Link>
                       <Link
                         href={`/book/course/${gig.id}`}
                         className="px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
@@ -2363,7 +2268,7 @@ function MentorDashboardView({ user }) {
                   <span>Arbitrum One Payout Address</span>
                 </h3>
                 <p className="text-slate-500 text-xs mt-0.5">
-                  The destination where 95% of milestone funds are transferred automatically when students release escrow.
+                  The destination where 90% of milestone funds are transferred automatically when students release escrow (10% platform protocol cut).
                 </p>
               </div>
 
@@ -2724,10 +2629,10 @@ function MentorDashboardView({ user }) {
               <div className="text-right sm:text-right bg-white/10 p-4 rounded-2xl border border-white/10 backdrop-blur-xs">
                 <span className="text-purple-200 text-[11px] block">Current Protocol Cut</span>
                 <span className="text-white font-black text-3xl block mt-0.5">
-                  {stats.mentorLevel === "MASTER" ? "1%" : stats.mentorLevel === "PRO" ? "3%" : "5%"}
+                  10%
                 </span>
                 <span className="text-emerald-400 font-bold text-[10px] block mt-0.5">
-                  {stats.mentorLevel === "MASTER" ? "Master Minimum Fee" : stats.mentorLevel === "PRO" ? "Pro Tier Reduced" : "Standard Listing Fee"}
+                  Standard 10% Protocol Cut (90% Payout)
                 </span>
               </div>
             </div>
@@ -2765,7 +2670,7 @@ function MentorDashboardView({ user }) {
               <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
-                  <span>5% Platform Protocol Cut</span>
+                  <span>10% Platform Protocol Cut</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-purple-600 shrink-0" />
@@ -2794,7 +2699,7 @@ function MentorDashboardView({ user }) {
               <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700 font-bold">
                   <CheckCircle2 size={13} className="text-indigo-600 shrink-0" />
-                  <span>3% Reduced Protocol Cut (Save 40%)</span>
+                  <span>10% Protocol Cut (Zero Gas Fees)</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-indigo-600 shrink-0" />
@@ -2823,7 +2728,7 @@ function MentorDashboardView({ user }) {
               <div className="pt-4 mt-4 border-t border-purple-50 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700 font-bold">
                   <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
-                  <span>1% Minimum Platform Fee</span>
+                  <span>10% Protocol Cut (Instant Clearance)</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700">
                   <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
@@ -3945,7 +3850,9 @@ function MentorDashboardView({ user }) {
 // STUDENT DASHBOARD VIEW (With Radix UI Tabs)
 // =============================================================
 function StudentDashboardView({ user }) {
-  const { sessions, updateSessionStatus, clearAllSessions, switchRole } = useAuth();
+  const { sessions, updateSessionStatus, clearAllSessions, switchRole, walletAddress } = useAuth();
+  const effectiveWallet = walletAddress || user?.walletAddress;
+  const { usdcBalance, ethBalance, isLoading: isLoadingBalances } = useWalletBalances(effectiveWallet);
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
@@ -4214,17 +4121,27 @@ function StudentDashboardView({ user }) {
                 Review deliverables and authorize milestone escrow releases.
               </p>
             </div>
-            {sessions.length > 0 && (
-              <button
-                type="button"
-                onClick={clearAllSessions}
-                className="px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                title="Wipe test session history"
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard/classes"
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
               >
-                <Trash2 size={13} />
-                <span>Clear All Bookings</span>
-              </button>
-            )}
+                <GraduationCap size={14} />
+                <span>Open Classroom</span>
+                <ArrowRight size={13} />
+              </Link>
+              {sessions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllSessions}
+                  className="px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                  title="Wipe test session history"
+                >
+                  <Trash2 size={13} />
+                  <span>Clear All Bookings</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {sessions.length > 0 ? (
@@ -4342,17 +4259,65 @@ function StudentDashboardView({ user }) {
         <TabsContent value="wallet" className="space-y-6">
           <WalletConnectCard />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100">
-              <p className="text-amber-900/60 text-xs font-semibold">Active Escrow Deposits</p>
-              <p className="text-amber-950 font-extrabold text-3xl mt-1">${activeEscrowAmount}</p>
-              <p className="text-amber-700 text-[11px] mt-1 font-medium">Locked safely until your explicit confirmation</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white border border-emerald-100/90 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-emerald-900/70 text-xs font-bold uppercase tracking-wider">Available USDC</span>
+                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                  Spendable
+                </span>
+              </div>
+              <p className="text-emerald-950 font-black text-2xl sm:text-3xl font-mono tracking-tight">
+                {isLoadingBalances && usdcBalance === null
+                  ? "..."
+                  : usdcBalance !== null
+                  ? `$${usdcBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : "$0.00"}
+              </p>
+              <p className="text-emerald-700 text-[11px] mt-1.5 font-medium">
+                Ready for funding milestone escrow vaults
+              </p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-100">
-              <p className="text-purple-900/60 text-xs font-semibold">Smart Contract Guarantee</p>
-              <p className="text-purple-950 font-extrabold text-3xl mt-1">100% Refundable</p>
-              <p className="text-purple-700 text-[11px] mt-1 font-medium">Full refund if mentor fails milestone terms</p>
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white border border-sky-100/90 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sky-900/70 text-xs font-bold uppercase tracking-wider">Gas Fee Reserve</span>
+                <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[10px] font-bold flex items-center gap-1">
+                  <Fuel size={10} /> Arbitrum Gas
+                </span>
+              </div>
+              <p className="text-sky-950 font-black text-2xl sm:text-3xl font-mono tracking-tight">
+                {isLoadingBalances && ethBalance === null
+                  ? "..."
+                  : ethBalance !== null
+                  ? `${ethBalance.toFixed(4)} ETH`
+                  : "0.0000 ETH"}
+              </p>
+              <p className="text-sky-700 text-[11px] mt-1.5 font-medium">
+                Native ETH to execute contract transactions & payouts
+              </p>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-amber-900/60 text-xs font-bold uppercase tracking-wider">Active Deposits</span>
+                <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold">
+                  In Escrow
+                </span>
+              </div>
+              <p className="text-amber-950 font-black text-2xl sm:text-3xl font-mono tracking-tight">${activeEscrowAmount}</p>
+              <p className="text-amber-700 text-[11px] mt-1.5 font-medium">Locked safely until your explicit confirmation</p>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-indigo-50/60 border border-purple-100 shadow-2xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-purple-900/60 text-xs font-bold uppercase tracking-wider">Smart Guarantee</span>
+                <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">
+                  Audited
+                </span>
+              </div>
+              <p className="text-purple-950 font-black text-2xl sm:text-3xl tracking-tight">100% Refundable</p>
+              <p className="text-purple-700 text-[11px] mt-1.5 font-medium">Full refund if mentor fails milestone terms</p>
             </div>
           </div>
         </TabsContent>
@@ -4509,10 +4474,33 @@ function StudentProfileEditor({ user, sessions }) {
   const [formDomain, setFormDomain] = useState(user.domain || "");
   const [formLinkedin, setFormLinkedin] = useState(user.linkedin || "");
   const [formUniversity, setFormUniversity] = useState(user.university || "");
-  const [formAvatarUrl, setFormAvatarUrl] = useState(user.avatarUrl || "");
   const [saved, setSaved] = useState(false);
   const [isSyncingLinkedin, setIsSyncingLinkedin] = useState(false);
   const [linkedinMsg, setLinkedinMsg] = useState("");
+
+  const [learnerCerts, setLearnerCerts] = useState([]);
+  const [loadingCerts, setLoadingCerts] = useState(true);
+  const [selectedCertModal, setSelectedCertModal] = useState(null);
+
+  useEffect(() => {
+    async function loadCerts() {
+      try {
+        const token = localStorage.getItem("tl_jwt") || localStorage.getItem("tl_token");
+        const res = await fetch("/api/certificates", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLearnerCerts(data.certificates || []);
+        }
+      } catch (err) {
+        console.warn("Failed to load certificates:", err);
+      } finally {
+        setLoadingCerts(false);
+      }
+    }
+    loadCerts();
+  }, [user]);
 
   const handlePhotoUpload = (e) => {
     const file = e.target.files?.[0];
@@ -4890,6 +4878,211 @@ function StudentProfileEditor({ user, sessions }) {
           )}
         </div>
       </div>
+
+      {/* SECTION: VERIFIABLE CERTIFICATES & CREDENTIALS */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div className="space-y-1">
+            <h4 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <Award className="text-purple-600" size={20} />
+              <span>My Verifiable Certificates & Credentials</span>
+            </h4>
+            <p className="text-xs text-slate-500">
+              Official Soulbound completion credentials anchored on Arbitrum Sepolia with platform gas sponsorship.
+            </p>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200 self-start sm:self-auto">
+            {learnerCerts.length} Verified Credential{learnerCerts.length === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        {loadingCerts ? (
+          <div className="py-8 text-center text-slate-400 text-xs">
+            Loading your verified credentials...
+          </div>
+        ) : learnerCerts.length === 0 ? (
+          <div className="p-8 rounded-2xl bg-slate-50 border border-slate-200/80 text-center space-y-2">
+            <Award size={32} className="mx-auto text-slate-400" />
+            <p className="text-sm font-bold text-slate-700">No Certificates Issued Yet</p>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Complete your mentorship classes and release escrow to earn verifiable on-chain certificates featuring your mentor's verified signature.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {learnerCerts.map((cert) => (
+              <div
+                key={cert.id}
+                className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-purple-950 text-white border border-purple-500/30 shadow-lg flex flex-col justify-between space-y-4 relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-28 h-28 bg-purple-500/10 rounded-full blur-xl" />
+                <div className="space-y-2 relative">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-purple-300">
+                    <span className="truncate max-w-[200px]">{cert.category || "Web3 Engineering"}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-400/30 text-[10px]">
+                      Arbitrum Sepolia
+                    </span>
+                  </div>
+                  <h5 className="font-black text-base text-white leading-snug line-clamp-2">
+                    {cert.skillTitle || "Mentorship Program"}
+                  </h5>
+                </div>
+
+                <div className="space-y-2 pt-3 border-t border-white/10 text-xs relative">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-[11px]">Mentor:</span>
+                    <span className="font-bold text-white flex items-center gap-1">
+                      <ShieldCheck size={13} className="text-emerald-400" />
+                      <span>{cert.mentorName || "Verified Mentor"}</span>
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-[11px]">Issue Date:</span>
+                    <span className="font-medium text-white">
+                      {new Date(cert.issuedAt || cert.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-[11px]">Rating:</span>
+                    <span className="font-bold text-amber-400 flex items-center gap-1">
+                      <Star size={12} className="fill-amber-400 text-amber-400" />
+                      <span>{(cert.rating || 5).toFixed(1)} / 5.0</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[11px] relative">
+                  {cert.txHash ? (
+                    <a
+                      href={cert.explorerUrl || `https://sepolia.arbiscan.io/tx/${cert.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-300 hover:text-purple-100 underline inline-flex items-center gap-1 font-mono"
+                    >
+                      <span>{cert.txHash.slice(0, 8)}...{cert.txHash.slice(-6)}</span>
+                      <ExternalLink size={10} />
+                    </a>
+                  ) : (
+                    <span className="text-slate-400 font-mono">UID: {cert.attestationUid?.slice(0, 10)}...</span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCertModal(cert)}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                  >
+                    View Credential
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Certificate Modal Viewer */}
+      {selectedCertModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-purple-200 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Award size={18} />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">Verified Certificate of Completion</h4>
+                  <p className="text-[10px] text-slate-500 font-medium">Arbitrum Sepolia Attestation</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCertModal(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 text-white space-y-4 border border-purple-500/30 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-36 h-36 bg-purple-500/10 rounded-full blur-2xl" />
+              <div className="flex items-center justify-between text-[11px] font-bold text-purple-300">
+                <span>TRUST LESSON VERIFIABLE CREDENTIAL</span>
+                <span className="px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-400/30">Arbitrum Nitro</span>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-slate-400 uppercase tracking-widest font-semibold">Awarded To</p>
+                <h3 className="text-xl font-black text-white">{selectedCertModal.learnerName || user?.name || "Student"}</h3>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-slate-400 uppercase tracking-widest font-semibold">For Completing</p>
+                <p className="text-sm font-bold text-purple-200">{selectedCertModal.skillTitle}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/10 text-xs">
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Verified Mentor</p>
+                  <p className="font-bold text-white truncate">{selectedCertModal.mentorName}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Issue Date</p>
+                  <p className="font-bold text-white">
+                    {new Date(selectedCertModal.issuedAt || selectedCertModal.createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold">Attestation UID:</span>
+                <span className="font-mono text-[11px] font-bold text-purple-700 truncate max-w-[220px]">
+                  {selectedCertModal.attestationUid || "0x..."}
+                </span>
+              </div>
+
+              {selectedCertModal.txHash && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-semibold">On-Chain Transaction:</span>
+                  <a
+                    href={selectedCertModal.explorerUrl || `https://sepolia.arbiscan.io/tx/${selectedCertModal.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-[11px] font-bold text-purple-700 hover:text-purple-900 underline inline-flex items-center gap-1"
+                  >
+                    <span className="truncate max-w-[200px]">{selectedCertModal.txHash.slice(0, 10)}...{selectedCertModal.txHash.slice(-8)}</span>
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold">Gas Fee Sponsor:</span>
+                <span className="font-bold text-emerald-700">Covered by Platform ($0.00 Paid by Learner)</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedCertModal(null)}
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

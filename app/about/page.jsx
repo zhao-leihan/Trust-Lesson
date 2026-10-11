@@ -38,7 +38,7 @@ const values = [
     Icon: Heart,
     color: "bg-rose-50 text-rose-600 border border-rose-200",
     title: "Mentors First",
-    desc: "Our platform fee remains capped at 5–8%, drastically lower than the 20–30% industry average. Mentors deserve to retain what they earn.",
+    desc: "Our platform fee remains capped at 10%, drastically lower than the 20–30% industry average. Mentors retain 90% of what they earn.",
   },
   {
     Icon: Star,
