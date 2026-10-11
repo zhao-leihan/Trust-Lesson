@@ -39,8 +39,10 @@ import {
   Upload,
   Check,
   File,
+  Trophy,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
+import ClassroomLeaderboard from "@/src/components/ClassroomLeaderboard";
 
 function StatusBadge({ status }) {
   const map = {
@@ -644,6 +646,17 @@ export default function ClassroomDetailPage() {
             >
               <MessageSquare size={16} />
               <span>Chat with Mentor</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("leaderboard")}
+              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                activeTab === "leaderboard"
+                  ? "border-purple-600 text-purple-700"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Trophy size={16} />
+              <span>Leaderboard</span>
             </button>
           </div>
 
@@ -1651,6 +1664,11 @@ export default function ClassroomDetailPage() {
               </form>
             </div>
           )}
+
+          {/* TAB 5: CLASSROOM LEADERBOARD */}
+          {activeTab === "leaderboard" && (
+            <ClassroomLeaderboard gigId={gig?.id || enrollment?.gigId} />
+          )}
         </div>
 
         {/* Release Escrow Confirmation Modal */}
@@ -1667,6 +1685,17 @@ export default function ClassroomDetailPage() {
                 </h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
                   This will release the escrow funds ({enrollment.packagePrice || 50} USDC) to your mentor ({mentor?.name}) and issue your official on-chain completion certificate on Arbitrum Sepolia.
+                </p>
+              </div>
+
+              {/* Pass / Fail Guard Notice */}
+              <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200 text-amber-900 text-xs space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-[11px] uppercase tracking-wide text-amber-800">
+                  <Shield size={13} />
+                  <span>Academic Evaluation Guard</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-amber-700">
+                  Passing criteria requires completion of all deliverables with an average score of at least 70%. If any required task is missing or average score is under 70%, the issuance will fail.
                 </p>
               </div>
 

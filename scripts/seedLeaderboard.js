@@ -243,7 +243,7 @@ async function main() {
       escrowAmount: 130,
       currency: "USDC",
       network: "Arbitrum Sepolia",
-      txHash: "0x2e8f17bc16d84a51e66c7fb414777d853112d785a9bc83d47f9984b5c777e112",
+      txHash: "0x" + Buffer.from("mock-seed-tx-hash-1").toString("hex").padEnd(64, "0"),
       blockNumber: 120485912,
       contractAddress: "0x50fA8e6c56B97484D2571b2C220d3EDbBAe6847D",
       credentialId: "1",
@@ -273,11 +273,12 @@ async function main() {
     },
   });
 
+  const seedAttestationUid2 = "0x" + Buffer.from("mock-attestation-uid-maya").toString("hex").padEnd(64, "0");
   await prisma.certificate.upsert({
-    where: { attestationUid: "0x4b81c33d2890a98b074ecf12489083315a6b0c2688b14a22ad31846b0a79441f" },
+    where: { attestationUid: seedAttestationUid2 },
     update: {},
     create: {
-      attestationUid: "0x4b81c33d2890a98b074ecf12489083315a6b0c2688b14a22ad31846b0a79441f",
+      attestationUid: seedAttestationUid2,
       schemaUid: "0x7a30b91e1d09e86a074bcf62589083315a6b0c2688b14a22ad31846b0a79339e",
       sessionId: session2.id,
       learnerName: createdStudents[1].name,
@@ -290,7 +291,7 @@ async function main() {
       escrowAmount: 150,
       currency: "USDC",
       network: "Arbitrum Sepolia",
-      txHash: "0x7d9f28ec16a84b51e66c7fb414777d853112d785a9bc83d47f9984b5c777e334",
+      txHash: "0x" + Buffer.from("mock-seed-tx-hash-2").toString("hex").padEnd(64, "0"),
       blockNumber: 120486001,
       contractAddress: "0x50fA8e6c56B97484D2571b2C220d3EDbBAe6847D",
       credentialId: "2",

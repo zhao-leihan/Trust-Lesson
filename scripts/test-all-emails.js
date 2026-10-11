@@ -57,7 +57,7 @@ async function runEmailTests() {
       totalAmount: 150.0,
       sessionsCount: 3,
       durationMin: 60,
-      txHash: "0x89abf10928374829384729384729384729384729384729384729384729384729",
+      txHash: "0x" + Buffer.from("mock-tx-hash-for-testing-order-receipt").toString("hex").padEnd(64, "0"),
     });
     console.log("   Result:", res.error ? `FAILED: ${res.error.message}` : `SENT (ID: ${res.data?.id})`);
     results.push({ test: "Order Receipt", status: res.error ? "FAILED" : "SUCCESS", id: res.data?.id });

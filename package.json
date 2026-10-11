@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "lint:check": "node scripts/lint-check.js",
+    "security:check": "node scripts/security-audit.js",
     "test:gated": "node --import ./test/register-loader.js test/gated-content.test.js",
     "compile": "hardhat compile",
     "test:contracts": "hardhat test",

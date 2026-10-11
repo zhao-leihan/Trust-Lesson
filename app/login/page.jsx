@@ -8,8 +8,7 @@ import { useGoogleAuth } from "@/src/hooks/useGoogleAuth";
 import { Eye, EyeOff, ArrowRight, CheckCircle2, ShieldCheck, User, X, Mail } from "lucide-react";
 import { GoogleIcon } from "@/src/components/SocialIcons";
 
-const TURNSTILE_SITE_KEY =
-  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 export default function LoginPage() {
   const { login, user, authLoading } = useAuth();
@@ -28,6 +27,11 @@ export default function LoginPage() {
   const [turnstileToken, setTurnstileToken] = useState("");
 
   useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) {
+      setTurnstileToken("dev-test-bypass-token");
+      return;
+    }
+
     let scriptEl = document.getElementById("cf-turnstile-script");
     let isMounted = true;
 

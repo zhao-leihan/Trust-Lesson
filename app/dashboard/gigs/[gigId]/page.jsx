@@ -32,8 +32,10 @@ import {
   Square,
   File,
   Download,
+  Trophy,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
+import ClassroomLeaderboard from "@/src/components/ClassroomLeaderboard";
 
 function StatusBadge({ status }) {
   const map = {
@@ -382,6 +384,17 @@ export default function MentorGigClassroomPage() {
             >
               <ClipboardList size={16} />
               <span>Tasks & Assignments ({assignments.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("leaderboard")}
+              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer shrink-0 ${
+                activeTab === "leaderboard"
+                  ? "border-purple-600 text-purple-700"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Trophy size={16} />
+              <span>Leaderboard</span>
             </button>
           </div>
 
@@ -1234,6 +1247,11 @@ export default function MentorGigClassroomPage() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* TAB 5: CLASSROOM LEADERBOARD */}
+          {activeTab === "leaderboard" && (
+            <ClassroomLeaderboard gigId={gigId} />
           )}
         </div>
       </main>
