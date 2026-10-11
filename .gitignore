@@ -13,11 +13,15 @@ dist-ssr
 # Environment, Secrets & Local Reports
 .env
 .env*
+.vercel
+.vercel/
 !.env.local.example
 *.local
 Report.md
 report.md
 REPORT.md
+gitleaks-report.json
+*.json.report
 prisma/*.db
 prisma/*.db-journal
 *.db
