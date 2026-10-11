@@ -18,6 +18,7 @@ import {
   Video,
   History,
   Award,
+  Calendar,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 
@@ -124,47 +125,33 @@ export default function MyClassesPage() {
             </Link>
           </div>
 
-          {/* Navigation Tabs: Active Classes vs Class History */}
+          {/* Navigation Tabs: Active Classes vs History & Completed */}
           {!loading && !error && enrollments.length > 0 && (
-            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+            <div className="flex border-b border-slate-200 space-x-6 text-sm font-bold">
               <button
                 type="button"
                 onClick={() => setActiveTab("active")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
                   activeTab === "active"
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
-                <BookOpen size={14} />
-                <span>Active Classes</span>
-                <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                    activeTab === "active" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  {activeClasses.length}
-                </span>
+                <Clock size={16} />
+                <span>Active Classes ({activeClasses.length})</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab("history")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
                   activeTab === "history"
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
-                <History size={14} />
-                <span>Class History</span>
-                <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                    activeTab === "history" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-800"
-                  }`}
-                >
-                  {completedClasses.length}
-                </span>
+                <Calendar size={16} />
+                <span>History & Completed ({completedClasses.length})</span>
               </button>
             </div>
           )}
@@ -387,7 +374,7 @@ export default function MyClassesPage() {
                           className="w-full py-3 rounded-2xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                         >
                           <Award size={14} className="text-amber-300 shrink-0" />
-                          <span>Enter Classroom & Certificate</span>
+                          <span>Review Materials & Certificate</span>
                         </Link>
                       ) : (
                         <Link

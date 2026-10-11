@@ -2484,6 +2484,29 @@ app.post("/enrollments", authMiddleware, async (c) => {
     return c.json({ error: "Gig not found" }, 404);
   }
 
+  // Double payment prevention: check if learner already has active or completed enrollment for this gig
+  const existingActiveForGig = await db.enrollment.findFirst({
+    where: {
+      learnerId: jwtUser.sub,
+      gigId,
+      escrowStatus: { in: ["FUNDED", "IN_SESSION", "COMPLETED"] },
+    },
+    include: { gig: true, mentor: true, learner: true },
+  });
+
+  if (existingActiveForGig) {
+    return c.json({
+      enrollment: {
+        ...existingActiveForGig,
+        onchainSessionId: existingActiveForGig.onchainSessionId
+          ? existingActiveForGig.onchainSessionId.toString()
+          : null,
+      },
+      message: "Enrollment already active. Double payment prevented.",
+      alreadyEnrolled: true,
+    });
+  }
+
   // Idempotency check on onchainSessionId
   if (onchainSessionId) {
     const existing = await db.enrollment.findUnique({
@@ -2807,7 +2830,8 @@ app.get("/enrollments/:id", authMiddleware, async (c) => {
       },
     },
     access: {
-      canViewMaterials: access.canViewMaterials,
+      status: enrollment.escrowStatus || access.status,
+      canViewMaterials: true, // Always allow reviewing course materials
       canRequestMeeting: access.canRequestMeeting,
       canSeeJoinLink: access.canSeeJoinLink,
       isReadOnly: access.isReadOnly,

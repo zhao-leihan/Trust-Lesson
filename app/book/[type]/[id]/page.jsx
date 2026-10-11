@@ -28,6 +28,7 @@ import {
   Sparkles,
   RefreshCw,
   AlertTriangle,
+  BookOpen,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 import { CurrencyBadge, formatPriceCurrency, UsdcIcon, UsdtIcon, ArbitrumIcon } from "@/src/components/CurrencyBadge";
@@ -195,6 +196,49 @@ export default function BookingPage() {
       .finally(() => setLoadingItem(false));
   }, [id]);
 
+  // Double payment prevention: check if learner is already enrolled & funded for this gig
+  const [existingEnrollment, setExistingEnrollment] = useState(null);
+  const [checkingExisting, setCheckingExisting] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function checkExistingEnrollment() {
+      if (!id) return;
+      try {
+        setCheckingExisting(true);
+        const token =
+          typeof window !== "undefined"
+            ? localStorage.getItem("tl_jwt") || localStorage.getItem("tl_token")
+            : null;
+        if (!token) return;
+        const res = await fetch("/api/enrollments?role=learner", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.enrollments && isMounted) {
+            const match = data.enrollments.find(
+              (e) =>
+                (String(e.gigId) === String(id) || String(e.gig?.id) === String(id)) &&
+                ["FUNDED", "IN_SESSION", "COMPLETED"].includes(e.escrowStatus)
+            );
+            if (match) {
+              setExistingEnrollment(match);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Check existing enrollment failed:", err);
+      } finally {
+        if (isMounted) setCheckingExisting(false);
+      }
+    }
+    checkExistingEnrollment();
+    return () => {
+      isMounted = false;
+    };
+  }, [id, user]);
+
   const isMentor = type === "mentor" || item?.offeringType === "mentor";
 
   if (loadingItem) {
@@ -276,6 +320,10 @@ export default function BookingPage() {
 
   // Real Web3 Escrow Deposit via MetaMask & Arbitrum Sepolia
   const handleDepositEscrow = async () => {
+    if (existingEnrollment) {
+      alert("You already have an active enrollment for this course. Double payment is prevented.");
+      return;
+    }
     setIsProcessing(true);
     setWeb3Error(null);
     setInsufficientBalanceInfo(null);
@@ -1433,7 +1481,27 @@ export default function BookingPage() {
                 )}
 
                 {/* Deposit / Transak CTA Button */}
-                {isSelfMentor ? (
+                {existingEnrollment ? (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl flex items-start gap-3">
+                      <CheckCircle2 size={18} className="text-purple-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-purple-900">Already Enrolled & Active</p>
+                        <p className="text-[11px] text-purple-700 mt-0.5">
+                          You already have an active course enrollment ({existingEnrollment.packageName || "Classroom"}). Duplicate payments are blocked.
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/dashboard/classes/${existingEnrollment.id}`}
+                      className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-sm shadow-lg shadow-purple-900/30 hover:shadow-purple-900/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <BookOpen size={16} />
+                      <span>Go to Classroom & Materials</span>
+                      <ArrowRight size={15} />
+                    </Link>
+                  </div>
+                ) : isSelfMentor ? (
                   <button
                     type="button"
                     disabled={true}

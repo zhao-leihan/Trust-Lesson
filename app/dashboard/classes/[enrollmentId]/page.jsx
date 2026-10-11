@@ -460,6 +460,8 @@ export default function ClassroomDetailPage() {
   const gig = enrollment?.gig;
   const mentor = enrollment?.mentor;
   const modules = gig?.parsedModules || [];
+  const isCompleted = enrollment?.escrowStatus === "COMPLETED" || access?.status === "COMPLETED";
+  const effectiveStatus = isCompleted ? "COMPLETED" : (access?.status || enrollment?.escrowStatus || "FUNDED");
 
   // Calculate Roadmap Progress
   const completedCount = modules.filter((_, idx) => completedModules[idx]).length;
@@ -481,13 +483,13 @@ export default function ClassroomDetailPage() {
             </Link>
 
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={access.status} />
+              <StatusBadge status={effectiveStatus} />
               {enrollment.onchainSessionId && (
                 <span className="font-mono text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
                   Session #{enrollment.onchainSessionId}
                 </span>
               )}
-              {access.status !== "COMPLETED" ? (
+              {!isCompleted ? (
                 <button
                   type="button"
                   onClick={() => setShowReleaseModal(true)}
@@ -606,7 +608,19 @@ export default function ClassroomDetailPage() {
               </div>
 
               {/* Action Button */}
-              {quota.canBook ? (
+              {isCompleted ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchCertificate();
+                    setShowCertModal(true);
+                  }}
+                  className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 shadow-md shadow-purple-500/20 cursor-pointer"
+                >
+                  <Award size={14} />
+                  <span>View On-Chain Certificate</span>
+                </button>
+              ) : quota.canBook ? (
                 <Link
                   href={`/dashboard/classes/${enrollment.id}/schedule`}
                   className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 shadow-md shadow-purple-500/20"
@@ -619,7 +633,7 @@ export default function ClassroomDetailPage() {
                   {quota.remaining === 0
                     ? "Quota Exhausted: 0 sessions remaining"
                     : !access.canRequestMeeting
-                    ? `Booking disabled for ${access.status} status`
+                    ? `Booking disabled for ${effectiveStatus} status`
                     : "Scheduling temporarily unavailable"}
                 </div>
               )}
@@ -701,12 +715,25 @@ export default function ClassroomDetailPage() {
                 </div>
               )}
 
-              {access.isReadOnly && access.canViewMaterials && (
-                <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl flex items-center gap-3 text-purple-900 text-xs">
-                  <CheckCircle2 size={18} className="text-purple-600 shrink-0" />
-                  <span>
-                    Mentorship completed. All video lessons and resources remain accessible to you indefinitely in read-only mode.
-                  </span>
+              {(isCompleted || (access.isReadOnly && access.canViewMaterials)) && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-purple-900 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 size={18} className="text-purple-600 shrink-0" />
+                    <span>
+                      Mentorship completed. All course modules, video lessons, and learning materials remain permanently unlocked for review.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchCertificate();
+                      setShowCertModal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer shadow-xs"
+                  >
+                    <Award size={13} />
+                    <span>View Certificate</span>
+                  </button>
                 </div>
               )}
 
@@ -762,7 +789,7 @@ export default function ClassroomDetailPage() {
                 <div className="relative space-y-4">
                   {modules.map((mod, idx) => {
                     const isExpanded = expandedModule === idx;
-                    const isLocked = !access.canViewMaterials || mod.isLocked;
+                    const isLocked = !isCompleted && (!access.canViewMaterials || mod.isLocked);
                     const isDone = Boolean(completedModules[idx]);
 
                     return (
@@ -828,6 +855,12 @@ export default function ClassroomDetailPage() {
                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                                       <CheckCircle2 size={11} />
                                       <span>Completed</span>
+                                    </span>
+                                  )}
+                                  {isCompleted && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-100/70 px-2 py-0.5 rounded-full">
+                                      <BookOpen size={11} />
+                                      <span>Review Material</span>
                                     </span>
                                   )}
                                 </div>
