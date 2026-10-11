@@ -379,6 +379,42 @@ export default function BookingPage() {
         );
       }
 
+      // Helper function to build safe Arbitrum gas fee overrides with buffer
+      const getArbitrumGasOverrides = async () => {
+        try {
+          const feeData = await provider.getFeeData();
+          const overrides = {};
+
+          if (feeData.maxFeePerGas) {
+            // Buffer by 80% to absorb rapid Arbitrum block baseFee fluctuations
+            overrides.maxFeePerGas = (feeData.maxFeePerGas * 180n) / 100n;
+          } else if (feeData.gasPrice) {
+            overrides.gasPrice = (feeData.gasPrice * 180n) / 100n;
+          }
+
+          if (feeData.maxPriorityFeePerGas) {
+            overrides.maxPriorityFeePerGas = (feeData.maxPriorityFeePerGas * 150n) / 100n;
+          }
+
+          // Ensure minimum safe floor for Arbitrum Sepolia (0.1 gwei = 100,000,000 wei)
+          const MIN_FEE = 100000000n;
+          if (!overrides.maxFeePerGas || overrides.maxFeePerGas < MIN_FEE) {
+            overrides.maxFeePerGas = MIN_FEE;
+          }
+          if (!overrides.maxPriorityFeePerGas || overrides.maxPriorityFeePerGas < 10000000n) {
+            overrides.maxPriorityFeePerGas = 10000000n;
+          }
+
+          return overrides;
+        } catch (feeErr) {
+          console.warn("[Gas Fee Estimation Fallback]:", feeErr);
+          return {
+            maxFeePerGas: 150000000n, // 0.15 gwei safe floor
+            maxPriorityFeePerGas: 20000000n,
+          };
+        }
+      };
+
       // 6. Check Allowance and Approve USDC
       const allowance = await usdcContract.allowance(studentAddress, routerAddress);
       if (allowance < totalUnits) {
@@ -386,7 +422,14 @@ export default function BookingPage() {
         setWeb3StatusMessage(
           `Step 1/2: Please approve ${(Number(totalUnits) / 1e6).toFixed(2)} USDC in MetaMask...`
         );
-        const approveTx = await usdcContract.approve(routerAddress, totalUnits);
+        const approveOverrides = await getArbitrumGasOverrides();
+        try {
+          const estApprove = await usdcContract.approve.estimateGas(routerAddress, totalUnits);
+          approveOverrides.gasLimit = (estApprove * 130n) / 100n;
+        } catch {
+          approveOverrides.gasLimit = 100000n;
+        }
+        const approveTx = await usdcContract.approve(routerAddress, totalUnits, approveOverrides);
         setWeb3Step("confirming_approval");
         setWeb3StatusMessage("USDC Approval broadcasted. Waiting for confirmation on Arbitrum...");
         await approveTx.wait(1);
@@ -410,7 +453,16 @@ export default function BookingPage() {
       setWeb3Step("depositing");
       setWeb3StatusMessage(`Step 2/2: Confirming Escrow Vault Deposit in MetaMask...`);
 
-      const createTx = await routerContract.createSession(targetMentorAddress, [subtotalUnits]);
+      const createOverrides = await getArbitrumGasOverrides();
+      try {
+        const estGas = await routerContract.createSession.estimateGas(targetMentorAddress, [subtotalUnits]);
+        createOverrides.gasLimit = (estGas * 140n) / 100n;
+      } catch (estErr) {
+        console.warn("[Gas Estimate Fallback]:", estErr.message);
+        createOverrides.gasLimit = 450000n;
+      }
+
+      const createTx = await routerContract.createSession(targetMentorAddress, [subtotalUnits], createOverrides);
 
       setWeb3Step("mining");
       setWeb3StatusMessage("Escrow transaction broadcasted! Waiting for block confirmation on Arbitrum...");
@@ -531,6 +583,8 @@ export default function BookingPage() {
       let errorMsg = err.message || "Failed to process escrow deposit on Arbitrum.";
       if (err.code === 4001 || err.code === "ACTION_REJECTED" || err.info?.error?.code === 4001) {
         errorMsg = "Transaction was cancelled or rejected in MetaMask.";
+      } else if (err.message && err.message.includes("max fee per gas less than block base fee")) {
+        errorMsg = "Arbitrum gas fee fluctuated on the network. Please click Deposit again.";
       }
       setWeb3Error(errorMsg);
     } finally {
