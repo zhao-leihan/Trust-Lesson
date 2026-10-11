@@ -3035,11 +3035,10 @@ app.post("/enrollments/:id/complete-and-release", authMiddleware, async (c) => {
       }
     }
 
-    // Update enrollment status to COMPLETED
+    // Update enrollment escrowStatus to COMPLETED
     const updatedEnrollment = await db.enrollment.update({
       where: { id: enrollmentId },
       data: {
-        status: "COMPLETED",
         escrowStatus: "COMPLETED",
       },
     });
@@ -3318,7 +3317,8 @@ app.get("/gigs/:id/leaderboard", async (c) => {
       }
 
       const averageScore = gradedCount > 0 ? Math.round(scoreSum / gradedCount) : 0;
-      const points = (averageScore * 10) + (completedTasks * 50) + (enr.escrowStatus === "RELEASED" ? 100 : 0);
+      const isCompleted = enr.escrowStatus === "COMPLETED" || enr.escrowStatus === "RELEASED";
+      const points = (averageScore * 10) + (completedTasks * 50) + (isCompleted ? 100 : 0);
 
       return {
         learnerId: enr.learner?.id || enr.id,
@@ -4720,7 +4720,7 @@ app.get("/certificates", authMiddleware, async (c) => {
     const completedEnrollments = await db.enrollment.findMany({
       where: {
         learnerId: jwtUser.sub,
-        escrowStatus: "RELEASED",
+        escrowStatus: { in: ["COMPLETED", "RELEASED"] },
       },
       include: {
         mentor: true,

@@ -1830,10 +1830,17 @@ export default function ClassroomDetailPage() {
                 <button
                   type="button"
                   onClick={() => setShowCertModal(false)}
-                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   Close
                 </button>
+                <Link
+                  href={`/certificate/${certificateData.id}`}
+                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Award size={14} />
+                  <span>View Official Certificate</span>
+                </Link>
               </div>
             </div>
           </div>
