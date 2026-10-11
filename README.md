@@ -76,6 +76,8 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 | **Web3 Providers** | [Ethers.js v6](https://docs.ethers.org/) + [Viem](https://viem.sh/) (MetaMask, Rabby, Coinbase Wallet) |
 | **Fiat On-Ramp** | [Transak Gateway](https://transak.com/) (Visa, Mastercard, Apple Pay) |
 | **Media & Storage** | [Cloudflare Stream](https://www.cloudflare.com/products/cloudflare-stream/) (HLS Signed Tokens) + [Cloudflare R2](https://www.cloudflare.com/products/r2/) (Presigned AWS SigV4) + [Pinata IPFS](https://pinata.cloud/) |
+| **P2P Direct Messaging** | WebRTC DataChannels (RTCDataChannel) + Ephemeral In-Memory Signaling |
+| **Code Verification** | Automated SWC Syntax Validator (scripts/lint-check.js) |
 
 ---
 
@@ -92,7 +94,7 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 ### 2. Student Workspace
 - **Live MetaMask Balance**: View connected Arbitrum Sepolia USDC and ETH balances directly in the checkout card.
 - **Insufficient Balance Protection**: Clear warning states and direct faucet links (Circle USDC & Sepolia ETH) when balance is below required deposit.
-- **Milestone Progress Tracker**: Step-by-step visibility (*Escrow Deposited → In Session → Confirmed & Released*).
+- **Milestone Progress Tracker**: Step-by-step visibility (*Escrow Deposited -> In Session -> Confirmed & Released*).
 - **Dispute Resolution Engine**: Transparent 48-hour dispute resolution with evidence hashing to IPFS.
 - **Soulbound Credentials**: Automatic minting of tamper-proof completion certificates linked to Arbiscan.
 
@@ -102,6 +104,24 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 - **Arbitrum Gas Fee**: **FREE** (100% subsidized by the Platform Gas Sponsor).
 - **Grand Total Paid by Learner**: **$55.00 USDC**.
 - **Net Payout to Mentor**: **$50.00 USDC** (100% of base price).
+
+### 4. Interactive Gig Classroom & Deliverables Engine
+- **Mentor Gig Command Center (`/dashboard/gigs/[gigId]`)**: Dedicated class management view per gig enabling mentors to inspect individual student progress, coordinate 1-on-1 meeting requests, and issue curriculum assignments.
+- **Student Classroom Hub (`/dashboard/classes/[enrollmentId]`)**: Real-time interactive classroom with curriculum roadmaps, modular lesson tracks, meeting session requester, and progress synchronization.
+- **Deliverables & Submission Review**: Multi-format submissions supporting file uploads (PDF, docs, source files) and external URLs (Google Forms, Google Docs, GitHub repositories), alongside mentor scoring (0-100), feedback notes, and status management (Approved, Rejected, Submitted).
+- **Direct Escrow Release & Dual-Party SBT Credentials**: Direct release triggers upon course completion, verifying deliveries and generating soulbound completion certificates for both learner and mentor.
+
+### 5. WebRTC P2P Direct Chat (Zero Database Overhead)
+- **Direct P2P DataChannel**: Direct browser-to-browser messaging between mentor and learner using WebRTC DataChannels.
+- **Zero Database Load**: In-memory ephemeral signaling (`/api/webrtc/signal`, `/api/webrtc/signals`) without storing chat messages in the database.
+- **Local Persistence & Status Monitoring**: Chat conversations saved locally in client `localStorage` with real-time peer connection badge indicators (`Connected P2P`, `Signaling`, `Offline`).
+- **Global Unread Alerts**: Live unread badge count and incoming notification toasts in the top navigation bar.
+
+### 6. High-Performance Instant Rendering
+- **0ms Instant Cache**: Stale-while-revalidate caching leveraging `sessionStorage` for instantaneous page transitions.
+- **Layout Skeleton Shell**: Replaced blocking modal overlays with responsive animated skeleton layouts for progressive rendering.
+- **Batched Database Sync**: Bulk task synchronization with Prisma `createMany` and concurrent DB lookups using `Promise.all`.
+- **Automated Syntax Check**: Automated linting tool (`npm run lint:check`) verifying all JavaScript/JSX files across the project.
 
 ---
 
@@ -150,11 +170,15 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 ```text
 Trust-Lesson/
 ├── app/                          # Next.js 15 App Router
-│   ├── api/[[...route]]/route.js # Unified Hono API router
+│   ├── api/[[...route]]/route.js # Unified Hono API router & WebRTC signaling
 │   ├── about/page.jsx            # Platform narrative & leadership profiles
 │   ├── book/[type]/[id]/page.jsx # Real Web3 checkout & live MetaMask balance
 │   ├── certificate/[id]/page.jsx # Soulbound SBT certificate verification
-│   ├── dashboard/page.jsx        # Role-based workspace (Learner, Mentor, Admin)
+│   ├── dashboard/                # Role-based workspace
+│   │   ├── classes/[id]/page.jsx # Interactive student classroom & deliverables
+│   │   ├── gigs/[id]/page.jsx    # Mentor gig classroom management & grading
+│   │   ├── chat/page.jsx         # WebRTC direct P2P messaging interface
+│   │   └── page.jsx              # Main dashboard overview
 │   ├── explore/page.jsx          # Marketplace catalog with instant search
 │   └── page.jsx                  # Homepage with live ecosystem statistics
 ├── contracts/                    # Solidity 0.8.20 Smart Contracts
@@ -164,16 +188,22 @@ Trust-Lesson/
 │   └── VideoAccess.sol           # On-chain course content gating
 ├── docs/                         # Engineering Specifications
 │   ├── code architecture.md      # Full-stack architectural blueprint
+│   ├── classroom-webrtc-architecture.md # Classroom, assignments & WebRTC specification
 │   ├── report.md                 # Technical audit & verification manual
 │   └── systematics.md            # Protocol lifecycle & state machine
 ├── lib/                          # Core Protocol Utilities
+│   ├── access.js                 # Classroom authorization & access controller
 │   ├── networkConfig.js          # Master Multi-Chain Switcher (Testnet / Mainnet)
 │   ├── gasSponsor.js             # Gas Paymaster Relayer engine
 │   ├── prisma.js                 # Database client
 │   └── jwt.js                    # SIWE token signing & verification
+├── src/                          # Shared Components & Custom Hooks
+│   ├── hooks/useWebRTCChat.js    # Browser-to-browser WebRTC DataChannel hook
+│   └── components/               # Navbar, Footer & reusable UI widgets
 ├── prisma/                       # Prisma ORM schemas & SQLite database
-├── public/                       # Static brand assets & Lesson Monster characters
+├── public/                       # Static brand assets & characters
 ├── scripts/                      # Deployment & test automation scripts
+│   ├── lint-check.js             # Automated SWC syntax & lint check validator
 │   ├── deploy.cjs                # Full suite contract deployer
 │   └── deployEscrow10Percent.cjs # Dedicated EscrowRouter deployer
 └── hardhat.config.cjs            # Hardhat L2 compiler & network configuration

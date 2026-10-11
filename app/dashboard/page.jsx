@@ -2075,11 +2075,15 @@ function MentorDashboardView({ user }) {
                 >
                   <div>
                     {/* Cover Preview Image */}
-                    <div className="w-full h-36 rounded-2xl overflow-hidden mb-3.5 bg-slate-900 relative">
+                    <Link
+                      href={`/dashboard/gigs/${gig.id}`}
+                      className="block w-full h-36 rounded-2xl overflow-hidden mb-3.5 bg-slate-900 relative group cursor-pointer"
+                      title="Open Classroom Area"
+                    >
                       <img
                         src={gig.coverImage || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80"}
                         alt={gig.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                         <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/95 text-purple-900 shadow-xs">
@@ -2092,10 +2096,15 @@ function MentorDashboardView({ user }) {
                       <div className="absolute bottom-2.5 right-2.5">
                         <CurrencyBadge currency={gig.currency || "USDC"} size="sm" />
                       </div>
-                    </div>
+                    </Link>
 
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <h3 className="font-extrabold text-slate-950 text-base leading-snug">{gig.title}</h3>
+                      <Link
+                        href={`/dashboard/gigs/${gig.id}`}
+                        className="hover:text-purple-700 transition-colors cursor-pointer"
+                      >
+                        <h3 className="font-extrabold text-slate-950 text-base leading-snug">{gig.title}</h3>
+                      </Link>
                       <span className="text-slate-950 font-black text-sm shrink-0">
                         {formatPriceCurrency(gig.price, gig.currency || "USDC")}
                       </span>
@@ -2145,11 +2154,11 @@ function MentorDashboardView({ user }) {
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/dashboard/gigs/${gig.id}`}
-                        className="px-3 py-1.5 rounded-full bg-purple-100/80 text-purple-800 hover:bg-purple-700 hover:text-white font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
-                        title="View buyers, package tiers, and session quota usage"
+                        className="px-3.5 py-1.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        title="Enter Classroom Area for this gig"
                       >
-                        <Users size={12} />
-                        <span>Buyers</span>
+                        <BookOpen size={12} />
+                        <span>Class Area</span>
                       </Link>
                       <Link
                         href={`/book/course/${gig.id}`}
@@ -4465,10 +4474,33 @@ function StudentProfileEditor({ user, sessions }) {
   const [formDomain, setFormDomain] = useState(user.domain || "");
   const [formLinkedin, setFormLinkedin] = useState(user.linkedin || "");
   const [formUniversity, setFormUniversity] = useState(user.university || "");
-  const [formAvatarUrl, setFormAvatarUrl] = useState(user.avatarUrl || "");
   const [saved, setSaved] = useState(false);
   const [isSyncingLinkedin, setIsSyncingLinkedin] = useState(false);
   const [linkedinMsg, setLinkedinMsg] = useState("");
+
+  const [learnerCerts, setLearnerCerts] = useState([]);
+  const [loadingCerts, setLoadingCerts] = useState(true);
+  const [selectedCertModal, setSelectedCertModal] = useState(null);
+
+  useEffect(() => {
+    async function loadCerts() {
+      try {
+        const token = localStorage.getItem("tl_jwt") || localStorage.getItem("tl_token");
+        const res = await fetch("/api/certificates", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLearnerCerts(data.certificates || []);
+        }
+      } catch (err) {
+        console.warn("Failed to load certificates:", err);
+      } finally {
+        setLoadingCerts(false);
+      }
+    }
+    loadCerts();
+  }, [user]);
 
   const handlePhotoUpload = (e) => {
     const file = e.target.files?.[0];
@@ -4846,6 +4878,211 @@ function StudentProfileEditor({ user, sessions }) {
           )}
         </div>
       </div>
+
+      {/* SECTION: VERIFIABLE CERTIFICATES & CREDENTIALS */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div className="space-y-1">
+            <h4 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <Award className="text-purple-600" size={20} />
+              <span>My Verifiable Certificates & Credentials</span>
+            </h4>
+            <p className="text-xs text-slate-500">
+              Official Soulbound completion credentials anchored on Arbitrum Sepolia with platform gas sponsorship.
+            </p>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200 self-start sm:self-auto">
+            {learnerCerts.length} Verified Credential{learnerCerts.length === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        {loadingCerts ? (
+          <div className="py-8 text-center text-slate-400 text-xs">
+            Loading your verified credentials...
+          </div>
+        ) : learnerCerts.length === 0 ? (
+          <div className="p-8 rounded-2xl bg-slate-50 border border-slate-200/80 text-center space-y-2">
+            <Award size={32} className="mx-auto text-slate-400" />
+            <p className="text-sm font-bold text-slate-700">No Certificates Issued Yet</p>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Complete your mentorship classes and release escrow to earn verifiable on-chain certificates featuring your mentor's verified signature.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {learnerCerts.map((cert) => (
+              <div
+                key={cert.id}
+                className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-purple-950 text-white border border-purple-500/30 shadow-lg flex flex-col justify-between space-y-4 relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-28 h-28 bg-purple-500/10 rounded-full blur-xl" />
+                <div className="space-y-2 relative">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-purple-300">
+                    <span className="truncate max-w-[200px]">{cert.category || "Web3 Engineering"}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-400/30 text-[10px]">
+                      Arbitrum Sepolia
+                    </span>
+                  </div>
+                  <h5 className="font-black text-base text-white leading-snug line-clamp-2">
+                    {cert.skillTitle || "Mentorship Program"}
+                  </h5>
+                </div>
+
+                <div className="space-y-2 pt-3 border-t border-white/10 text-xs relative">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-[11px]">Mentor:</span>
+                    <span className="font-bold text-white flex items-center gap-1">
+                      <ShieldCheck size={13} className="text-emerald-400" />
+                      <span>{cert.mentorName || "Verified Mentor"}</span>
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-[11px]">Issue Date:</span>
+                    <span className="font-medium text-white">
+                      {new Date(cert.issuedAt || cert.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span className="text-[11px]">Rating:</span>
+                    <span className="font-bold text-amber-400 flex items-center gap-1">
+                      <Star size={12} className="fill-amber-400 text-amber-400" />
+                      <span>{(cert.rating || 5).toFixed(1)} / 5.0</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[11px] relative">
+                  {cert.txHash ? (
+                    <a
+                      href={cert.explorerUrl || `https://sepolia.arbiscan.io/tx/${cert.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-300 hover:text-purple-100 underline inline-flex items-center gap-1 font-mono"
+                    >
+                      <span>{cert.txHash.slice(0, 8)}...{cert.txHash.slice(-6)}</span>
+                      <ExternalLink size={10} />
+                    </a>
+                  ) : (
+                    <span className="text-slate-400 font-mono">UID: {cert.attestationUid?.slice(0, 10)}...</span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCertModal(cert)}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                  >
+                    View Credential
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Certificate Modal Viewer */}
+      {selectedCertModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-purple-200 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Award size={18} />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">Verified Certificate of Completion</h4>
+                  <p className="text-[10px] text-slate-500 font-medium">Arbitrum Sepolia Attestation</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCertModal(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 text-white space-y-4 border border-purple-500/30 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-36 h-36 bg-purple-500/10 rounded-full blur-2xl" />
+              <div className="flex items-center justify-between text-[11px] font-bold text-purple-300">
+                <span>TRUST LESSON VERIFIABLE CREDENTIAL</span>
+                <span className="px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-400/30">Arbitrum Nitro</span>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-slate-400 uppercase tracking-widest font-semibold">Awarded To</p>
+                <h3 className="text-xl font-black text-white">{selectedCertModal.learnerName || user?.name || "Student"}</h3>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] text-slate-400 uppercase tracking-widest font-semibold">For Completing</p>
+                <p className="text-sm font-bold text-purple-200">{selectedCertModal.skillTitle}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/10 text-xs">
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Verified Mentor</p>
+                  <p className="font-bold text-white truncate">{selectedCertModal.mentorName}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Issue Date</p>
+                  <p className="font-bold text-white">
+                    {new Date(selectedCertModal.issuedAt || selectedCertModal.createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold">Attestation UID:</span>
+                <span className="font-mono text-[11px] font-bold text-purple-700 truncate max-w-[220px]">
+                  {selectedCertModal.attestationUid || "0x..."}
+                </span>
+              </div>
+
+              {selectedCertModal.txHash && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-semibold">On-Chain Transaction:</span>
+                  <a
+                    href={selectedCertModal.explorerUrl || `https://sepolia.arbiscan.io/tx/${selectedCertModal.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-[11px] font-bold text-purple-700 hover:text-purple-900 underline inline-flex items-center gap-1"
+                  >
+                    <span className="truncate max-w-[200px]">{selectedCertModal.txHash.slice(0, 10)}...{selectedCertModal.txHash.slice(-8)}</span>
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold">Gas Fee Sponsor:</span>
+                <span className="font-bold text-emerald-700">Covered by Platform ($0.00 Paid by Learner)</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedCertModal(null)}
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
