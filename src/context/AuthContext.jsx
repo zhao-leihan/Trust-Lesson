@@ -189,7 +189,16 @@ export function AuthProvider({ children }) {
                 apiFetch("/sessions?role=learner").catch(() => null),
                 apiFetch("/videos").catch(() => null),
               ]);
-              if (sessionsData?.sessions?.length > 0) setSessions(sessionsData.sessions);
+              if (sessionsData?.sessions?.length > 0) {
+                const normalizedSessions = sessionsData.sessions.map((s) => ({
+                  ...s,
+                  mentor: typeof s.mentor === "object" ? (s.mentor?.name || s.mentor?.email || "Verified Mentor") : (s.mentor || "Verified Mentor"),
+                  mentorAddress: typeof s.mentor === "object" ? s.mentor?.walletAddress : (s.mentorAddress || null),
+                  studentName: typeof s.learner === "object" ? (s.learner?.name || s.learner?.email || "Student") : (s.studentName || "Student"),
+                  skill: s.skill || s.note || "Mentorship Milestone Project",
+                }));
+                setSessions(normalizedSessions);
+              }
               if (gigsData?.videos?.length > 0) setCourses(gigsData.videos);
             } catch (e) {
               console.warn("[API] Fetch failed, falling back to IndexedDB:", e.message);

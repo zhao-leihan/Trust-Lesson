@@ -3881,8 +3881,8 @@ function StudentDashboardView({ user }) {
           sessionId: s.id,
           learnerName: user?.name || s.studentName || "Verified Learner",
           learnerAddress: user?.walletAddress || "0x7a3F9B...c912",
-          mentorName: s.mentor || "Verified Mentor",
-          mentorAddress: s.mentorAddress || "0x89b14E...e415",
+          mentorName: typeof s.mentor === "object" ? (s.mentor?.name || s.mentor?.email || "Verified Mentor") : (s.mentor || "Verified Mentor"),
+          mentorAddress: typeof s.mentor === "object" ? (s.mentor?.walletAddress || s.mentorAddress || "0x89b14E...e415") : (s.mentorAddress || "0x89b14E...e415"),
           skillTitle: s.skill || "Mentorship Milestone Project",
           category: s.category || "Coding",
           rating: 5,
@@ -4158,7 +4158,7 @@ function StudentDashboardView({ user }) {
                           {s.type === "session" ? "1-on-1 Mentorship" : "Milestone Gig"}
                         </span>
                         <span className="text-xs text-slate-500">
-                          Mentor: <strong className="text-slate-800">{s.mentor}</strong>
+                          Mentor: <strong className="text-slate-800">{typeof s.mentor === "object" ? (s.mentor?.name || s.mentor?.email || "Verified Mentor") : (s.mentor || "Verified Mentor")}</strong>
                         </span>
                       </div>
                       <h3 className="font-extrabold text-slate-900 text-base">{s.skill}</h3>

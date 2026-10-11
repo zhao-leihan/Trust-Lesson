@@ -284,8 +284,32 @@ export default function ClassroomDetailPage() {
   const handleCompleteAndRelease = async () => {
     setCompletingEscrow(true);
     try {
+      let clientTxHash = null;
+      if (typeof window !== "undefined" && window.ethereum && enrollment?.onchainSessionId) {
+        try {
+          const { ethers } = await import("ethers");
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner();
+          const routerAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT || "0xA9E6Ef15829c0629aE2F4B3135EAC7528123eeDD";
+          const routerAbi = [
+            "function confirmMilestone(uint256 sessionId, uint256 milestoneIndex) external",
+            "function getSession(uint256 sessionId) external view returns (address learner, address mentor, uint256 totalAmount, uint8 status, uint256 createdAt, uint256 milestoneCount)",
+          ];
+          const routerContract = new ethers.Contract(routerAddress, routerAbi, signer);
+          const sess = await routerContract.getSession(enrollment.onchainSessionId).catch(() => null);
+          if (sess && Number(sess[3]) === 2) {
+            const tx = await routerContract.confirmMilestone(enrollment.onchainSessionId, 0, { gasLimit: 250000 });
+            const receipt = await tx.wait(1);
+            clientTxHash = receipt.hash;
+          }
+        } catch (onChainErr) {
+          console.warn("[On-Chain Release Notice]:", onChainErr.message);
+        }
+      }
+
       const res = await apiFetch(`/enrollments/${enrollmentId}/complete-and-release`, {
         method: "POST",
+        body: JSON.stringify({ txHash: clientTxHash }),
       });
       if (res?.certificate) {
         setCertificateData(res.certificate);
