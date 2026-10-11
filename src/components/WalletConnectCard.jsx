@@ -27,6 +27,29 @@ export default function WalletConnectCard({ compact = false }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleAddUsdcToMetaMask = async () => {
+    if (typeof window === "undefined" || !window.ethereum) {
+      alert("MetaMask is not detected in your browser.");
+      return;
+    }
+    const usdcAddr = activeNet?.contracts?.usdc || process.env.NEXT_PUBLIC_USDC_ADDRESS || "0x65BfF36b3FD34c58F6543537871D9066CEbA6A44";
+    try {
+      await window.ethereum.request({
+        method: "wallet_watchAsset",
+        params: {
+          type: "ERC20",
+          options: {
+            address: usdcAddr,
+            symbol: "USDC",
+            decimals: 6,
+          },
+        },
+      });
+    } catch (err) {
+      console.warn("User rejected watchAsset request:", err);
+    }
+  };
+
   const shortAddr = walletAddress
     ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
     : "";
@@ -138,6 +161,16 @@ export default function WalletConnectCard({ compact = false }) {
               title="Refresh On-Chain Balances"
             >
               <RefreshCw size={13} className={isLoading ? "animate-spin text-purple-400" : ""} />
+            </button>
+
+            {/* Import USDC into MetaMask button */}
+            <button
+              onClick={handleAddUsdcToMetaMask}
+              className="px-2.5 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Import USDC token directly into MetaMask extension"
+            >
+              <Coins size={12} className="text-purple-400" />
+              <span>Import USDC</span>
             </button>
 
             {/* Address Pill */}

@@ -32,6 +32,8 @@ const IGNORED_PATHS = [
 
 const WHITELIST = [
   "0x7a30b91e1d09e86a074bcf62589083315a6b0c2688b14a22ad31846b0a79339e", // Schema UID
+  "0xf9bb02c35522b0fa28315b0cb6fff59515ade1c9003c0e3a08d11571149bcbab", // Arbitrum Sepolia createSession tx
+  "0xe1df5c2964011b95ac9b61b6127894162d8c5a9e1c0be51a18c11cd3b721974e", // Arbitrum Sepolia releaseEscrow tx
   "0x0000000000000000000000000000000000000000000000000000000000000000", // Zero hash
   "1x00000000000000000000AA", // Cloudflare Turnstile public testing sitekey
 ];

@@ -228,6 +228,7 @@ function AdminDashboardView({ user }) {
   const [isVerifying, setIsVerifying] = useState({});
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+  const [withdrawTxHash, setWithdrawTxHash] = useState(null);
 
   // User Feedbacks & Satisfaction State
   const [feedbacksList, setFeedbacksList] = useState([]);
@@ -360,13 +361,25 @@ function AdminDashboardView({ user }) {
     }
   };
 
-  const handleWithdrawTreasury = () => {
+  const handleWithdrawTreasury = async () => {
     setWithdrawing(true);
-    setTimeout(() => {
+    setWithdrawSuccess(false);
+    setWithdrawTxHash(null);
+    try {
+      const res = await apiFetch("/admin/treasury/withdraw", { method: "POST" });
+      if (res?.success) {
+        setWithdrawSuccess(true);
+        if (res.txHash) setWithdrawTxHash(res.txHash);
+        await fetchStats();
+        setTimeout(() => setWithdrawSuccess(false), 12000);
+      } else {
+        alert(res?.error || "Withdrawal failed");
+      }
+    } catch (err) {
+      alert("Failed to withdraw protocol fees: " + err.message);
+    } finally {
       setWithdrawing(false);
-      setWithdrawSuccess(true);
-      setTimeout(() => setWithdrawSuccess(false), 5000);
-    }, 1000);
+    }
   };
 
   const handleAdminAvatarUpload = (e) => {
@@ -467,9 +480,21 @@ function AdminDashboardView({ user }) {
             </div>
 
             {withdrawSuccess && (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
-                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                <span>Protocol fees successfully withdrawn to Treasury Vault: <code className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono">{stats.treasuryWallet}</code></span>
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span>Protocol fees successfully withdrawn to Treasury Vault: <code className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono">{stats.treasuryWallet || "0x656c9a75d5069B6050b16260F44aB0f3d64A7E02"}</code></span>
+                </div>
+                {withdrawTxHash && (
+                  <a
+                    href={`https://sepolia.arbiscan.io/tx/${withdrawTxHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-700 hover:text-purple-900 underline font-mono text-[11px] shrink-0"
+                  >
+                    View on Arbiscan
+                  </a>
+                )}
               </div>
             )}
 
@@ -945,9 +970,15 @@ function AdminDashboardView({ user }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-3.5 py-1.5 rounded-full bg-purple-50 border border-purple-200 font-mono text-xs text-purple-900 font-bold">
-                    {stats.treasuryWallet ? `${stats.treasuryWallet.slice(0, 8)}...${stats.treasuryWallet.slice(-6)}` : "0xf39Fd6...92266"}
-                  </span>
+                  <a
+                    href="https://sepolia.arbiscan.io/address/0xF3Ca9731772781e19852E9cE3b1ec7A68Eb3edcA"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-1.5 rounded-full bg-purple-50 hover:bg-purple-100 border border-purple-200 font-mono text-xs text-purple-900 font-bold transition-colors"
+                    title="View EscrowRouter on Arbiscan"
+                  >
+                    0xF3Ca...edcA
+                  </a>
                   <button
                     onClick={handleWithdrawTreasury}
                     disabled={withdrawing}
@@ -957,6 +988,25 @@ function AdminDashboardView({ user }) {
                   </button>
                 </div>
               </div>
+
+              {withdrawSuccess && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    <span>Protocol fees successfully withdrawn to Treasury Vault: <code className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono">{stats.treasuryWallet || "0x656c9a75d5069B6050b16260F44aB0f3d64A7E02"}</code></span>
+                  </div>
+                  {withdrawTxHash && (
+                    <a
+                      href={`https://sepolia.arbiscan.io/tx/${withdrawTxHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-700 hover:text-purple-900 underline font-mono text-[11px] shrink-0"
+                    >
+                      View on Arbiscan
+                    </a>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-3 border-t border-purple-100 text-xs">
                 <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">

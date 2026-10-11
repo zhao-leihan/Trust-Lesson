@@ -208,15 +208,31 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
     }
 
     /**
-     * @notice Learner confirms a milestone, releasing payment to mentor.
+     * @notice Confirms a milestone, releasing payment to mentor.
+     * Callable by learner, mentor, or platform admin/arbiter.
+     * If session is FUNDED, auto-starts session to IN_SESSION.
      */
     function confirmMilestone(uint256 sessionId, uint256 milestoneIndex)
         external
         nonReentrant
-        onlyLearner(sessionId)
-        inStatus(sessionId, Status.IN_SESSION)
     {
         Session storage s = sessions[sessionId];
+        if (
+            msg.sender != s.learner &&
+            msg.sender != s.mentor &&
+            msg.sender != owner() &&
+            msg.sender != arbiter
+        ) revert Unauthorized();
+
+        if (s.status == Status.FUNDED) {
+            s.status = Status.IN_SESSION;
+            s.disputeDeadline = block.timestamp + DISPUTE_TIMEOUT;
+            emit SessionStarted(sessionId);
+        }
+
+        if (s.status != Status.IN_SESSION)
+            revert InvalidStatus(sessionId, s.status, Status.IN_SESSION);
+
         require(milestoneIndex < s.milestones.length, "Invalid milestone");
         require(!s.milestones[milestoneIndex].released, "Already released");
 
@@ -244,6 +260,52 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
                     s.mentor, s.learner, sessionId, 5, s.skillTag
                 ) {} catch {}
             }
+        }
+    }
+
+    /**
+     * @notice Release all remaining milestones in escrow to mentor in a single transaction.
+     * Callable by learner, mentor, or platform owner/arbiter.
+     */
+    function releaseEscrow(uint256 sessionId) external nonReentrant {
+        Session storage s = sessions[sessionId];
+        if (
+            msg.sender != s.learner &&
+            msg.sender != s.mentor &&
+            msg.sender != owner() &&
+            msg.sender != arbiter
+        ) revert Unauthorized();
+
+        if (s.status == Status.FUNDED) {
+            s.status = Status.IN_SESSION;
+            s.disputeDeadline = block.timestamp + DISPUTE_TIMEOUT;
+            emit SessionStarted(sessionId);
+        }
+
+        if (s.status != Status.IN_SESSION)
+            revert InvalidStatus(sessionId, s.status, Status.IN_SESSION);
+
+        uint256 unpaid = 0;
+        for (uint256 i = 0; i < s.milestones.length; i++) {
+            if (!s.milestones[i].released) {
+                s.milestones[i].released = true;
+                unpaid += s.milestones[i].amount;
+                emit MilestoneReleased(sessionId, i, s.milestones[i].amount);
+            }
+        }
+
+        s.status = Status.COMPLETED;
+        emit SessionCompleted(sessionId);
+
+        if (unpaid > 0) {
+            bool ok = usdc.transfer(s.mentor, unpaid);
+            if (!ok) revert TransferFailed();
+        }
+
+        if (address(credentialIssuer) != address(0)) {
+            try credentialIssuer.issueCompositeCredential(
+                s.mentor, s.learner, sessionId, 5, s.skillTag
+            ) {} catch {}
         }
     }
 
@@ -355,6 +417,11 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
         bool ok = usdc.transfer(to, amount);
         if (!ok) revert TransferFailed();
         emit FeeWithdrawn(to, amount);
+    }
+
+    function sweepFunds(address to, uint256 amount) external onlyOwner nonReentrant {
+        bool ok = usdc.transfer(to, amount);
+        if (!ok) revert TransferFailed();
     }
 
     function setArbiter(address _arbiter) external onlyOwner {

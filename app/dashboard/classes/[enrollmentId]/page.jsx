@@ -285,25 +285,26 @@ export default function ClassroomDetailPage() {
     setCompletingEscrow(true);
     try {
       let clientTxHash = null;
-      if (typeof window !== "undefined" && window.ethereum && enrollment?.onchainSessionId) {
+      if (typeof window !== "undefined" && window.ethereum && enrollment?.onchainSessionId !== undefined && enrollment?.onchainSessionId !== null) {
         try {
           const { ethers } = await import("ethers");
           const provider = new ethers.BrowserProvider(window.ethereum);
           const signer = await provider.getSigner();
-          const routerAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT || "0xA9E6Ef15829c0629aE2F4B3135EAC7528123eeDD";
+          const routerAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT || "0xF3Ca9731772781e19852E9cE3b1ec7A68Eb3edcA";
           const routerAbi = [
+            "function releaseEscrow(uint256 sessionId) external",
             "function confirmMilestone(uint256 sessionId, uint256 milestoneIndex) external",
-            "function getSession(uint256 sessionId) external view returns (address learner, address mentor, uint256 totalAmount, uint8 status, uint256 createdAt, uint256 milestoneCount)",
+            "function getSession(uint256 sessionId) external view returns (address learner, address mentor, uint256 totalAmount, uint256 platformFeeAmount, uint8 status, uint256 createdAt, uint256 milestoneCount)",
           ];
           const routerContract = new ethers.Contract(routerAddress, routerAbi, signer);
           const sess = await routerContract.getSession(enrollment.onchainSessionId).catch(() => null);
-          if (sess && Number(sess[3]) === 2) {
-            const tx = await routerContract.confirmMilestone(enrollment.onchainSessionId, 0, { gasLimit: 250000 });
+          if (sess && Number(sess[4]) < 3) {
+            const tx = await routerContract.releaseEscrow(enrollment.onchainSessionId, { gasLimit: 350000 });
             const receipt = await tx.wait(1);
             clientTxHash = receipt.hash;
           }
         } catch (onChainErr) {
-          console.warn("[On-Chain Release Notice]:", onChainErr.message);
+          console.warn("[On-Chain Client Release Notice]:", onChainErr.message);
         }
       }
 
