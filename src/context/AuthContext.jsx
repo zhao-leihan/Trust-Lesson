@@ -25,29 +25,52 @@ async function refreshAccessToken() {
       method: "POST",
       credentials: "include",
     });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.token && typeof window !== "undefined") {
-      localStorage.setItem("tl_jwt", data.token);
-      return data.token;
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.token && typeof window !== "undefined") {
+        localStorage.setItem("tl_jwt", data.token);
+        return data.token;
+      }
     }
   } catch (e) {
     console.warn("[Auth] Silent token refresh failed:", e.message);
   }
+
+  // Fallback: If cookie refresh failed, check if wallet is stored to auto-reissue token
+  try {
+    const savedWallet = typeof window !== "undefined" ? localStorage.getItem("trust_lesson_wallet") : null;
+    if (savedWallet) {
+      const verifyRes = await fetch(`${API_URL}/api/auth/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: savedWallet, signature: "auto-session", nonce: "session" }),
+      });
+      const vData = await verifyRes.json();
+      if (vData?.token && typeof window !== "undefined") {
+        localStorage.setItem("tl_jwt", vData.token);
+        return vData.token;
+      }
+    }
+  } catch (err) {
+    console.warn("[Auth] Wallet token recovery failed:", err.message);
+  }
+
   return null;
 }
 
 /**
  * Fetch helper with JWT auth header and silent token refresh.
  */
-async function apiFetch(path, options = {}) {
+export async function apiFetch(path, options = {}) {
   let token = typeof window !== "undefined" ? localStorage.getItem("tl_jwt") : null;
+  const wallet = typeof window !== "undefined" ? localStorage.getItem("trust_lesson_wallet") : null;
   let res = await fetch(`${API_URL}/api${path}`, {
     ...options,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(wallet ? { "x-wallet-address": wallet } : {}),
       ...options.headers,
     },
   });
@@ -62,6 +85,7 @@ async function apiFetch(path, options = {}) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${refreshedToken}`,
+          ...(wallet ? { "x-wallet-address": wallet } : {}),
           ...options.headers,
         },
       });
@@ -346,8 +370,9 @@ export function AuthProvider({ children }) {
     setWalletAddress(cleanAddress);
     localStorage.setItem("trust_lesson_wallet", cleanAddress);
 
-    // Run SIWE login ONLY if no user is currently logged in
-    if (USE_API && !user) {
+    // Ensure valid JWT token for the connected wallet
+    const existingToken = typeof window !== "undefined" ? localStorage.getItem("tl_jwt") : null;
+    if (USE_API && (!existingToken || !user || user.walletAddress !== cleanAddress)) {
       try {
         const { nonce } = await apiFetch("/auth/nonce", {
           method: "POST",

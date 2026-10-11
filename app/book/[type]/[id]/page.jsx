@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ethers } from "ethers";
-import { useAuth } from "@/src/context/AuthContext";
+import { useAuth, apiFetch } from "@/src/context/AuthContext";
 import {
   Shield,
   Clock,
@@ -494,13 +494,8 @@ export default function BookingPage() {
 
       // 9. Store Real Authenticated Session & Database Enrollment
       try {
-        const token = localStorage.getItem("tl_jwt");
-        const enrollRes = await fetch("/api/enrollments", {
+        const enrollData = await apiFetch("/enrollments", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
           body: JSON.stringify({
             gigId: item?.id,
             packageId: selectedPackage?.id || null,
@@ -513,7 +508,6 @@ export default function BookingPage() {
             txHash: receipt.hash,
           }),
         });
-        const enrollData = await enrollRes.json();
         if (enrollData?.enrollment?.id) {
           setConfirmedTx((prev) => ({ ...prev, enrollmentId: enrollData.enrollment.id }));
 
@@ -533,12 +527,8 @@ export default function BookingPage() {
               const sessionDurMin = selectedPackage?.sessionDurationMin || 60;
               const endAt = new Date(dateObj.getTime() + sessionDurMin * 60000).toISOString();
 
-              await fetch(`/api/enrollments/${enrollData.enrollment.id}/meetings`, {
+              await apiFetch(`/enrollments/${enrollData.enrollment.id}/meetings`, {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
                 body: JSON.stringify({
                   startAt,
                   endAt,

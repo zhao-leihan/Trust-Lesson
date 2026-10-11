@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/src/context/AuthContext";
+import { useAuth, apiFetch } from "@/src/context/AuthContext";
 import {
   ArrowLeft,
   Calendar,
@@ -54,14 +54,7 @@ export default function ScheduleSessionPage() {
         return;
       }
       try {
-        const token = localStorage.getItem("tl_jwt");
-        const res = await fetch(`/api/enrollments/${enrollmentId}`, {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        if (!res.ok) throw new Error("Enrollment not found or unauthorized");
-        const data = await res.json();
+        const data = await apiFetch(`/enrollments/${enrollmentId}`);
         if (isMounted) {
           setEnrollmentData(data);
         }
@@ -124,15 +117,12 @@ export default function ScheduleSessionPage() {
 
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem("tl_jwt");
       const idempotencyKey = `book-${enrollmentId}-${Date.now()}`;
 
-      const res = await fetch(`/api/enrollments/${enrollmentId}/meetings`, {
+      const data = await apiFetch(`/enrollments/${enrollmentId}/meetings`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           startAt: selectedSlot.startAt,
@@ -141,17 +131,6 @@ export default function ScheduleSessionPage() {
           agenda: agenda.trim() || null,
         }),
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.code === "SLOT_TAKEN") {
-          setSubmitError("That slot was just booked by another student. Refreshed available slots.");
-          if (data.freshSlots) setSlots(data.freshSlots);
-          setSelectedSlot(null);
-          return;
-        }
-        throw new Error(data.error || "Failed to schedule session");
-      }
 
       setSubmitSuccess(true);
       setTimeout(() => {
