@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
-import { LogOut, ArrowRight, Menu, X, LayoutDashboard } from "lucide-react";
+import { LogOut, ArrowRight, Menu, X, LayoutDashboard, MessageSquare } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/Avatar";
 
 const DEFAULT_NAV_LINKS = [
@@ -87,8 +87,50 @@ export default function Navbar() {
       { to: "/leaderboard", label: "Leaderboard" },
       { to: "/dashboard/classes", label: "My Classes" },
       { to: "/dashboard/requests", label: "Requests" },
+      { to: "/dashboard/chat", label: "Chat" },
     ];
   }
+
+  // Incoming chat unread count and real-time notification
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [lastSeenMsgId, setLastSeenMsgId] = useState(null);
+  const [chatToast, setChatToast] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    let isSubscribed = true;
+
+    const checkUnread = async () => {
+      try {
+        const token = localStorage.getItem("tl_jwt") || localStorage.getItem("tl_token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch("/api/chat/unread", { headers });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isSubscribed) return;
+
+        const count = data.unreadCount || 0;
+        setUnreadChatCount(count);
+
+        if (data.latestUnread && data.latestUnread.id !== lastSeenMsgId) {
+          if (lastSeenMsgId !== null && pathname !== "/dashboard/chat") {
+            setChatToast(data.latestUnread);
+            setTimeout(() => setChatToast(null), 5000);
+          }
+          setLastSeenMsgId(data.latestUnread.id);
+        }
+      } catch (err) {
+        // silent fail
+      }
+    };
+
+    checkUnread();
+    const interval = setInterval(checkUnread, 6000);
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
+  }, [user, pathname, lastSeenMsgId]);
 
   // Close mobile drawer on route transition
   useEffect(() => {
@@ -164,7 +206,7 @@ export default function Navbar() {
                     window.dispatchEvent(new CustomEvent("admin-tab-change", { detail: targetTab }));
                   }
                 }}
-                className={`text-sm font-semibold tracking-wide transition-all relative py-1 ${
+                className={`text-sm font-semibold tracking-wide transition-all relative py-1 inline-flex items-center gap-1.5 ${
                   isWhiteTheme
                     ? isActive
                       ? "text-white font-bold after:absolute after:bottom-[-4px] after:left-1/2 after:-translate-x-1/2 after:w-6 after:h-0.5 after:bg-indigo-400 after:rounded-full"
@@ -174,7 +216,12 @@ export default function Navbar() {
                     : "text-slate-600 hover:text-purple-700"
                 }`}
               >
-                {label}
+                <span>{label}</span>
+                {to === "/dashboard/chat" && unreadChatCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black leading-none shadow-xs">
+                    {unreadChatCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -541,7 +588,14 @@ export default function Navbar() {
                       : "text-slate-700 hover:text-purple-700 hover:bg-slate-50"
                   }`}
                 >
-                  <span>{label}</span>
+                  <span className="flex items-center gap-2">
+                    <span>{label}</span>
+                    {to === "/dashboard/chat" && unreadChatCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black leading-none">
+                        {unreadChatCount}
+                      </span>
+                    )}
+                  </span>
                   {isActive && (
                     <span
                       className={`w-2 h-2 rounded-full ${
@@ -598,6 +652,38 @@ export default function Navbar() {
                 </Link>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Incoming Chat Notification Toast */}
+      {chatToast && (
+        <div className="fixed top-20 right-4 sm:right-8 z-50 animate-bounce max-w-sm w-full bg-white rounded-2xl p-4 shadow-2xl border border-purple-200 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-600/30">
+            <MessageSquare size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <h5 className="text-xs font-black text-slate-900">New Message</h5>
+              <button
+                type="button"
+                onClick={() => setChatToast(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 truncate mt-0.5 font-medium">
+              {chatToast.body || "You have a new message."}
+            </p>
+            <Link
+              href="/dashboard/chat"
+              onClick={() => setChatToast(null)}
+              className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900 underline"
+            >
+              <span>Open Chat</span>
+              <ArrowRight size={11} />
+            </Link>
           </div>
         </div>
       )}

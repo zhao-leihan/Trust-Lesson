@@ -16,7 +16,7 @@ import {
 
 const AuthContext = createContext(null);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_URL = typeof window !== "undefined" ? "" : (process.env.NEXT_PUBLIC_API_URL || "");
 const USE_API = true;
 
 async function refreshAccessToken() {

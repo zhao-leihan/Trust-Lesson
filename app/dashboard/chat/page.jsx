@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/src/context/AuthContext";
+import { useWebRTCChat } from "@/src/hooks/useWebRTCChat";
 import {
   MessageSquare,
   Send,
@@ -21,16 +22,17 @@ export default function ChatPage() {
   const { user } = useAuth();
   const [threads, setThreads] = useState([]);
   const [activeThreadId, setActiveThreadId] = useState(null);
-  const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const [loadingThreads, setLoadingThreads] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
 
   const fetchThreads = async () => {
     try {
-      const res = await fetch("/api/chat/threads");
+      const token = typeof window !== "undefined" ? (localStorage.getItem("tl_jwt") || localStorage.getItem("tl_token")) : null;
+      const res = await fetch("/api/chat/threads", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!res.ok) throw new Error("Failed to load threads");
       const data = await res.json();
       setThreads(data.threads || []);
@@ -44,34 +46,26 @@ export default function ChatPage() {
     }
   };
 
-  const fetchMessages = async (threadId) => {
-    if (!threadId) return;
-    setLoadingMessages(true);
-    try {
-      const res = await fetch(`/api/chat/threads/${threadId}/messages`);
-      if (!res.ok) throw new Error("Failed to load messages");
-      const data = await res.json();
-      setMessages(data.messages || []);
-    } catch (err) {
-      console.warn("Error fetching messages:", err);
-    } finally {
-      setLoadingMessages(false);
-    }
-  };
-
   useEffect(() => {
     fetchThreads();
   }, []);
 
-  useEffect(() => {
-    if (activeThreadId) {
-      fetchMessages(activeThreadId);
-      const interval = setInterval(() => {
-        fetchMessages(activeThreadId);
-      }, 5000); // 5s poll
-      return () => clearInterval(interval);
-    }
-  }, [activeThreadId]);
+  const activeThread = threads.find((t) => t.id === activeThreadId);
+  const otherParticipant = activeThread?.participants?.find(
+    (p) => p.userId !== user?.id
+  )?.user;
+
+  // WebRTC P2P Direct Chat Hook (Zero DB Overhead)
+  const {
+    messages,
+    sendMessage: sendP2PMessage,
+    isP2PConnected,
+    connectionState,
+  } = useWebRTCChat({
+    roomId: activeThread?.enrollmentId || activeThread?.id,
+    currentUser: user,
+    peerUser: otherParticipant,
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -79,35 +73,21 @@ export default function ChatPage() {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!messageInput.trim() || !activeThreadId || sending) return;
+    if (!messageInput.trim() || !activeThread || sending) return;
 
     const bodyText = messageInput.trim();
     setMessageInput("");
     setSending(true);
 
     try {
-      const res = await fetch(`/api/chat/threads/${activeThreadId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: bodyText }),
-      });
-
-      if (!res.ok) throw new Error("Failed to send message");
-      const data = await res.json();
-      setMessages((prev) => [...prev, data.message]);
-      fetchThreads(); // update last message preview
+      await sendP2PMessage(bodyText);
     } catch (err) {
-      console.error("Failed to send:", err);
-      setMessageInput(bodyText); // restore on error
+      console.error("Failed to send P2P message:", err);
+      setMessageInput(bodyText);
     } finally {
       setSending(false);
     }
   };
-
-  const activeThread = threads.find((t) => t.id === activeThreadId);
-  const otherParticipant = activeThread?.participants?.find(
-    (p) => p.userId !== user?.id
-  )?.user;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between pt-24">
@@ -127,7 +107,7 @@ export default function ChatPage() {
                 <span>Classroom Messages</span>
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                Real-time encrypted communication between mentors and enrolled students
+                Direct WebRTC peer-to-peer communication between mentors and enrolled students
               </p>
             </div>
           </div>
@@ -204,7 +184,7 @@ export default function ChatPage() {
                         )}
 
                         <p className="text-xs text-slate-500 truncate mt-1">
-                          {lastMsg ? lastMsg.body : "No messages yet"}
+                          {lastMsg ? lastMsg.body : "Direct WebRTC Channel"}
                         </p>
                       </div>
                     </button>
@@ -242,24 +222,28 @@ export default function ChatPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <Shield size={14} className="text-emerald-600" />
-                    <span className="hidden sm:inline">Escrow Gated</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${isP2PConnected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isP2PConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
+                      <span>{isP2PConnected ? "P2P Connected" : "Connecting P2P..."}</span>
+                    </span>
+                    <div className="hidden sm:flex items-center gap-1 text-slate-500 text-xs ml-1">
+                      <Shield size={14} className="text-emerald-600" />
+                      <span>Escrow Gated</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Messages Body */}
                 <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-3.5 bg-slate-50/20">
-                  {loadingMessages && messages.length === 0 ? (
-                    <div className="text-center py-12 text-xs text-slate-400">Loading conversation...</div>
-                  ) : messages.length === 0 ? (
+                  {messages.length === 0 ? (
                     <div className="text-center py-16">
                       <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto mb-2">
                         <Sparkles size={18} />
                       </div>
                       <p className="font-bold text-xs text-slate-700">Start the Discussion</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        Ask questions about mentorship milestones, schedule dates, or project deliverables.
+                        Send message directly over WebRTC DataChannel with zero database overhead.
                       </p>
                     </div>
                   ) : (
@@ -323,7 +307,7 @@ export default function ChatPage() {
                   </div>
                   <h4 className="font-bold text-sm text-slate-700">Select a Conversation</h4>
                   <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                    Choose a student or class from the sidebar to view message history and send updates.
+                    Choose a student or class from the sidebar to start encrypted WebRTC discussion.
                   </p>
                 </div>
               </div>

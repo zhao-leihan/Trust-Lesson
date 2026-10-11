@@ -1442,60 +1442,19 @@ export default function CreateGigPage() {
                     </p>
                   </div>
 
-                  {/* Live Video Call Platform Selector (Always Included) */}
+                  {/* Live Video Call Platform Selector (Flexible / Learner Choice) */}
                   <div className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-slate-800 font-extrabold text-xs">
-                          Select Live Video Call Platform
-                        </label>
-                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                          Always Included
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {PLATFORMS.map((plat) => {
-                          const isSelected = meetingPlatform === plat.id;
-                          const IconComp = plat.Icon;
-                          return (
-                            <button
-                              key={plat.id}
-                              type="button"
-                              onClick={() => setMeetingPlatform(plat.id)}
-                              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                                isSelected
-                                  ? "bg-purple-50/70 border-purple-600 ring-2 ring-purple-400/20 shadow-xs"
-                                  : "bg-white border-slate-200 hover:border-slate-300"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-1.5">
-                                  <IconComp className="w-7 h-7" />
-                                </div>
-                                {isSelected && <CheckCircle2 size={16} className="text-purple-600" />}
-                              </div>
-                              <div>
-                                <span className="font-extrabold text-slate-950 text-xs sm:text-sm block">{plat.label}</span>
-                                <span className="text-[11px] text-slate-500">{plat.desc}</span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Automatic Smart Room Generator Notice */}
                     <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border border-purple-200 flex items-start gap-3 shadow-2xs">
                       <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
                         <Sparkles size={16} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-slate-900 font-extrabold text-xs flex items-center gap-1.5">
-                          <span>Automatic Smart Meeting Room Generation</span>
-                          <span className="px-2 py-0.2 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">Zero Setup</span>
+                          <span>Live Meeting Platform: Google Meet & Zoom Fully Supported</span>
+                          <span className="px-2 py-0.2 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">Learner's Choice</span>
                         </h4>
                         <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
-                          You do not need to create or paste any meeting links manually. As soon as a student books this gig and you click <strong className="text-purple-700">Accept</strong> in your Requests inbox, Trust Lesson will instantly generate a dedicated, secure <strong className="text-slate-900">{meetingPlatform}</strong> meeting room for you and your student!
+                          No pre-selection needed. Learners choose between <strong className="text-purple-700">Google Meet</strong> or <strong className="text-purple-700">Zoom</strong> when submitting their session request. Meeting rooms are automatically generated upon your schedule approval.
                         </p>
                       </div>
                     </div>
