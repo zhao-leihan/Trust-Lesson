@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/src/context/AuthContext";
+import { useAuth, apiFetch } from "@/src/context/AuthContext";
 import {
   ArrowLeft,
   Shield,
@@ -71,17 +71,7 @@ export default function ClassroomDetailPage() {
         return;
       }
       try {
-        const token = localStorage.getItem("tl_jwt");
-        const res = await fetch(`/api/enrollments/${enrollmentId}`, {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        if (res.status === 404) {
-          throw new Error("Classroom not found or you do not have permission to access it.");
-        }
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Failed to load classroom details");
+        const json = await apiFetch(`/enrollments/${enrollmentId}`);
         if (isMounted) setData(json);
       } catch (err) {
         if (isMounted) setError(err.message);

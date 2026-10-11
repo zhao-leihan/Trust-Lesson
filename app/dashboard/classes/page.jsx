@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useAuth } from "@/src/context/AuthContext";
+import { useAuth, apiFetch } from "@/src/context/AuthContext";
 import {
   GraduationCap,
   BookOpen,
@@ -48,39 +48,23 @@ export default function MyClassesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchEnrollments() {
-      if (!user) {
-        if (isMounted) setLoading(false);
-        return;
-      }
-      try {
-        const token = localStorage.getItem("tl_jwt");
-        const res = await fetch("/api/enrollments?role=learner", {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load classes");
-        if (isMounted) {
-          setEnrollments(data.enrollments || []);
-        }
-      } catch (err) {
-        if (isMounted) setError(err.message);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
+  const fetchEnrollments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiFetch("/enrollments?role=learner");
+      setEnrollments(data.enrollments || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     if (!authLoading) {
       fetchEnrollments();
     }
-
-    return () => {
-      isMounted = false;
-    };
   }, [user, authLoading]);
 
   return (
@@ -135,12 +119,21 @@ export default function MyClassesPage() {
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-sm flex items-center gap-3">
-              <AlertCircle size={20} className="text-rose-600 shrink-0" />
-              <div>
-                <p className="font-bold">Unable to load classes</p>
-                <p className="text-xs text-rose-700 mt-0.5">{error}</p>
+            <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle size={20} className="text-rose-600 shrink-0" />
+                <div>
+                  <p className="font-bold">Unable to load classes</p>
+                  <p className="text-xs text-rose-700 mt-0.5">{error}</p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => fetchEnrollments()}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors shrink-0 shadow-sm"
+              >
+                Retry
+              </button>
             </div>
           )}
 

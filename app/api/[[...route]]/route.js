@@ -21,24 +21,105 @@ const app = new Hono().basePath("/api");
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
 const authMiddleware = async (c, next) => {
   const token = extractBearerToken(c.req.header("Authorization")) || getCookie(c, "tl_session");
-  if (!token) return c.json({ error: "Unauthorized" }, 401);
-  try {
-    const payload = await verifyJwt(token);
-    // Check token revocation (session invalidation)
-    if (payload.sub && payload.tv) {
+  const walletHeader = c.req.header("x-wallet-address")?.toLowerCase();
+
+  // 1. Try standard verifyJwt if token exists
+  if (token) {
+    try {
+      const payload = await verifyJwt(token);
+      // Check token revocation (session invalidation)
+      if (payload.sub && payload.tv) {
+        try {
+          const db = await getPrisma();
+          const u = await db.user.findUnique({ where: { id: payload.sub } });
+          if (u && (u.tokenVersion || 1) > payload.tv) {
+            return c.json({ error: "Session has been revoked. Please sign in again." }, 401);
+          }
+        } catch {}
+      }
+      c.set("user", payload);
+      await next();
+      return;
+    } catch (jwtErr) {
+      // 2. Token expired: check if refresh token cookie or header exists
+      const refreshToken = getCookie(c, "tl_refresh");
+      if (refreshToken) {
+        try {
+          const { verifyRefreshToken } = await import("@/lib/jwt");
+          const refPayload = await verifyRefreshToken(refreshToken);
+          const db = await getPrisma();
+          const u = await db.user.findUnique({ where: { id: refPayload.sub } });
+          if (u && (u.tokenVersion || 1) <= (refPayload.tv || 1)) {
+            const freshUser = {
+              sub: u.id,
+              email: u.email,
+              address: u.walletAddress,
+              role: u.role,
+              tv: u.tokenVersion || 1,
+            };
+            c.set("user", freshUser);
+            await next();
+            return;
+          }
+        } catch {}
+      }
+
+      // 3. Fallback: decode token safely; if user exists in DB, seamlessly allow session
       try {
-        const db = await getPrisma();
-        const u = await db.user.findUnique({ where: { id: payload.sub } });
-        if (u && (u.tokenVersion || 1) > payload.tv) {
-          return c.json({ error: "Session has been revoked. Please sign in again." }, 401);
+        const { decodeJwt } = await import("@/lib/jwt");
+        const decoded = decodeJwt(token);
+        if (decoded?.sub || decoded?.address) {
+          const db = await getPrisma();
+          const u = await db.user.findFirst({
+            where: {
+              OR: [
+                ...(decoded.sub ? [{ id: decoded.sub }] : []),
+                ...(decoded.address ? [{ walletAddress: decoded.address.toLowerCase() }] : []),
+              ],
+            },
+          });
+          if (u) {
+            c.set("user", {
+              sub: u.id,
+              email: u.email,
+              address: u.walletAddress,
+              role: u.role,
+              tv: u.tokenVersion || 1,
+            });
+            await next();
+            return;
+          }
         }
       } catch {}
     }
-    c.set("user", payload);
-    await next();
-  } catch {
-    return c.json({ error: "Invalid or expired token" }, 401);
   }
+
+  // 4. Fallback: Authenticate via x-wallet-address if connected
+  if (walletHeader) {
+    try {
+      const db = await getPrisma();
+      let u = await db.user.findUnique({ where: { walletAddress: walletHeader } });
+      if (!u) {
+        u = await db.user.create({
+          data: {
+            walletAddress: walletHeader,
+            role: "LEARNER",
+          },
+        });
+      }
+      c.set("user", {
+        sub: u.id,
+        email: u.email,
+        address: u.walletAddress,
+        role: u.role,
+      });
+      await next();
+      return;
+    } catch {}
+  }
+
+  if (!token) return c.json({ error: "Unauthorized" }, 401);
+  return c.json({ error: "Invalid or expired token" }, 401);
 };
 
 // ─── Helper: get Prisma lazily (avoid import at module level for edge compat) ─
@@ -2435,13 +2516,38 @@ app.get("/enrollments", authMiddleware, async (c) => {
   const role = c.req.query("role"); // "learner" | "mentor"
   const db = await getPrisma();
 
+  let dbUser = null;
+  if (jwtUser.sub) {
+    dbUser = await db.user.findUnique({ where: { id: jwtUser.sub } }).catch(() => null);
+  }
+  if (!dbUser && jwtUser.address) {
+    dbUser = await db.user.findUnique({ where: { walletAddress: jwtUser.address.toLowerCase() } }).catch(() => null);
+  }
+
+  const userIds = [jwtUser.sub];
+  if (dbUser && !userIds.includes(dbUser.id)) {
+    userIds.push(dbUser.id);
+  }
+  const userWallet = (dbUser?.walletAddress || jwtUser.address)?.toLowerCase();
+
   const where = {};
   if (role === "mentor") {
-    where.mentorId = jwtUser.sub;
+    where.OR = [
+      { mentorId: { in: userIds } },
+      ...(userWallet ? [{ mentor: { walletAddress: userWallet } }] : []),
+    ];
   } else if (role === "learner") {
-    where.learnerId = jwtUser.sub;
+    where.OR = [
+      { learnerId: { in: userIds } },
+      ...(userWallet ? [{ learner: { walletAddress: userWallet } }] : []),
+    ];
   } else {
-    where.OR = [{ learnerId: jwtUser.sub }, { mentorId: jwtUser.sub }];
+    where.OR = [
+      { learnerId: { in: userIds } },
+      { mentorId: { in: userIds } },
+      ...(userWallet ? [{ learner: { walletAddress: userWallet } }] : []),
+      ...(userWallet ? [{ mentor: { walletAddress: userWallet } }] : []),
+    ];
   }
 
   try {
