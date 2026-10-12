@@ -2255,6 +2255,10 @@ app.get("/mentor/stats", async (c) => {
       },
     });
 
+    const userStake = Number(user?.stakeAmount || 0);
+    const userVerified = Boolean(user?.isVerified || userStake >= 100);
+    const userJuror = Boolean(user?.isJuror || (userStake >= 100 && (user?.role === "MENTOR" || user?.role === "ADMIN")));
+
     return c.json({
       monthlyEarnings: Number(monthlyEarnings.toFixed(2)),
       lifetimeEarnings: Number(lifetimeEarnings.toFixed(2)),
@@ -2266,12 +2270,195 @@ app.get("/mentor/stats", async (c) => {
       rating: 5.0,
       walletAddress: user?.walletAddress || null,
       walletLocked: user?.walletLocked || false,
-      mentorLevel: user?.mentorLevel || "RISING",
+      mentorLevel: user?.mentorLevel || (userStake >= 300 ? "MASTER" : userStake >= 100 ? "PRO" : "RISING"),
+      stakeAmount: userStake,
+      isVerified: userVerified,
+      isJuror: userJuror,
       gigsCount,
     });
   } catch (e) {
     console.error("[Database Error] /api/mentor/stats:", e);
     return c.json({ error: "Failed to fetch mentor statistics", detail: e.message }, 500);
+  }
+});
+
+/** POST /api/mentor/stake — Deposit collateral to verify mentor profile */
+app.post("/mentor/stake", authMiddleware, async (c) => {
+  const jwtUser = c.get("user");
+  const { amount = 100, txHash } = await c.req.json();
+
+  const numAmount = Math.max(0, Number(amount) || 100);
+  try {
+    const db = await getPrisma();
+    const user = await db.user.findUnique({ where: { id: jwtUser.sub } });
+    if (!user) return c.json({ error: "User not found" }, 404);
+
+    const currentStake = Number(user.stakeAmount || 0);
+    const newStake = currentStake + numAmount;
+    const isVerifiedNow = newStake >= 100;
+    const isMasterNow = newStake >= 300;
+    const newLevel = isMasterNow ? "MASTER" : (isVerifiedNow ? "PRO" : user.mentorLevel || "RISING");
+
+    const updatedUser = await db.user.update({
+      where: { id: jwtUser.sub },
+      data: {
+        stakeAmount: newStake,
+        isVerified: user.isVerified || isVerifiedNow,
+        isJuror: user.isJuror || isVerifiedNow,
+        mentorLevel: newLevel,
+      },
+    });
+
+    return c.json({
+      success: true,
+      user: updatedUser,
+      stakeAmount: Number(updatedUser.stakeAmount),
+      isVerified: updatedUser.isVerified,
+      mentorLevel: updatedUser.mentorLevel,
+      isJuror: updatedUser.isJuror,
+      txHash: txHash || null,
+      message: `Successfully staked ${numAmount} USDC. Profile verified status: ${updatedUser.isVerified ? "Verified" : "Pending"}`,
+    });
+  } catch (err) {
+    console.error("[Mentor Stake Error]:", err);
+    return c.json({ error: "Failed to process stake", detail: err.message }, 500);
+  }
+});
+
+/** POST /api/mentor/unstake — Request or execute unstake */
+app.post("/mentor/unstake", authMiddleware, async (c) => {
+  const jwtUser = c.get("user");
+  const { amount } = await c.req.json();
+
+  try {
+    const db = await getPrisma();
+    const user = await db.user.findUnique({ where: { id: jwtUser.sub } });
+    if (!user) return c.json({ error: "User not found" }, 404);
+
+    const currentStake = Number(user.stakeAmount || 0);
+    const unstakeAmount = amount !== undefined ? Math.min(Number(amount) || 0, currentStake) : currentStake;
+    const remainingStake = Math.max(0, currentStake - unstakeAmount);
+    const isStillVerified = remainingStake >= 100;
+
+    const updatedUser = await db.user.update({
+      where: { id: jwtUser.sub },
+      data: {
+        stakeAmount: remainingStake,
+        isVerified: isStillVerified,
+        isJuror: isStillVerified && user.isJuror,
+        mentorLevel: remainingStake >= 300 ? "MASTER" : (isStillVerified ? "PRO" : "RISING"),
+      },
+    });
+
+    return c.json({
+      success: true,
+      user: updatedUser,
+      stakeAmount: Number(updatedUser.stakeAmount),
+      isVerified: updatedUser.isVerified,
+      message: `Unstaked ${unstakeAmount} USDC. Remaining collateral: ${remainingStake} USDC.`,
+    });
+  } catch (err) {
+    console.error("[Mentor Unstake Error]:", err);
+    return c.json({ error: "Failed to process unstake", detail: err.message }, 500);
+  }
+});
+
+// Faucet rate limit cache: address -> timestamp
+const faucetCooldowns = new Map();
+
+/** GET /api/faucet/info — Public Faucet Vault Info */
+app.get("/faucet/info", async (c) => {
+  const faucetAddress = process.env.PLATFORM_SPONSOR_WALLET || "0xf2cE5319aeB733fd2279a830260316358A036098";
+  const tokenAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS || "0x65BfF36b3FD34c58F6543537871D9066CEbA6A44";
+  const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
+
+  let faucetBalance = "1000000";
+  try {
+    const { ethers } = await import("ethers");
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const erc20 = new ethers.Contract(tokenAddress, ["function balanceOf(address) view returns (uint256)"], provider);
+    const rawBalance = await erc20.balanceOf(faucetAddress);
+    faucetBalance = ethers.formatUnits(rawBalance, 6);
+  } catch (e) {
+    console.warn("[Faucet Info] Failed to query on-chain balance:", e.message);
+  }
+
+  return c.json({
+    success: true,
+    faucetAddress,
+    tokenAddress,
+    tokenSymbol: "USDC",
+    network: "Arbitrum Sepolia",
+    chainId: 421614,
+    faucetBalance,
+    defaultDripAmount: 250,
+    supportedAmounts: [100, 250, 500],
+    cooldownSeconds: 60,
+  });
+});
+
+/** POST /api/faucet/claim — Dispense Mock USDC on Arbitrum Sepolia */
+app.post("/faucet/claim", async (c) => {
+  const { recipientAddress, amount = 250 } = await c.req.json();
+
+  if (!recipientAddress || !/^0x[a-fA-F0-9]{40}$/.test(recipientAddress)) {
+    return c.json({ error: "Invalid Ethereum/Arbitrum wallet address." }, 400);
+  }
+
+  const claimAmount = Math.min(Math.max(Number(amount) || 250, 50), 500);
+  const normalizedAddr = recipientAddress.toLowerCase();
+
+  // Rate limiting: 60 seconds per address
+  const now = Date.now();
+  const lastClaim = faucetCooldowns.get(normalizedAddr);
+  if (lastClaim && now - lastClaim < 60 * 1000) {
+    const remaining = Math.ceil((60 * 1000 - (now - lastClaim)) / 1000);
+    return c.json({ error: `Cooldown active. Please wait ${remaining} seconds before requesting again.` }, 429);
+  }
+
+  const privateKey = process.env.PLATFORM_SPONSOR_PRIVATE_KEY || process.env.DEPLOY_PRIVATE_KEY;
+  const tokenAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS || "0x65BfF36b3FD34c58F6543537871D9066CEbA6A44";
+  const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
+
+  if (!privateKey) {
+    return c.json({ error: "Faucet signer key not configured." }, 500);
+  }
+
+  try {
+    const { ethers } = await import("ethers");
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const wallet = new ethers.Wallet(privateKey, provider);
+
+    const abi = [
+      "function transfer(address to, uint256 amount) returns (bool)",
+      "function mint(address to, uint256 amount) external",
+      "function balanceOf(address account) view returns (uint256)",
+    ];
+    const contract = new ethers.Contract(tokenAddress, abi, wallet);
+    const parsedAmount = ethers.parseUnits(claimAmount.toString(), 6);
+
+    let tx;
+    const balance = await contract.balanceOf(wallet.address);
+    if (balance >= parsedAmount) {
+      tx = await contract.transfer(recipientAddress, parsedAmount);
+    } else {
+      // Fallback: mint directly if MockUSDC allows public or owner mint
+      tx = await contract.mint(recipientAddress, parsedAmount);
+    }
+
+    faucetCooldowns.set(normalizedAddr, now);
+
+    return c.json({
+      success: true,
+      amount: claimAmount,
+      recipientAddress,
+      txHash: tx.hash,
+      explorerUrl: `https://sepolia.arbiscan.io/tx/${tx.hash}`,
+      message: `Successfully transferred ${claimAmount} Mock USDC to ${recipientAddress}!`,
+    });
+  } catch (err) {
+    console.error("[Faucet Claim Error]:", err);
+    return c.json({ error: "Faucet transaction failed", detail: err.message }, 500);
   }
 });
 

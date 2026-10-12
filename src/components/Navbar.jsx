@@ -11,6 +11,7 @@ const DEFAULT_NAV_LINKS = [
   { to: "/", label: "Home" },
   { to: "/explore", label: "Course" },
   { to: "/leaderboard", label: "Leaderboard" },
+  { to: "/faucet", label: "USDC Faucet" },
   { to: "/how-to-use", label: "How to Use" },
   { to: "/about", label: "About" },
 ];
