@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/src/context/AuthContext";
-import { useWebRTCChat } from "@/src/hooks/useWebRTCChat";
+import { usePusherChat } from "@/src/hooks/usePusherChat";
 import {
   MessageSquare,
   Send,
@@ -55,14 +55,14 @@ export default function ChatPage() {
     (p) => p.userId !== user?.id
   )?.user;
 
-  // WebRTC P2P Direct Chat Hook (Zero DB Overhead)
+  // Realtime Pusher Channels Chat Hook with instant sync & database persistence
   const {
     messages,
-    sendMessage: sendP2PMessage,
-    isP2PConnected,
+    sendMessage: sendChatMessage,
+    isPusherConnected,
     connectionState,
-  } = useWebRTCChat({
-    roomId: activeThread?.enrollmentId || activeThread?.id,
+  } = usePusherChat({
+    roomId: activeThread?.id,
     currentUser: user,
     peerUser: otherParticipant,
   });
@@ -80,9 +80,9 @@ export default function ChatPage() {
     setSending(true);
 
     try {
-      await sendP2PMessage(bodyText);
+      await sendChatMessage(bodyText);
     } catch (err) {
-      console.error("Failed to send P2P message:", err);
+      console.error("Failed to send message:", err);
       setMessageInput(bodyText);
     } finally {
       setSending(false);
@@ -107,7 +107,7 @@ export default function ChatPage() {
                 <span>Classroom Messages</span>
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                Direct WebRTC peer-to-peer communication between mentors and enrolled students
+                Real-time communication between mentors and enrolled students powered by Pusher
               </p>
             </div>
           </div>
@@ -184,7 +184,7 @@ export default function ChatPage() {
                         )}
 
                         <p className="text-xs text-slate-500 truncate mt-1">
-                          {lastMsg ? lastMsg.body : "Direct WebRTC Channel"}
+                          {lastMsg ? lastMsg.body : "Pusher Realtime Channel"}
                         </p>
                       </div>
                     </button>
@@ -223,9 +223,9 @@ export default function ChatPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${isP2PConnected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${isP2PConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
-                      <span>{isP2PConnected ? "P2P Connected" : "Connecting P2P..."}</span>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${isPusherConnected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isPusherConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
+                      <span>{isPusherConnected ? "Live Connected" : "Connecting Live..."}</span>
                     </span>
                     <div className="hidden sm:flex items-center gap-1 text-slate-500 text-xs ml-1">
                       <Shield size={14} className="text-emerald-600" />
@@ -243,7 +243,7 @@ export default function ChatPage() {
                       </div>
                       <p className="font-bold text-xs text-slate-700">Start the Discussion</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        Send message directly over WebRTC DataChannel with zero database overhead.
+                        Send message via Pusher realtime channel with instant synchronization.
                       </p>
                     </div>
                   ) : (
@@ -307,7 +307,7 @@ export default function ChatPage() {
                   </div>
                   <h4 className="font-bold text-sm text-slate-700">Select a Conversation</h4>
                   <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                    Choose a student or class from the sidebar to start encrypted WebRTC discussion.
+                    Choose a student or class from the sidebar to start live discussion.
                   </p>
                 </div>
               </div>

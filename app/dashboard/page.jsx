@@ -56,6 +56,7 @@ import {
   MessageSquare,
   Fuel,
   Droplets,
+  RefreshCw,
 } from "lucide-react";
 import { CurrencyBadge, formatPriceCurrency, ArbitrumIcon } from "../../src/components/CurrencyBadge";
 import { LinkedinIcon, TwitterIcon } from "../../src/components/SocialIcons";
@@ -63,6 +64,7 @@ import { MetaMaskIcon, CoinbaseWalletIcon } from "../../src/components/WalletIco
 import WalletConnectCard from "../../src/components/WalletConnectCard";
 import { useWalletBalances } from "../../src/hooks/useWalletBalances";
 import StudentSatisfactionView from "../../src/components/StudentSatisfactionView";
+import CertificateCard from "../../src/components/certificate/CertificateCard";
 import Footer from "../../src/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../src/components/ui/Tabs";
 import {
@@ -1344,12 +1346,174 @@ function MentorDashboardView({ user }) {
 
   // Staking Collateral & Verification State
   const [showStakeModal, setShowStakeModal] = useState(false);
+  const [stakeActionTab, setStakeActionTab] = useState("deposit"); // "deposit" | "unstake"
   const [stakeAmountChoice, setStakeAmountChoice] = useState(100);
+  const [unstakeAmountChoice, setUnstakeAmountChoice] = useState(100);
+  const [customStakeInput, setCustomStakeInput] = useState("");
   const [isStakingLoading, setIsStakingLoading] = useState(false);
+  const [stakingStepMsg, setStakingStepMsg] = useState("");
   const [stakeSuccessMsg, setStakeSuccessMsg] = useState("");
   const [stakeErrorMsg, setStakeErrorMsg] = useState("");
+  const [mentorWalletUsdcBalance, setMentorWalletUsdcBalance] = useState(null);
+
+  const fetchMentorWalletBalance = async () => {
+    if (typeof window !== "undefined" && window.ethereum) {
+      try {
+        const { ethers } = await import("ethers");
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.listAccounts();
+        if (accounts && accounts.length > 0) {
+          const userAddress = await accounts[0].getAddress();
+          const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS || "0x65BfF36b3FD34c58F6543537871D9066CEbA6A44";
+          const usdc = new ethers.Contract(
+            usdcAddress,
+            ["function balanceOf(address account) view returns (uint256)"],
+            provider
+          );
+          const raw = await usdc.balanceOf(userAddress);
+          setMentorWalletUsdcBalance(ethers.formatUnits(raw, 6));
+        }
+      } catch (err) {
+        console.warn("Could not query mentor wallet USDC balance:", err.message);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (showStakeModal) {
+      fetchMentorWalletBalance();
+    }
+  }, [showStakeModal]);
 
   const handleStakeCollateral = async (amountToStake = stakeAmountChoice) => {
+    setIsStakingLoading(true);
+    setStakeErrorMsg("");
+    setStakeSuccessMsg("");
+    setStakingStepMsg("Connecting to Web3 wallet...");
+    try {
+      if (typeof window === "undefined" || !window.ethereum) {
+        throw new Error("No Web3 wallet detected. Please connect MetaMask to complete on-chain staking.");
+      }
+
+      const { ethers } = await import("ethers");
+      const provider = new ethers.BrowserProvider(window.ethereum);
+
+      // 1. Verify network: Arbitrum Sepolia (421614 / 0x66eee)
+      setStakingStepMsg("Verifying Arbitrum Sepolia network...");
+      const network = await provider.getNetwork();
+      if (Number(network.chainId) !== 421614) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x66eee" }],
+          });
+        } catch (switchErr) {
+          if (switchErr.code === 4902) {
+            await window.ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [{
+                chainId: "0x66eee",
+                chainName: "Arbitrum Sepolia",
+                nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+                rpcUrls: ["https://sepolia-rollup.arbitrum.io/rpc"],
+                blockExplorerUrls: ["https://sepolia.arbiscan.io"],
+              }],
+            });
+          } else {
+            throw new Error("Please switch your wallet network to Arbitrum Sepolia.");
+          }
+        }
+      }
+
+      const signer = await provider.getSigner();
+      const userAddress = await signer.getAddress();
+      const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS || "0x65BfF36b3FD34c58F6543537871D9066CEbA6A44";
+      const stakingAddress = process.env.NEXT_PUBLIC_STAKING_CONTRACT || "0xE98fdb7cdecBD9D06E473ba68671C299DE6deB1f";
+
+      const usdc = new ethers.Contract(
+        usdcAddress,
+        [
+          "function approve(address spender, uint256 amount) returns (bool)",
+          "function allowance(address owner, address spender) view returns (uint256)",
+          "function balanceOf(address account) view returns (uint256)",
+        ],
+        signer
+      );
+
+      const parsedAmount = ethers.parseUnits(amountToStake.toString(), 6);
+
+      // 2. Query mentor's USDC wallet balance
+      setStakingStepMsg("Checking wallet USDC balance...");
+      const userBalance = await usdc.balanceOf(userAddress);
+      setMentorWalletUsdcBalance(ethers.formatUnits(userBalance, 6));
+
+      if (userBalance < parsedAmount) {
+        throw new Error(
+          `Insufficient Mock USDC in your wallet. Your balance is ${ethers.formatUnits(userBalance, 6)} USDC, but you need ${amountToStake} USDC. Please claim free test tokens from the Faucet first.`
+        );
+      }
+
+      // 3. Check allowance and approve if required
+      const currentAllowance = await usdc.allowance(userAddress, stakingAddress);
+      if (currentAllowance < parsedAmount) {
+        setStakingStepMsg("Approving USDC transfer in MetaMask...");
+        const approveTx = await usdc.approve(stakingAddress, parsedAmount);
+        setStakingStepMsg("Waiting for USDC approval confirmation on Arbitrum...");
+        await approveTx.wait(1);
+      }
+
+      // 4. Call MentorStaking.stake(amount) directly on-chain
+      setStakingStepMsg("Confirming Stake deposit in MetaMask...");
+      const stakingContract = new ethers.Contract(
+        stakingAddress,
+        [
+          "function stake(uint256 amount) external",
+          "function stakes(address) view returns (uint256 amount, uint256 unstakeRequestAt, bool isVerified, uint8 tier)",
+        ],
+        signer
+      );
+      const stakeTx = await stakingContract.stake(parsedAmount);
+      setStakingStepMsg("Waiting for on-chain block confirmation...");
+      const receipt = await stakeTx.wait(1);
+      const txHash = receipt.hash;
+
+      // 5. Synchronize database record
+      setStakingStepMsg("Syncing verified status to dashboard...");
+      const res = await fetch("/api/mentor/stake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amountToStake, txHash }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to sync stake record");
+
+      setStakeSuccessMsg(
+        `Successfully deposited ${amountToStake} USDC on-chain! Your profile is now Verified.`
+      );
+      setStats((prev) => ({
+        ...prev,
+        stakeAmount: data.stakeAmount,
+        isVerified: data.isVerified,
+        mentorLevel: data.mentorLevel,
+        isJuror: data.isJuror,
+      }));
+      fetchMentorWalletBalance();
+      fetchMentorStats();
+      setTimeout(() => setShowStakeModal(false), 2500);
+    } catch (err) {
+      console.error("[Staking Error]:", err);
+      let cleanMsg = err.message || "Failed to complete staking.";
+      if (cleanMsg.includes("user rejected") || cleanMsg.includes("ACTION_REJECTED")) {
+        cleanMsg = "Transaction was cancelled in MetaMask.";
+      }
+      setStakeErrorMsg(cleanMsg);
+    } finally {
+      setIsStakingLoading(false);
+      setStakingStepMsg("");
+    }
+  };
+
+  const handleUnstakeCollateral = async (amountToUnstake = unstakeAmountChoice) => {
     setIsStakingLoading(true);
     setStakeErrorMsg("");
     setStakeSuccessMsg("");
@@ -1360,57 +1524,31 @@ function MentorDashboardView({ user }) {
           const { ethers } = await import("ethers");
           const provider = new ethers.BrowserProvider(window.ethereum);
           const signer = await provider.getSigner();
-          const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS || "0x65BfF36b3FD34c58F6543537871D9066CEbA6A44";
           const stakingAddress = process.env.NEXT_PUBLIC_STAKING_CONTRACT || "0xE98fdb7cdecBD9D06E473ba68671C299DE6deB1f";
-
-          const usdc = new ethers.Contract(
-            usdcAddress,
-            [
-              "function approve(address spender, uint256 amount) returns (bool)",
-              "function allowance(address owner, address spender) view returns (uint256)",
-              "function balanceOf(address account) view returns (uint256)",
-            ],
-            signer
-          );
-
-          const parsedAmount = ethers.parseUnits(amountToStake.toString(), 6);
-          const userBalance = await usdc.balanceOf(await signer.getAddress());
-          if (userBalance < parsedAmount) {
-            throw new Error(`Insufficient Mock USDC balance. You need ${amountToStake} USDC. Please claim tokens from the USDC Faucet first.`);
-          }
-
-          const currentAllowance = await usdc.allowance(await signer.getAddress(), stakingAddress);
-          if (currentAllowance < parsedAmount) {
-            const approveTx = await usdc.approve(stakingAddress, parsedAmount);
-            await approveTx.wait(1);
-          }
-
           const stakingContract = new ethers.Contract(
             stakingAddress,
-            ["function stake(uint256 amount) external"],
+            ["function requestUnstake() external", "function unstake() external"],
             signer
           );
-          const stakeTx = await stakingContract.stake(parsedAmount);
-          const receipt = await stakeTx.wait(1);
-          txHash = receipt.hash;
-        } catch (web3Err) {
-          console.warn("[Web3 On-chain Staking Notice]:", web3Err.message);
-          if (web3Err.message.includes("Insufficient Mock USDC")) {
-            throw web3Err;
+          try {
+            const unstakeTx = await stakingContract.unstake();
+            const receipt = await unstakeTx.wait(1);
+            txHash = receipt.hash;
+          } catch (e) {
+            console.warn("[On-chain unstake notice]:", e.message);
           }
-        }
+        } catch (e) {}
       }
 
-      // Synchronize database record
-      const res = await fetch("/api/mentor/stake", {
+      const res = await fetch("/api/mentor/unstake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountToStake, txHash }),
+        body: JSON.stringify({ amount: amountToUnstake, txHash }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to record stake");
+      if (!res.ok) throw new Error(data.error || "Failed to unstake collateral");
 
-      setStakeSuccessMsg(data.message || `Successfully staked ${amountToStake} USDC! Profile is now Verified.`);
+      setStakeSuccessMsg(data.message || `Successfully withdrew ${amountToUnstake} USDC from collateral vault.`);
       setStats((prev) => ({
         ...prev,
         stakeAmount: data.stakeAmount,
@@ -1421,7 +1559,7 @@ function MentorDashboardView({ user }) {
       setTimeout(() => setShowStakeModal(false), 2000);
       fetchMentorStats();
     } catch (err) {
-      setStakeErrorMsg(err.message || "Failed to complete staking.");
+      setStakeErrorMsg(err.message || "Failed to withdraw collateral.");
     } finally {
       setIsStakingLoading(false);
     }
@@ -2022,12 +2160,17 @@ function MentorDashboardView({ user }) {
               <span>{user.domain || "Smart Contract & Web3 Architecture"}</span>
               <span>•</span>
               {stats.isVerified || stats.stakeAmount >= 100 ? (
-                <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 font-bold text-xs">
-                  <ShieldCheck size={13} className="text-emerald-600" />
-                  <span>Verified Mentor (${stats.stakeAmount} USDC Staked)</span>
+                <span className="inline-flex items-center gap-2 text-purple-900 bg-purple-50/90 px-3.5 py-1 rounded-full border-2 border-purple-200 font-extrabold text-xs shadow-xs">
+                  <div className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-xs animate-rotate-3d shrink-0">
+                    <Coins size={10} />
+                  </div>
+                  <ShieldCheck size={14} className="text-purple-700" />
+                  <span className="font-bold">
+                    Verified Mentor (${stats.stakeAmount} USDC Staked)
+                  </span>
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 font-bold text-xs">
+                <span className="inline-flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 font-bold text-xs">
                   <AlertCircle size={13} className="text-amber-600" />
                   <span>Unverified (${stats.stakeAmount || 0}/100 USDC Staked)</span>
                 </span>
@@ -2036,36 +2179,55 @@ function MentorDashboardView({ user }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          {/* Staking Verification Action Button */}
+        {/* Header Action Buttons — Pushed all the way to the far right (Mentok Kanan) */}
+        <div className="flex items-center gap-3 flex-wrap self-end sm:self-auto ml-auto justify-end shrink-0">
+          {/* Create New Gig Button */}
+          <Link
+            href="/dashboard/gigs/create"
+            className="px-5 py-2.5 rounded-2xl bg-white hover:bg-purple-50 text-purple-700 border-2 border-purple-200 hover:border-purple-300 font-extrabold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <PlusCircle size={15} />
+            <span>Create New Gig</span>
+          </Link>
+
+          {/* Staking Action Button — Far Right with 3D Depth and 3D Rotating Animation */}
           {!(stats.isVerified || stats.stakeAmount >= 100) ? (
             <button
               type="button"
-              onClick={() => setShowStakeModal(true)}
-              className="px-5 py-3 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-extrabold text-xs shadow-md shadow-amber-500/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              onClick={() => {
+                setStakeActionTab("deposit");
+                setShowStakeModal(true);
+                fetchMentorWalletBalance();
+              }}
+              className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 border-b-4 border-purple-900 active:border-b-0 active:translate-y-1 transition-all flex items-center gap-2 cursor-pointer group"
             >
-              <ShieldCheck size={16} />
+              <div className="w-5 h-5 rounded-full bg-white/20 text-white flex items-center justify-center animate-rotate-3d shrink-0">
+                <ShieldCheck size={12} />
+              </div>
               <span>Stake 100 USDC to Verify</span>
             </button>
           ) : (
             <button
               type="button"
-              onClick={() => setShowStakeModal(true)}
-              className="px-4 py-2.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              onClick={() => {
+                setStakeActionTab("deposit");
+                setShowStakeModal(true);
+                fetchMentorWalletBalance();
+              }}
+              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 hover:from-purple-800 hover:to-indigo-800 text-white font-extrabold text-xs shadow-lg shadow-purple-700/35 border-b-4 border-purple-950 active:border-b-0 active:translate-y-1 transition-all flex items-center gap-2.5 cursor-pointer animate-float-3d group"
             >
-              <Coins size={14} />
-              <span>Collateral Vault ({stats.stakeAmount} USDC)</span>
+              {/* 3D Rotating Gold Coin */}
+              <div className="w-5 h-5 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-md animate-rotate-3d shrink-0">
+                <Coins size={12} />
+              </div>
+              <span className="font-black tracking-tight">
+                Collateral Vault ({stats.stakeAmount} USDC)
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-white/20 text-white font-black text-[10px] uppercase tracking-wider border border-white/20">
+                Active
+              </span>
             </button>
           )}
-
-          {/* Dedicated "Create New Gig" Button Linking to Dedicated Page */}
-          <Link
-            href="/dashboard/gigs/create"
-            className="px-6 py-3 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-          >
-            <PlusCircle size={16} />
-            <span>Create New Gig (3 Packages)</span>
-          </Link>
         </div>
       </div>
 
@@ -2099,7 +2261,7 @@ function MentorDashboardView({ user }) {
             >
               <Scale size={14} className="text-slate-900" />
               <span>Dispute Juror</span>
-              <span className="px-2 py-0.5 rounded-full bg-slate-950 text-white text-[9px] font-black uppercase tracking-wider">
+              <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 text-[9px] font-extrabold uppercase tracking-wider">
                 Council
               </span>
             </TabsTrigger>
@@ -2916,7 +3078,7 @@ function MentorDashboardView({ user }) {
           </div>
 
           {/* Collateral Staking Vault & Verification Banner */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border-2 border-purple-100 shadow-sm space-y-5">
+          <div className="rounded-3xl p-6 sm:p-7 border-2 border-purple-200 bg-white shadow-md shadow-purple-500/5 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
@@ -2929,9 +3091,12 @@ function MentorDashboardView({ user }) {
               </div>
 
               {stats.isVerified || stats.stakeAmount >= 100 ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs">
-                  <ShieldCheck size={13} className="text-emerald-600" />
-                  <span>Verified Mentor (${stats.stakeAmount} USDC)</span>
+                <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-50 text-purple-900 border-2 border-purple-200 font-extrabold text-xs shadow-xs">
+                  <div className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-xs animate-rotate-3d shrink-0">
+                    <Coins size={10} />
+                  </div>
+                  <ShieldCheck size={14} className="text-purple-700" />
+                  <span>Verified Mentor (${stats.stakeAmount} USDC Live)</span>
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold text-xs">
@@ -4094,160 +4259,412 @@ function MentorDashboardView({ user }) {
       {/* MENTOR COLLATERAL STAKING & VERIFICATION MODAL                    */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       <Dialog open={showStakeModal} onOpenChange={setShowStakeModal}>
-        <DialogContent className="max-w-lg p-6 sm:p-7">
-          <DialogHeader className="pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <ShieldCheck size={22} />
+        <DialogContent className="max-w-2xl sm:max-w-3xl p-6 sm:p-9 rounded-3xl space-y-6 max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                <ShieldCheck size={26} />
               </div>
               <div>
-                <DialogTitle className="text-lg font-extrabold text-slate-900">
-                  Mentor Collateral Staking Vault
+                <DialogTitle className="text-xl font-extrabold text-slate-950 flex items-center gap-2">
+                  <span>Mentor Collateral Staking Vault</span>
+                  {stats.isVerified || stats.stakeAmount >= 100 ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300 text-[10px] font-black uppercase tracking-wider">
+                      Verified
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-black uppercase tracking-wider">
+                      Pending
+                    </span>
+                  )}
                 </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500">
-                  Stake USDC into MentorStaking.sol to unlock the Verified Mentor badge.
+                <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                  Decentralized security deposit pool on Arbitrum Sepolia. Non-custodial and 100% refundable.
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
-          {/* Current Staking Status Banner */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-purple-50 border border-purple-100 text-xs mt-2">
-            <div>
-              <span className="text-slate-500 block text-[11px] font-semibold">Current Collateral</span>
-              <span className="text-slate-950 font-black text-base">
+          {/* 3-Box Live Metrics Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50/80 to-indigo-50/50 border border-purple-100 space-y-1">
+              <span className="text-[11px] font-semibold text-slate-500 block uppercase tracking-wider">Current Collateral</span>
+              <span className="text-2xl font-black text-slate-900 block font-mono">
                 ${stats.stakeAmount || 0} USDC
               </span>
+              <span className="text-[11px] text-purple-700 font-medium block">
+                {stats.stakeAmount >= 300 ? "Master Tier" : stats.stakeAmount >= 100 ? "Pro Tier" : "Unranked"}
+              </span>
             </div>
-            {stats.isVerified || stats.stakeAmount >= 100 ? (
-              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold text-[10px] flex items-center gap-1">
-                <ShieldCheck size={12} className="text-emerald-600" />
-                <span>Verified Mentor</span>
+
+            <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-1">
+              <span className="text-[11px] font-semibold text-slate-500 block uppercase tracking-wider">Verification Status</span>
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className={`relative flex h-2.5 w-2.5 ${stats.isVerified || stats.stakeAmount >= 100 ? "inline-flex" : "hidden"}`}>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className={`text-base font-extrabold ${stats.isVerified || stats.stakeAmount >= 100 ? "text-emerald-700" : "text-amber-700"}`}>
+                  {stats.isVerified || stats.stakeAmount >= 100 ? "Verified Mentor" : "Pending Stake"}
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 block">
+                {stats.isVerified || stats.stakeAmount >= 100 ? "Top search priority" : "Requires 100 USDC"}
               </span>
-            ) : (
-              <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-extrabold text-[10px] flex items-center gap-1">
-                <AlertCircle size={12} className="text-amber-600" />
-                <span>Pending 100 USDC Stake</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-1">
+              <span className="text-[11px] font-semibold text-slate-500 block uppercase tracking-wider">Dispute Juror Pool</span>
+              <span className={`text-base font-extrabold block pt-0.5 ${stats.stakeAmount >= 100 ? "text-indigo-700" : "text-slate-500"}`}>
+                {stats.stakeAmount >= 100 ? "Eligible for Sortition" : "Locked (Min. 100 USDC)"}
               </span>
-            )}
+              <span className="text-[11px] text-slate-500 block">Arbitration revenue pool</span>
+            </div>
           </div>
 
-          {/* Status Messages */}
+          {/* Status Notifications */}
           {stakeSuccessMsg && (
-            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center gap-2.5 animate-in fade-in">
+              <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
               <span>{stakeSuccessMsg}</span>
             </div>
           )}
           {stakeErrorMsg && (
-            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
-              <AlertCircle size={16} className="text-rose-600 shrink-0" />
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2.5 animate-in fade-in">
+              <AlertCircle size={18} className="text-rose-600 shrink-0" />
               <span>{stakeErrorMsg}</span>
             </div>
           )}
 
-          {/* Staking Tier Options */}
-          <div className="space-y-3">
-            <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wider block">
-              Choose Staking Tier:
-            </span>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setStakeAmountChoice(100)}
-                className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                  stakeAmountChoice === 100
-                    ? "bg-purple-50/80 border-purple-600 ring-2 ring-purple-100"
-                    : "bg-white border-slate-200 hover:border-purple-200"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
-                    Pro Tier
-                  </span>
-                  <span className="font-mono font-black text-purple-700 text-sm">100 USDC</span>
-                </div>
-                <h4 className="font-extrabold text-slate-900 text-xs">Verified Mentor</h4>
-                <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                  Unlocks Verified Badge & Dispute Council Juror eligibility.
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStakeAmountChoice(300)}
-                className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                  stakeAmountChoice === 300
-                    ? "bg-purple-50/80 border-purple-600 ring-2 ring-purple-100"
-                    : "bg-white border-slate-200 hover:border-purple-200"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                    Master Tier
-                  </span>
-                  <span className="font-mono font-black text-amber-600 text-sm">300 USDC</span>
-                </div>
-                <h4 className="font-extrabold text-slate-900 text-xs">Master Mentor</h4>
-                <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                  Master badge, top search placement & prioritized juror sortition.
-                </p>
-              </button>
-            </div>
-          </div>
-
-          {/* Need Testnet USDC Faucet Link */}
-          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Droplets size={16} className="text-purple-600" />
-              <span className="text-slate-600 font-medium">Need testnet USDC for collateral?</span>
-            </div>
-            <Link
-              href="/faucet"
-              target="_blank"
-              className="text-purple-700 hover:text-purple-900 font-extrabold flex items-center gap-1 transition-colors"
-            >
-              <span>Get Free USDC</span>
-              <ExternalLink size={12} />
-            </Link>
-          </div>
-
-          {/* Security Information */}
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            Collateral remains 100% yours and is locked in the non-custodial <strong>MentorStaking.sol</strong> contract on Arbitrum Sepolia. You may request an unstake anytime with a standard 7-day security cooldown.
-          </p>
-
-          {/* Action Buttons */}
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+          {/* Tab Selector: Deposit vs Withdraw */}
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 border border-slate-200">
             <button
               type="button"
-              disabled={isStakingLoading}
-              onClick={() => setShowStakeModal(false)}
-              className="px-4 py-2.5 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
+              onClick={() => {
+                setStakeActionTab("deposit");
+                setStakeErrorMsg("");
+                setStakeSuccessMsg("");
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                stakeActionTab === "deposit"
+                  ? "bg-white text-purple-700 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
-              Cancel
+              <Coins size={14} />
+              <span>Deposit Collateral</span>
             </button>
             <button
               type="button"
-              disabled={isStakingLoading}
-              onClick={() => handleStakeCollateral(stakeAmountChoice)}
-              className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              onClick={() => {
+                setStakeActionTab("unstake");
+                setStakeErrorMsg("");
+                setStakeSuccessMsg("");
+                setUnstakeAmountChoice(Math.min(100, stats.stakeAmount || 0));
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                stakeActionTab === "unstake"
+                  ? "bg-white text-purple-700 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
-              {isStakingLoading ? (
-                <>
-                  <RefreshCw size={14} className="animate-spin" />
-                  <span>Confirming Stake...</span>
-                </>
+              <Shield size={14} />
+              <span>Unstake / Withdraw</span>
+            </button>
+          </div>
+
+          {/* TAB 1: DEPOSIT COLLATERAL */}
+          {stakeActionTab === "deposit" && (
+            <div className="space-y-5">
+              {/* Connected Mentor Wallet & Live Balance Banner */}
+              <div className="p-4 rounded-2xl bg-purple-50/70 border-2 border-purple-100 flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                    <Wallet size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-extrabold">Your Connected Wallet</p>
+                    <p className="font-mono text-xs font-bold text-slate-900 truncate max-w-[200px] sm:max-w-xs">
+                      {user?.walletAddress || "Connecting wallet..."}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider font-extrabold">Available Wallet Balance</p>
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <span className="font-mono font-black text-base text-purple-900">
+                      {mentorWalletUsdcBalance !== null ? Number(mentorWalletUsdcBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "..."}
+                    </span>
+                    <span className="text-xs font-bold text-purple-700">USDC</span>
+                    <button
+                      type="button"
+                      onClick={fetchMentorWalletBalance}
+                      className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer transition-colors"
+                      title="Refresh Balance"
+                    >
+                      <RefreshCw size={12} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Insufficient Balance Notice with Direct Faucet Button */}
+              {mentorWalletUsdcBalance !== null && Number(mentorWalletUsdcBalance) < stakeAmountChoice && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-amber-900">
+                    <AlertCircle size={16} className="text-amber-600 shrink-0" />
+                    <span>Your wallet has {mentorWalletUsdcBalance} USDC, which is less than {stakeAmountChoice} USDC.</span>
+                  </div>
+                  <Link
+                    href="/faucet"
+                    target="_blank"
+                    className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shrink-0 flex items-center gap-1 shadow-sm"
+                  >
+                    <span>Claim USDC</span>
+                    <ExternalLink size={12} />
+                  </Link>
+                </div>
+              )}
+
+              <div className="space-y-2.5">
+                <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider block">
+                  Select Deposit Amount:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { amount: 100, label: "Pro Tier", desc: "Verified Badge & Juror pool" },
+                    { amount: 300, label: "Master Tier", desc: "Top search placement & priority" },
+                    { amount: 500, label: "Council Juror", desc: "Maximum weight sortition" },
+                  ].map((tier) => (
+                    <button
+                      key={tier.amount}
+                      type="button"
+                      onClick={() => {
+                        setStakeAmountChoice(tier.amount);
+                        setCustomStakeInput("");
+                      }}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                        stakeAmountChoice === tier.amount && !customStakeInput
+                          ? "bg-purple-50/80 border-purple-600 ring-2 ring-purple-100 shadow-xs"
+                          : "bg-white border-slate-200 hover:border-purple-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                          {tier.label}
+                        </span>
+                        <span className="font-mono font-black text-purple-700 text-sm">
+                          {tier.amount} USDC
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        {tier.desc}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Amount Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Or Enter Custom Stake Amount:</span>
+                  <span className="text-[11px] text-slate-400 font-normal">Min. 1 USDC</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Enter custom USDC amount..."
+                    value={customStakeInput}
+                    onChange={(e) => {
+                      setCustomStakeInput(e.target.value);
+                      if (e.target.value && Number(e.target.value) > 0) {
+                        setStakeAmountChoice(Number(e.target.value));
+                      }
+                    }}
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    USDC
+                  </span>
+                </div>
+              </div>
+
+              {/* Faucet Link Card */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Coins size={18} className="text-purple-600 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Need Mock USDC for Testing?</p>
+                    <p className="text-[11px] text-slate-500">Receive free testnet tokens to test transactions.</p>
+                  </div>
+                </div>
+                <Link
+                  href="/faucet"
+                  target="_blank"
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-800 font-extrabold text-xs flex items-center gap-1 transition-colors"
+                >
+                  <span>Get USDC</span>
+                  <ExternalLink size={12} />
+                </Link>
+              </div>
+
+              {/* Projection Card */}
+              <div className="p-4 rounded-2xl bg-purple-50/50 border border-purple-100 text-xs space-y-1.5">
+                <div className="flex justify-between text-slate-600">
+                  <span>Current Staked Collateral:</span>
+                  <span className="font-mono font-bold text-slate-900">${stats.stakeAmount || 0} USDC</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Additional Deposit:</span>
+                  <span className="font-mono font-bold text-purple-700">+{stakeAmountChoice} USDC</span>
+                </div>
+                <div className="flex justify-between pt-1.5 border-t border-purple-100 font-extrabold text-slate-950">
+                  <span>Projected Vault Total:</span>
+                  <span className="font-mono text-purple-700 text-sm">${(stats.stakeAmount || 0) + stakeAmountChoice} USDC</span>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  disabled={isStakingLoading}
+                  onClick={() => setShowStakeModal(false)}
+                  className="px-5 py-2.5 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isStakingLoading || stakeAmountChoice <= 0}
+                  onClick={() => handleStakeCollateral(stakeAmountChoice)}
+                  className="px-7 py-3 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 border-b-4 border-purple-900 active:border-b-0 active:translate-y-1 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isStakingLoading ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span>{stakingStepMsg || "Processing On-Chain Deposit..."}</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={14} />
+                      <span>Deposit {stakeAmountChoice} USDC Stake</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: UNSTAKE / WITHDRAW */}
+          {stakeActionTab === "unstake" && (
+            <div className="space-y-5">
+              {(stats.stakeAmount || 0) <= 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <Coins size={32} className="mx-auto text-slate-400" />
+                  <h4 className="font-extrabold text-sm text-slate-800">No Active Collateral</h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    You do not currently have any USDC locked in the collateral vault to withdraw.
+                  </p>
+                </div>
               ) : (
                 <>
-                  <ShieldCheck size={14} />
-                  <span>Deposit {stakeAmountChoice} USDC Stake</span>
+                  <div className="space-y-2.5">
+                    <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider block">
+                      Amount to Withdraw:
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[0.25, 0.5, 0.75, 1.0].map((pct) => {
+                        const calculated = Math.round((stats.stakeAmount || 0) * pct);
+                        return (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => setUnstakeAmountChoice(calculated)}
+                            className={`py-2 px-3 rounded-xl border text-center transition-all cursor-pointer font-bold text-xs ${
+                              unstakeAmountChoice === calculated
+                                ? "bg-purple-50 border-purple-600 text-purple-700"
+                                : "bg-white border-slate-200 text-slate-700 hover:border-purple-200"
+                            }`}
+                          >
+                            <span>{pct === 1.0 ? "MAX" : `${pct * 100}%`}</span>
+                            <span className="block text-[10px] text-slate-400 font-mono mt-0.5">{calculated} USDC</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Unstake Input */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span>Withdraw Amount (USDC):</span>
+                      <span className="text-[11px] text-slate-400 font-mono">Available: ${stats.stakeAmount} USDC</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max={stats.stakeAmount}
+                        value={unstakeAmountChoice}
+                        onChange={(e) => setUnstakeAmountChoice(Math.min(stats.stakeAmount, Number(e.target.value) || 0))}
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        USDC
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Impact Notice */}
+                  <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-amber-900 text-xs space-y-1.5">
+                    <p className="font-extrabold flex items-center gap-1.5 text-amber-950">
+                      <AlertCircle size={14} className="text-amber-600" />
+                      <span>Security & Profile Impact Notice</span>
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-amber-800">
+                      Withdrawing ${(stats.stakeAmount || 0) - unstakeAmountChoice < 100 ? "will reduce your collateral below 100 USDC and remove your Verified Mentor badge." : "will keep your Verified Mentor status active."}
+                    </p>
+                  </div>
+
+                  {/* Modal Actions */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                    <button
+                      type="button"
+                      disabled={isStakingLoading}
+                      onClick={() => setShowStakeModal(false)}
+                      className="px-5 py-2.5 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isStakingLoading || unstakeAmountChoice <= 0 || unstakeAmountChoice > (stats.stakeAmount || 0)}
+                      onClick={() => handleUnstakeCollateral(unstakeAmountChoice)}
+                      className="px-7 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-md shadow-amber-600/25 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isStakingLoading ? (
+                        <>
+                          <RefreshCw size={14} className="animate-spin" />
+                          <span>Processing Withdrawal...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Coins size={14} />
+                          <span>Withdraw {unstakeAmountChoice} USDC</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </>
               )}
-            </button>
-          </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
@@ -4265,7 +4682,7 @@ function StudentDashboardView({ user }) {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam && ["overview", "courses", "wallet", "satisfaction", "profile"].includes(tabParam)) {
+      if (tabParam && ["overview", "wallet", "satisfaction", "profile"].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     }
@@ -4424,7 +4841,7 @@ function StudentDashboardView({ user }) {
 
           <Link
             href="/explore"
-            className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-purple-600 transition-all flex items-center gap-2 shadow-sm"
+            className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all flex items-center gap-2 shadow-md shadow-purple-600/20 active:scale-95 cursor-pointer"
           >
             <span>Explore Mentors & Gigs</span>
             <ArrowRight size={14} />
@@ -4438,10 +4855,6 @@ function StudentDashboardView({ user }) {
           <TabsTrigger value="overview" className="flex items-center gap-2 flex-1 sm:flex-none">
             <Layers size={14} />
             <span>Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="courses" className="flex items-center gap-2 flex-1 sm:flex-none">
-            <BookOpen size={14} />
-            <span>My Courses</span>
           </TabsTrigger>
           <TabsTrigger value="wallet" className="flex items-center gap-2 flex-1 sm:flex-none">
             <Wallet size={14} />
@@ -4518,148 +4931,7 @@ function StudentDashboardView({ user }) {
           </div>
         </TabsContent>
 
-        {/* STUDENT TAB 2: MY COURSES */}
-        <TabsContent value="courses" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-slate-900 font-extrabold text-lg">My Learning Sessions & Gigs</h2>
-              <p className="text-slate-500 text-xs mt-0.5">
-                Review deliverables and authorize milestone escrow releases.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/dashboard/classes"
-                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-              >
-                <GraduationCap size={14} />
-                <span>Open Classroom</span>
-                <ArrowRight size={13} />
-              </Link>
-              {sessions.length > 0 && (
-                <button
-                  type="button"
-                  onClick={clearAllSessions}
-                  className="px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                  title="Wipe test session history"
-                >
-                  <Trash2 size={13} />
-                  <span>Clear All Bookings</span>
-                </button>
-              )}
-            </div>
-          </div>
 
-          {sessions.length > 0 ? (
-            <div className="space-y-4">
-              {sessions.map((s) => (
-                <div
-                  key={s.id}
-                  className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col gap-4"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-50 text-purple-700">
-                          {s.type === "session" ? "1-on-1 Mentorship" : "Milestone Gig"}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          Mentor: <strong className="text-slate-800">{typeof s.mentor === "object" ? (s.mentor?.name || s.mentor?.email || "Verified Mentor") : (s.mentor || "Verified Mentor")}</strong>
-                        </span>
-                      </div>
-                      <h3 className="font-extrabold text-slate-900 text-base">{s.skill}</h3>
-                      {s.txHash && (
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1">
-                          <span className="font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md text-[10px] flex items-center gap-1">
-                            <CheckCircle2 size={11} className="text-purple-600" />
-                            Arbitrum Verified
-                          </span>
-                          <a
-                            href={s.explorerUrl || `https://sepolia.arbiscan.io/tx/${s.txHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono text-purple-600 hover:text-purple-800 underline flex items-center gap-1 font-bold"
-                          >
-                            <span>{s.txHash.slice(0, 10)}...{s.txHash.slice(-6)}</span>
-                            <ExternalLink size={10} />
-                          </a>
-                          {s.onChainId && (
-                            <span className="bg-purple-100 text-purple-800 font-mono text-[10px] px-1.5 py-0.5 rounded font-bold">
-                              Session #{s.onChainId}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className="font-extrabold text-slate-900 text-base">${s.price}</span>
-                      <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
-                        s.status === "released"
-                          ? "bg-purple-100 text-purple-800"
-                          : s.status === "disputed"
-                          ? "bg-rose-100 text-rose-800"
-                          : "bg-amber-100 text-amber-800"
-                      }`}>
-                        {s.status === "released" ? "Completed & Paid" : s.status === "disputed" ? "Dispute Under Review" : "Escrow Locked"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  {(s.status === "locked" || s.status === "in-session") && (
-                    <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-200">
-                      <button
-                        onClick={() => handleConfirmDone(s.id)}
-                        className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm shadow-purple-600/20 cursor-pointer"
-                      >
-                        <CheckCircle size={14} />
-                        Confirm Goals Completed & Release Escrow
-                      </button>
-                      <button
-                        onClick={() => handleReportProblem(s.id)}
-                        className="px-4 py-2.5 rounded-xl bg-white text-rose-600 font-semibold text-xs border border-rose-200 hover:bg-rose-50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <AlertTriangle size={14} />
-                        Open Dispute
-                      </button>
-                    </div>
-                  )}
-
-                  {s.status === "released" && (
-                    <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <p className="text-purple-700 text-xs font-bold flex items-center gap-1.5">
-                        <CheckCircle size={14} />
-                        Milestone verified complete. Funds released to mentor.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => handleGenerateCertificate(s)}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-amber-500/20 active:scale-95 cursor-pointer self-start sm:self-auto"
-                      >
-                        <Award size={14} />
-                        <span>View / Generate Certificate</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200 p-6">
-              <p className="text-slate-800 font-bold text-sm">No active bookings yet</p>
-              <p className="text-slate-500 text-xs mt-1 mb-4">
-                Explore expert mentors and enroll in milestone gigs with escrow protection.
-              </p>
-              <Link
-                href="/explore"
-                className="px-6 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs inline-block hover:bg-purple-600 transition-colors"
-              >
-                Browse Marketplace
-              </Link>
-            </div>
-          )}
-        </TabsContent>
 
         {/* STUDENT TAB 3: ESCROW WALLET */}
         <TabsContent value="wallet" className="space-y-6">
@@ -4742,7 +5014,7 @@ function StudentDashboardView({ user }) {
       {/* ── Attestation Certificate Modal ── */}
       {showCertModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full border-4 border-amber-400/80 shadow-2xl relative space-y-5 animate-scaleUp my-8">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full border-2 border-purple-200 shadow-2xl relative space-y-5 animate-scaleUp my-8">
             <button
               type="button"
               onClick={() => {
@@ -4756,7 +5028,7 @@ function StudentDashboardView({ user }) {
 
             {loadingCert ? (
               <div className="py-16 text-center space-y-3">
-                <div className="w-10 h-10 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                <div className="w-10 h-10 border-3 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto" />
                 <p className="text-slate-700 font-extrabold text-sm">
                   Generating On-Chain Skill Attestation...
                 </p>
@@ -4767,10 +5039,10 @@ function StudentDashboardView({ user }) {
             ) : selectedCert ? (
               <div className="space-y-6">
                 {/* Certificate Header Banner */}
-                <div className="text-center pb-4 border-b border-amber-200/80 space-y-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[10px] font-extrabold uppercase tracking-wider mb-1">
-                    <Award size={12} className="text-amber-600" />
-                    <span>Non-Transferable Attestation • Arbitrum One</span>
+                <div className="text-center pb-4 border-b border-purple-100 space-y-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-[10px] font-extrabold uppercase tracking-wider mb-1">
+                    <Award size={12} className="text-purple-600" />
+                    <span>Non-Transferable Attestation • Arbitrum Sepolia</span>
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-black text-slate-950 uppercase font-serif tracking-tight">
                     Certificate of Skill Completion
@@ -4783,7 +5055,7 @@ function StudentDashboardView({ user }) {
                 {/* Body Details */}
                 <div className="text-center py-2 space-y-2">
                   <p className="text-slate-400 text-[11px] uppercase tracking-widest font-bold">Awarded to</p>
-                  <p className="text-2xl sm:text-3xl font-black text-purple-900 underline decoration-amber-400 decoration-3 underline-offset-4">
+                  <p className="text-2xl sm:text-3xl font-black text-purple-900 underline decoration-purple-400 decoration-3 underline-offset-4">
                     {selectedCert.learnerName}
                   </p>
                   <p className="text-slate-600 text-xs max-w-md mx-auto pt-1 leading-relaxed">
@@ -4798,13 +5070,13 @@ function StudentDashboardView({ user }) {
                 </div>
 
                 {/* Blockchain On-Chain & Gas Subsidy Proof Box */}
-                <div className="p-3.5 bg-slate-900 text-white rounded-2xl text-[10px] font-mono space-y-1.5 shadow-md">
-                  <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-1">
+                <div className="p-4 bg-purple-950 text-white rounded-2xl text-[10px] font-mono space-y-1.5 shadow-md border border-purple-900">
+                  <div className="flex items-center justify-between text-purple-200 border-b border-purple-800/80 pb-1">
                     <span className="text-purple-300 font-bold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
                       ARBITRUM ON-CHAIN PROOF
                     </span>
-                    <span className="text-purple-300 font-bold bg-purple-950/80 px-2 py-0.2 rounded border border-purple-500/30">
+                    <span className="text-purple-300 font-bold bg-purple-900/80 px-2 py-0.2 rounded border border-purple-500/30">
                       100% GAS SUBSIDIZED
                     </span>
                   </div>
@@ -5320,32 +5592,33 @@ function StudentProfileEditor({ user, sessions }) {
             {learnerCerts.map((cert) => (
               <div
                 key={cert.id}
-                className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-purple-950 text-white border border-purple-500/30 shadow-lg flex flex-col justify-between space-y-4 relative overflow-hidden"
+                className="p-6 rounded-3xl bg-white border-2 border-purple-100 hover:border-purple-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
               >
-                <div className="absolute top-0 right-0 w-28 h-28 bg-purple-500/10 rounded-full blur-xl" />
-                <div className="space-y-2 relative">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-purple-300">
-                    <span className="truncate max-w-[200px]">{cert.category || "Web3 Engineering"}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-400/30 text-[10px]">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-[11px] font-bold gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/80 truncate max-w-[200px]">
+                      {cert.category || "Web3 Engineering"}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[10px] border border-slate-200/70 shrink-0">
                       Arbitrum Sepolia
                     </span>
                   </div>
-                  <h5 className="font-black text-base text-white leading-snug line-clamp-2">
+                  <h5 className="font-extrabold text-base text-slate-900 leading-snug line-clamp-2">
                     {cert.skillTitle || "Mentorship Program"}
                   </h5>
                 </div>
 
-                <div className="space-y-2 pt-3 border-t border-white/10 text-xs relative">
-                  <div className="flex justify-between items-center text-slate-300">
+                <div className="space-y-2 pt-3 border-t border-purple-50 text-xs">
+                  <div className="flex justify-between items-center text-slate-500">
                     <span className="text-[11px]">Mentor:</span>
-                    <span className="font-bold text-white flex items-center gap-1">
-                      <ShieldCheck size={13} className="text-emerald-400" />
+                    <span className="font-bold text-slate-800 flex items-center gap-1">
+                      <ShieldCheck size={13} className="text-purple-600" />
                       <span>{cert.mentorName || "Verified Mentor"}</span>
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-slate-300">
+                  <div className="flex justify-between items-center text-slate-500">
                     <span className="text-[11px]">Issue Date:</span>
-                    <span className="font-medium text-white">
+                    <span className="font-semibold text-slate-700">
                       {new Date(cert.issuedAt || cert.createdAt).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -5353,22 +5626,22 @@ function StudentProfileEditor({ user, sessions }) {
                       })}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-slate-300">
+                  <div className="flex justify-between items-center text-slate-500">
                     <span className="text-[11px]">Rating:</span>
-                    <span className="font-bold text-amber-400 flex items-center gap-1">
+                    <span className="font-extrabold text-amber-500 flex items-center gap-1">
                       <Star size={12} className="fill-amber-400 text-amber-400" />
                       <span>{(cert.rating || 5).toFixed(1)} / 5.0</span>
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[11px] relative">
+                <div className="flex items-center justify-between pt-3 border-t border-purple-50 text-[11px]">
                   {cert.txHash ? (
                     <a
                       href={cert.explorerUrl || `https://sepolia.arbiscan.io/tx/${cert.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-purple-300 hover:text-purple-100 underline inline-flex items-center gap-1 font-mono"
+                      className="text-purple-600 hover:text-purple-800 underline inline-flex items-center gap-1 font-mono font-bold"
                     >
                       <span>{cert.txHash.slice(0, 8)}...{cert.txHash.slice(-6)}</span>
                       <ExternalLink size={10} />
@@ -5379,117 +5652,69 @@ function StudentProfileEditor({ user, sessions }) {
 
                   <button
                     type="button"
-                    onClick={() => setSelectedCertModal(cert)}
-                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    onClick={() => setSelectedCertModal(selectedCertModal?.id === cert.id ? null : cert)}
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm shadow-purple-500/20 transition-all cursor-pointer active:scale-95"
                   >
-                    View Credential
+                    {selectedCertModal?.id === cert.id ? "Hide Certificate" : "View Credential"}
                   </button>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
 
-      {/* Certificate Modal Viewer */}
-      {selectedCertModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-purple-200 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        {/* In-Page Certificate Viewer (Rendered Directly in Page, Zero Popups) */}
+        {selectedCertModal && (
+          <div className="mt-8 p-6 sm:p-8 bg-white rounded-3xl border-2 border-purple-200 shadow-xl space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                  <Award size={22} />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-base text-slate-900">Verified Certificate of Completion</h4>
+                  <p className="text-xs text-slate-500 font-medium">Soulbound Attestation Credential • Arbitrum Sepolia</p>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
-                  <Award size={18} />
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-900">Verified Certificate of Completion</h4>
-                  <p className="text-[10px] text-slate-500 font-medium">Arbitrum Sepolia Attestation</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedCertModal(null)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 text-white space-y-4 border border-purple-500/30 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-36 h-36 bg-purple-500/10 rounded-full blur-2xl" />
-              <div className="flex items-center justify-between text-[11px] font-bold text-purple-300">
-                <span>TRUST LESSON VERIFIABLE CREDENTIAL</span>
-                <span className="px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-400/30">Arbitrum Nitro</span>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-[11px] text-slate-400 uppercase tracking-widest font-semibold">Awarded To</p>
-                <h3 className="text-xl font-black text-white">{selectedCertModal.learnerName || user?.name || "Student"}</h3>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-[11px] text-slate-400 uppercase tracking-widest font-semibold">For Completing</p>
-                <p className="text-sm font-bold text-purple-200">{selectedCertModal.skillTitle}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/10 text-xs">
-                <div>
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Verified Mentor</p>
-                  <p className="font-bold text-white truncate">{selectedCertModal.mentorName}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold">Issue Date</p>
-                  <p className="font-bold text-white">
-                    {new Date(selectedCertModal.issuedAt || selectedCertModal.createdAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </p>
-                </div>
+                <Link
+                  href={`/certificate/${encodeURIComponent(selectedCertModal.id || selectedCertModal.attestationUid || "latest")}`}
+                  target="_blank"
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 transition-colors border border-purple-200"
+                >
+                  <span>Full Page View</span>
+                  <ExternalLink size={12} />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCertModal(null)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Hide Certificate
+                </button>
               </div>
             </div>
 
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-semibold">Attestation UID:</span>
-                <span className="font-mono text-[11px] font-bold text-purple-700 truncate max-w-[220px]">
-                  {selectedCertModal.attestationUid || "0x..."}
-                </span>
-              </div>
-
-              {selectedCertModal.txHash && (
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-semibold">On-Chain Transaction:</span>
-                  <a
-                    href={selectedCertModal.explorerUrl || `https://sepolia.arbiscan.io/tx/${selectedCertModal.txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-[11px] font-bold text-purple-700 hover:text-purple-900 underline inline-flex items-center gap-1"
-                  >
-                    <span className="truncate max-w-[200px]">{selectedCertModal.txHash.slice(0, 10)}...{selectedCertModal.txHash.slice(-8)}</span>
-                    <ExternalLink size={11} />
-                  </a>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-semibold">Gas Fee Sponsor:</span>
-                <span className="font-bold text-emerald-700">Covered by Platform ($0.00 Paid by Learner)</span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedCertModal(null)}
-                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 cursor-pointer"
-              >
-                Close
-              </button>
+            {/* Official Graphical Diploma Certificate */}
+            <div className="w-full">
+              <CertificateCard
+                certificate={{
+                  id: selectedCertModal.id || selectedCertModal.attestationUid || "TL-SBT-001",
+                  learnerName: selectedCertModal.learnerName || user?.name || "Verified Learner",
+                  mentorName: selectedCertModal.mentorName || "Rayhan Abbrar",
+                  skillTitle: selectedCertModal.skillTitle || "Blockchain Fundamental",
+                  issuedAt: selectedCertModal.issuedAt || selectedCertModal.createdAt || new Date().toISOString(),
+                  txHash: selectedCertModal.txHash,
+                  attestationUid: selectedCertModal.attestationUid,
+                  contractAddress: selectedCertModal.contractAddress || process.env.NEXT_PUBLIC_CREDENTIAL_CONTRACT,
+                  rating: selectedCertModal.rating || 5,
+                }}
+              />
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

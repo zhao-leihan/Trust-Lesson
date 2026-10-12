@@ -96,21 +96,21 @@ export default function WalletConnectCard({ compact = false }) {
   }
 
   return (
-    <div className="bg-slate-950 text-white rounded-2xl p-5 sm:p-6 border border-slate-800 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+    <div className="bg-white rounded-3xl p-5 sm:p-6 border-2 border-purple-100 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-slate-900">
       <div className="flex items-center gap-3.5">
-        <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 text-indigo-400">
+        <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center shrink-0">
           <Wallet size={20} />
         </div>
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-bold text-sm text-white">
+            <h3 className="font-extrabold text-sm text-slate-950">
               Arbitrum Escrow Wallet
             </h3>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/10 text-slate-300 border border-white/10">
+            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
               {activeNet?.name || "Arbitrum Sepolia"}
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             {walletAddress
               ? "Connected for non-custodial milestone funding and automated payouts."
               : "Connect MetaMask or Web3 wallet to interact with on-chain milestone escrow."}
@@ -123,12 +123,12 @@ export default function WalletConnectCard({ compact = false }) {
           <>
             {/* USDC Balance Pill */}
             <div
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold"
               title="Spendable USDC for escrow deposit"
             >
-              <Coins size={13} className="text-emerald-400 shrink-0" />
-              <span className="text-slate-300 text-[11px] font-semibold">USDC:</span>
-              <span className="font-bold text-white font-mono">
+              <Coins size={13} className="text-emerald-600 shrink-0" />
+              <span className="text-emerald-700 text-[11px] font-semibold">USDC:</span>
+              <span className="font-extrabold text-slate-900 font-mono">
                 {isLoading && usdcBalance === null
                   ? "..."
                   : usdcBalance !== null
@@ -139,12 +139,12 @@ export default function WalletConnectCard({ compact = false }) {
 
             {/* ETH Gas Fee Pill */}
             <div
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-medium"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-800 text-xs font-semibold"
               title="Native ETH for Arbitrum gas fees"
             >
-              <Fuel size={13} className="text-sky-400 shrink-0" />
-              <span className="text-slate-300 text-[11px] font-semibold">Gas (ETH):</span>
-              <span className="font-bold text-white font-mono">
+              <Fuel size={13} className="text-purple-600 shrink-0" />
+              <span className="text-purple-700 text-[11px] font-semibold">Gas (ETH):</span>
+              <span className="font-extrabold text-slate-900 font-mono">
                 {isLoading && ethBalance === null
                   ? "..."
                   : ethBalance !== null
@@ -157,36 +157,36 @@ export default function WalletConnectCard({ compact = false }) {
             <button
               onClick={refreshBalances}
               disabled={isLoading}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 text-slate-500 hover:text-purple-700 transition-colors cursor-pointer"
               title="Refresh On-Chain Balances"
             >
-              <RefreshCw size={13} className={isLoading ? "animate-spin text-purple-400" : ""} />
+              <RefreshCw size={13} className={isLoading ? "animate-spin text-purple-600" : ""} />
             </button>
 
             {/* Import USDC into MetaMask button */}
             <button
               onClick={handleAddUsdcToMetaMask}
-              className="px-2.5 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer"
               title="Import USDC token directly into MetaMask extension"
             >
-              <Coins size={12} className="text-purple-400" />
+              <Coins size={12} className="text-purple-600" />
               <span>Import USDC</span>
             </button>
 
             {/* Address Pill */}
-            <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="font-mono text-xs text-slate-200 font-semibold">{shortAddr}</span>
+            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="font-mono text-xs text-slate-800 font-bold">{shortAddr}</span>
               <button
                 onClick={handleCopy}
-                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+                className="text-slate-400 hover:text-purple-700 p-0.5 cursor-pointer"
                 title="Copy Address"
               >
-                {copied ? <CheckCircle2 size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                {copied ? <CheckCircle2 size={13} className="text-emerald-600" /> : <Copy size={13} />}
               </button>
               <button
                 onClick={disconnectWallet}
-                className="text-slate-400 hover:text-rose-400 p-1 cursor-pointer"
+                className="text-slate-400 hover:text-rose-600 p-0.5 cursor-pointer"
                 title="Disconnect Wallet"
               >
                 <LogOut size={13} />
@@ -197,7 +197,7 @@ export default function WalletConnectCard({ compact = false }) {
           <button
             onClick={handleConnect}
             disabled={isConnecting}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+            className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/20 flex items-center gap-2 cursor-pointer transition-all"
           >
             <Wallet size={14} />
             <span>{isConnecting ? "Connecting..." : "Connect Escrow Wallet"}</span>

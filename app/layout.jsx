@@ -39,7 +39,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${outfit.variable} ${poppins.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${outfit.variable} ${poppins.variable}`}>
       <body className="min-h-screen flex flex-col font-sans bg-slate-50 text-slate-900 antialiased selection:bg-purple-600 selection:text-white">
         <AuthProvider>
           <Navbar />

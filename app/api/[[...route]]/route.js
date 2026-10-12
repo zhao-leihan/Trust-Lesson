@@ -175,6 +175,36 @@ async function getPrisma() {
   return _prisma;
 }
 
+// ─── Helper: get Pusher Server lazily ─────────────────────────
+let _pusher = null;
+async function getPusherServer() {
+  const appId = process.env.PUSHER_APP_ID;
+  const key = process.env.PUSHER_KEY || process.env.NEXT_PUBLIC_PUSHER_KEY;
+  const secret = process.env.PUSHER_SECRET;
+  const cluster = process.env.PUSHER_CLUSTER || process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "ap1";
+
+  if (!appId || !key || !secret) {
+    return null;
+  }
+
+  if (!_pusher) {
+    try {
+      const Pusher = (await import("pusher")).default;
+      _pusher = new Pusher({
+        appId,
+        key,
+        secret,
+        cluster,
+        useTLS: true,
+      });
+    } catch (e) {
+      console.warn("[Pusher init warning]:", e?.message || e);
+      return null;
+    }
+  }
+  return _pusher;
+}
+
 
 // ════════════════════════════════════════════════════════════════════
 // AUTH ROUTES (Email/Password + SIWE Web3 + Captcha)
@@ -2355,6 +2385,8 @@ app.post("/mentor/unstake", authMiddleware, async (c) => {
       user: updatedUser,
       stakeAmount: Number(updatedUser.stakeAmount),
       isVerified: updatedUser.isVerified,
+      mentorLevel: updatedUser.mentorLevel,
+      isJuror: updatedUser.isJuror,
       message: `Unstaked ${unstakeAmount} USDC. Remaining collateral: ${remainingStake} USDC.`,
     });
   } catch (err) {
@@ -6338,19 +6370,120 @@ app.get("/chat/unread", authMiddleware, async (c) => {
   }
 });
 
+// ─── Helper: resolve chat thread by ID or enrollmentId with robust authentication ─
+async function resolveChatThreadWithAuth(db, idParam, user) {
+  if (!idParam) return null;
+  const userId = user?.sub || user?.id;
+  const userAddress = user?.address?.toLowerCase();
+
+  // 1. Try finding thread directly by id
+  let thread = await db.chatThread.findUnique({
+    where: { id: idParam },
+    include: {
+      participants: { include: { user: true } },
+    },
+  });
+
+  // 2. Try finding thread by enrollmentId
+  if (!thread) {
+    thread = await db.chatThread.findFirst({
+      where: { enrollmentId: idParam },
+      include: {
+        participants: { include: { user: true } },
+      },
+    });
+  }
+
+  // 3. If still not found, check if idParam is a gigEnrollment
+  if (!thread) {
+    const enr = await db.gigEnrollment.findUnique({
+      where: { id: idParam },
+      include: {
+        learner: true,
+        mentor: true,
+      },
+    });
+
+    if (enr) {
+      const isLearner = enr.learnerId === userId || (userAddress && enr.learner?.walletAddress?.toLowerCase() === userAddress);
+      const isMentor = enr.mentorId === userId || (userAddress && enr.mentor?.walletAddress?.toLowerCase() === userAddress);
+      if (isLearner || isMentor) {
+        thread = await db.chatThread.create({
+          data: {
+            kind: "DIRECT",
+            enrollmentId: enr.id,
+            participants: {
+              create: [
+                { userId: enr.learnerId, role: "LEARNER" },
+                { userId: enr.mentorId, role: "MENTOR" },
+              ],
+            },
+          },
+          include: {
+            participants: { include: { user: true } },
+          },
+        });
+      }
+    }
+  }
+
+  if (!thread) return null;
+
+  // 4. Verify participant access or automatically link enrollment party
+  let isParticipant = (thread.participants || []).some((p) => {
+    if (userId && p.userId === userId) return true;
+    if (userAddress && p.user?.walletAddress?.toLowerCase() === userAddress) return true;
+    return false;
+  });
+
+  if (!isParticipant && thread.enrollmentId) {
+    const enr = await db.gigEnrollment.findUnique({
+      where: { id: thread.enrollmentId },
+      include: { learner: true, mentor: true },
+    });
+    if (enr) {
+      const isLearner = enr.learnerId === userId || (userAddress && enr.learner?.walletAddress?.toLowerCase() === userAddress);
+      const isMentor = enr.mentorId === userId || (userAddress && enr.mentor?.walletAddress?.toLowerCase() === userAddress);
+      if (isLearner || isMentor) {
+        const participantUserId = userId || (isMentor ? enr.mentorId : enr.learnerId);
+        await db.chatParticipant.upsert({
+          where: {
+            threadId_userId: { threadId: thread.id, userId: participantUserId },
+          },
+          update: {},
+          create: {
+            threadId: thread.id,
+            userId: participantUserId,
+            role: isMentor ? "MENTOR" : "LEARNER",
+          },
+        }).catch(() => {});
+        isParticipant = true;
+      }
+    }
+  }
+
+  return isParticipant ? thread : null;
+}
+
 /** POST /api/chat/threads/:id/read — Mark thread as read */
 app.post("/chat/threads/:id/read", authMiddleware, async (c) => {
-  const threadId = c.req.param("id");
+  const idParam = c.req.param("id");
   const jwtUser = c.get("user");
   try {
     const db = await getPrisma();
+    const thread = await resolveChatThreadWithAuth(db, idParam, jwtUser);
+    if (!thread) {
+      return c.json({ error: "Access denied to thread" }, 403);
+    }
+
     const lastMsg = await db.chatMessage.findFirst({
-      where: { threadId },
+      where: { threadId: thread.id },
       orderBy: { seq: "desc" },
     });
     if (lastMsg) {
+      const currentUserId = jwtUser.sub || jwtUser.id;
       await db.chatParticipant.updateMany({
-        where: { threadId, userId: jwtUser.sub },
+        where: { threadId: thread.id, userId: currentUserId },
         data: { lastReadSeq: lastMsg.seq },
       });
     }
@@ -6362,19 +6495,17 @@ app.post("/chat/threads/:id/read", authMiddleware, async (c) => {
 
 /** GET /api/chat/threads/:id/messages — Get message history */
 app.get("/chat/threads/:id/messages", authMiddleware, async (c) => {
-  const threadId = c.req.param("id");
+  const idParam = c.req.param("id");
   const jwtUser = c.get("user");
   try {
     const db = await getPrisma();
-    const isParticipant = await db.chatParticipant.findFirst({
-      where: { threadId, userId: jwtUser.sub },
-    });
-    if (!isParticipant) {
+    const thread = await resolveChatThreadWithAuth(db, idParam, jwtUser);
+    if (!thread) {
       return c.json({ error: "Access denied to thread" }, 403);
     }
 
     const messages = await db.chatMessage.findMany({
-      where: { threadId },
+      where: { threadId: thread.id },
       orderBy: { seq: "asc" },
       take: 100,
     });
@@ -6382,8 +6513,9 @@ app.get("/chat/threads/:id/messages", authMiddleware, async (c) => {
     // Auto-update lastReadSeq when viewing messages
     if (messages.length > 0) {
       const highestSeq = messages[messages.length - 1].seq;
+      const currentUserId = jwtUser.sub || jwtUser.id;
       await db.chatParticipant.updateMany({
-        where: { threadId, userId: jwtUser.sub },
+        where: { threadId: thread.id, userId: currentUserId },
         data: { lastReadSeq: highestSeq },
       }).catch(() => {});
     }
@@ -6397,7 +6529,7 @@ app.get("/chat/threads/:id/messages", authMiddleware, async (c) => {
 
 /** POST /api/chat/threads/:id/messages — Send a message */
 app.post("/chat/threads/:id/messages", authMiddleware, async (c) => {
-  const threadId = c.req.param("id");
+  const idParam = c.req.param("id");
   const jwtUser = c.get("user");
   const { body, kind = "TEXT" } = await c.req.json();
   if (!body || !body.trim()) {
@@ -6406,24 +6538,19 @@ app.post("/chat/threads/:id/messages", authMiddleware, async (c) => {
 
   try {
     const db = await getPrisma();
-    const isParticipant = await db.chatParticipant.findFirst({
-      where: { threadId, userId: jwtUser.sub },
-    });
-    if (!isParticipant) {
+    const thread = await resolveChatThreadWithAuth(db, idParam, jwtUser);
+    if (!thread) {
       return c.json({ error: "Access denied to thread" }, 403);
     }
 
-    const thread = await db.chatThread.findUnique({
-      where: { id: threadId },
-      include: {
-        messages: {
-          orderBy: { seq: "desc" },
-          take: 1,
-        },
-      },
+    const threadId = thread.id;
+    const currentUserId = jwtUser.sub || jwtUser.id;
+
+    const lastMsg = await db.chatMessage.findFirst({
+      where: { threadId },
+      orderBy: { seq: "desc" },
     });
 
-    const lastMsg = thread?.messages?.[0];
     const seq = (lastMsg?.seq || 0) + 1;
     const prevHash = lastMsg?.hash || "0x0";
     const timestamp = new Date().toISOString();
@@ -6436,7 +6563,7 @@ app.post("/chat/threads/:id/messages", authMiddleware, async (c) => {
     const message = await db.chatMessage.create({
       data: {
         threadId,
-        senderId: jwtUser.sub,
+        senderId: currentUserId,
         seq,
         kind,
         body: body.trim(),
@@ -6450,15 +6577,30 @@ app.post("/chat/threads/:id/messages", authMiddleware, async (c) => {
       data: { headHash: hash, updatedAt: new Date() },
     });
 
+    // Broadcast to Pusher realtime channel asynchronously
+    (async () => {
+      try {
+        const pusher = await getPusherServer();
+        if (pusher) {
+          await pusher.trigger(`thread-${threadId}`, "message:new", message);
+          if (idParam && idParam !== threadId) {
+            await pusher.trigger(`thread-${idParam}`, "message:new", message);
+          }
+        }
+      } catch (pusherErr) {
+        console.warn("[Pusher trigger warning]:", pusherErr?.message || pusherErr);
+      }
+    })();
+
     // Notify other participant asynchronously via automated email
     (async () => {
       try {
         const otherParticipant = await db.chatParticipant.findFirst({
-          where: { threadId, userId: { not: jwtUser.sub } },
+          where: { threadId, userId: { not: currentUserId } },
           include: { user: true },
         });
         if (otherParticipant?.user?.email) {
-          const senderUser = await db.user.findUnique({ where: { id: jwtUser.sub } });
+          const senderUser = await db.user.findUnique({ where: { id: currentUserId } });
           sendChatNotificationEmail({
             recipientEmail: otherParticipant.user.email,
             recipientName: otherParticipant.user.name || "Peer",
@@ -6476,6 +6618,7 @@ app.post("/chat/threads/:id/messages", authMiddleware, async (c) => {
     return c.json({ error: err.message }, 500);
   }
 });
+
 
 // ════════════════════════════════════════════════════════════════════
 // WEBRTC SIGNALING ROUTES (In-Memory, Zero DB Overhead)

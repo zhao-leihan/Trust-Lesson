@@ -1,0 +1,15 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore Next.js build artifacts, local env files, and public Ethereum contract addresses"
+paths = [
+  '''^\.next/''',
+  '''^node_modules/''',
+  '''^artifacts/''',
+  '''^cache/''',
+  '''^\.env.*$''',
+]
+regexes = [
+  '''0x[a-fA-F0-9]{40}''',
+]
