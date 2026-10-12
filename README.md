@@ -12,54 +12,137 @@
 
   <p align="center">
     <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-9333ea.svg?style=flat-square" alt="License: MIT" /></a>
-    <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js-15%20App%20Router-000000.svg?style=flat-square&logo=next.js" alt="Next.js 15" /></a>
-    <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-61dafb.svg?style=flat-square&logo=react" alt="React 19" /></a>
-    <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind%20CSS-v4-06B6D4.svg?style=flat-square&logo=tailwindcss" alt="Tailwind CSS v4" /></a>
-    <a href="https://arbitrum.io"><img src="https://img.shields.io/badge/Network-Arbitrum%20Sepolia%20%7C%20One-28A0F0.svg?style=flat-square&logo=arbitrum" alt="Arbitrum" /></a>
-    <a href="https://soliditylang.org/"><img src="https://img.shields.io/badge/Solidity-0.8.24%20(Cancun)-363636.svg?style=flat-square&logo=solidity" alt="Solidity" /></a>
-    <a href="https://cloudflare.com"><img src="https://img.shields.io/badge/Storage-Cloudflare%20Stream%20%2B%20R2-F38020.svg?style=flat-square&logo=cloudflare" alt="Cloudflare" /></a>
-    <a href="./SECURITY.md"><img src="https://img.shields.io/badge/Gas-100%25%20Subsidized-10B981.svg?style=flat-square" alt="Gas Subsidized" /></a>
+    <a href="https://sepolia.arbiscan.io/"><img src="https://img.shields.io/badge/Network-Arbitrum%20Sepolia-28A0F0.svg?style=flat-square&logo=arbitrum" alt="Arbitrum Sepolia" /></a>
+    <a href="https://soliditylang.org/"><img src="https://img.shields.io/badge/Solidity-0.8.24%20(Cancun)-363636.svg?style=flat-square&logo=solidity" alt="Solidity 0.8.24" /></a>
+    <a href="#smart-contracts"><img src="https://img.shields.io/badge/Contracts-8%20Deployed-10B981.svg?style=flat-square" alt="8 Contracts Deployed" /></a>
+    <a href="#security"><img src="https://img.shields.io/badge/Tests-Hardhat%20%2B%20Foundry-yellow.svg?style=flat-square" alt="Tests" /></a>
   </p>
 </div>
 
 ---
 
-## Overview
+## Live Demo
 
-**Trust Lesson** eliminates payment risk and ghosting in private mentorship and freelance coaching. By combining milestone-based escrow vaults with on-chain reputation verification, learners book sessions with complete confidence and mentors are guaranteed 100% of their earnings upon verified delivery.
-
-### Why Trust Lesson?
-- **Non-Custodial Smart Escrow V2**: Funds are locked in audited Arbitrum smart contracts until the learner approves milestone deliverables.
-- **Native Access-Gated Content**: Mentors upload curriculum directly through Cloudflare Stream (videos) and Cloudflare R2 (documents) with short-lived signed URLs (1-hour playback tokens, 15-minute download links).
-- **Cost-Effective Fallback Hosting**: Zero-budget mentors can host course content via unlisted YouTube and restricted Google Drive links with interactive setup guides.
-- **Pre-Publish Student Simulator**: Mentors can inspect and verify their curriculum from both unpaid (locked) and paid (unlocked) perspectives before publishing.
-- **100% Mentor Base Earning Guarantee**: Mentors receive 100% of their listed fee without platform deductions.
-- **Fair 10% Protocol Cut**: A transparent 10% operational fee (`PLATFORM_FEE_BPS = 1000`) is calculated upfront on-chain.
-- **100% Gas Subsidy**: The Platform Gas Sponsor vault subsidizes transaction costs so users need 0 ETH for gas.
-- **Real Web3 MetaMask Integration**: Live USDC and ETH balance querying, pre-flight insufficient balance warnings, and seamless network switching.
-- **Composable Verifiable Credentials (W3C JSON-LD + EIP-712)**: Tamper-proof, non-transferable on-chain proof of completion issued to both student and mentor, exportable as W3C JSON-LD for instant verification by external DAOs and job boards without logging into the platform.
-- **On-Chain Skill Graph & Prerequisite Gating**: Completed sessions level up on-chain skill nodes (Level 1, 2, 3) with prerequisite tree verification.
-- **Decentralized Dispute Council (Phase 1.5 Multi-Sig)**: 3-of-5 juror quorum replacing single arbiter, 72h resolution timelock, transparent IPFS evidence hashes, and pluggable Kleros Court / UMA Optimistic Oracle hooks.
-- **Real-Time Ponder Indexer**: Blazing-fast on-chain event indexing across Arbitrum Sepolia for sub-second dashboard updates.
-- **100% English Web Experience**: Standardized English UI across all checkout, booking, and dashboard views.
+**[trust-lesson.vercel.app](https://trust-lesson.vercel.app)** — Book a mentorship session with testnet USDC. No real funds required.
 
 ---
 
-## Live Smart Contracts (Arbitrum Sepolia Testnet — V2 Architecture)
+## Overview
 
-All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and actively deployed on **Arbitrum Sepolia** (`Chain ID: 421614`):
+**Trust Lesson** eliminates payment risk and ghosting in private mentorship and freelance coaching. Milestone-based escrow vaults lock funds on-chain until the learner approves deliverables. Upon completion, both parties receive tamper-proof, non-transferable credentials.
 
-| Contract | Address | Explorer Link | Function |
+### Core Value Proposition
+
+| Problem | Solution |
+| :--- | :--- |
+| Learner pays upfront, mentor ghosts | Funds locked in escrow — released only on milestone confirmation |
+| Mentor delivers, learner refuses payment | Milestone approval triggers automatic release; disputes resolved by 3-of-5 jury |
+| No verifiable proof of completion | Dual-party soulbound credentials (W3C JSON-LD + EIP-712) minted on-chain |
+| High gas fees pricing out users | Platform-sponsored gas relayer — users pay 0 ETH |
+
+---
+
+## Smart Contracts
+
+All contracts deployed on **Arbitrum Sepolia** (`Chain ID: 421614`), compiled with Solidity `0.8.24` (Cancun EVM target).
+
+| Contract | Address | Function | Verified |
 | :--- | :--- | :--- | :--- |
-| **EscrowRouter (V2)** | `0x22f3aa08A15d24f7D274b33A234d96EDC5A98E88` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x22f3aa08A15d24f7D274b33A234d96EDC5A98E88) | Modular milestone escrow vault with 10% protocol cut distribution & multi-sig dispute resolution |
-| **VerifiableCredential** | `0x50fA8e6c56B97484D2571b2C220d3EDbBAe6847D` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x50fA8e6c56B97484D2571b2C220d3EDbBAe6847D) | Dual-party W3C & EIP-712 credential ledger (Learner Completion & Mentor Delivery) |
-| **SkillGraph** | `0x99303483484cc2c9393138574969f15C415A3016` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x99303483484cc2c9393138574969f15C415A3016) | On-chain composable skill tree with prerequisite gating & level progression |
-| **DisputeCouncil** | `0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006) | Decentralized 3-of-5 jury council with on-chain dynamic sortition, conflict filter & Kleros Court hooks |
-| **MentorStaking** | `0xbbD3dA628360c63f36c9E6D2A955e33ADc5281Dd` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0xbbD3dA628360c63f36c9E6D2A955e33ADc5281Dd) | Economic stake pool with on-chain Tier verification (PRO/MASTER) & automated slashing |
-| **VideoAccess** | `0xb7d6EE04514AB9A210fDa4A3006c230EEEc40023` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0xb7d6EE04514AB9A210fDa4A3006c230EEEc40023) | On-chain course content access gating |
-| **USDC Token** | `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d) | Official native Arbitrum Sepolia USDC settlement token |
-| **Gas Sponsor Relayer**| `0xf2cE5319aeB733fd2279a830260316358A036098` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0xf2cE5319aeB733fd2279a830260316358A036098) | Platform gas subsidy vault absorbing 100% of L2 gas |
-| **Platform Treasury** | `0x656c943c3a8BB5d5F7306CC5ED66C3a938Cb75eC` | [View on Arbiscan](https://sepolia.arbiscan.io/address/0x656c943c3a8BB5d5F7306CC5ED66C3a938Cb75eC) | Cold treasury vault receiving the 10% protocol cut |
+| **EscrowRouter (V2)** | [`0x22f3...98E88`](https://sepolia.arbiscan.io/address/0x22f3aa08A15d24f7D274b33A234d96EDC5A98E88) | Milestone escrow vault with 10% protocol fee | ✅ |
+| **VerifiableCredential** | [`0x50fA...6847D`](https://sepolia.arbiscan.io/address/0x50fA8e6c56B97484D2571b2C220d3EDbBAe6847D) | Dual-party W3C & EIP-712 credential ledger | ✅ |
+| **SkillGraph** | [`0x9930...A3016`](https://sepolia.arbiscan.io/address/0x99303483484cc2c9393138574969f15C415A3016) | On-chain skill tree with prerequisite gating | ✅ |
+| **DisputeCouncil** | [`0xAEA0...4B006`](https://sepolia.arbiscan.io/address/0xAEA0b1E4238b5a9E6c0614b32b65e94D26F4B006) | 3-of-5 jury council with dynamic sortition | ✅ |
+| **MentorStaking** | [`0xbbD3...281Dd`](https://sepolia.arbiscan.io/address/0xbbD3dA628360c63f36c9E6D2A955e33ADc5281Dd) | Economic stake pool with tier verification & slashing | ✅ |
+| **VideoAccess** | [`0xb7d6...40023`](https://sepolia.arbiscan.io/address/0xb7d6EE04514AB9A210fDa4A3006c230EEEc40023) | On-chain course content access gating | ✅ |
+| **Gas Sponsor Relayer** | [`0xf2cE...036098`](https://sepolia.arbiscan.io/address/0xf2cE5319aeB733fd2279a830260316358A036098) | Gas subsidy vault | ✅ |
+| **Platform Treasury** | [`0x656c...b75eC`](https://sepolia.arbiscan.io/address/0x656c943c3a8BB5d5F7306CC5ED66C3a938Cb75eC) | Cold treasury receiving protocol fees | ✅ |
+
+**Settlement Token**: [USDC (`0x75fa...6AA4d`)](https://sepolia.arbiscan.io/address/0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d)
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         USER LAYER                               │
+│  Next.js 15 App Router + React 19 + Tailwind CSS v4             │
+│  MetaMask / Rabby / Coinbase Wallet (Ethers.js v6 + Viem)       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       API & INDEXING                             │
+│  Hono Edge Router (app/api/[[...route]])                        │
+│  Ponder Indexer — sub-second event indexing                     │
+│  Prisma ORM + PostgreSQL (SQLite for local dev)                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SMART CONTRACT LAYER                          │
+│  ┌─────────────┐  ┌──────────────────┐  ┌─────────────────┐    │
+│  │ EscrowRouter│──│ DisputeCouncil   │  │ MentorStaking   │    │
+│  │ (escrow +   │  │ (3-of-5 jury)    │  │ (stake + slash) │    │
+│  │  fee split) │  └──────────────────┘  └─────────────────┘    │
+│  └──────┬──────┘                                                │
+│         │                                                       │
+│  ┌──────▼──────┐  ┌──────────────────┐  ┌─────────────────┐    │
+│  │Verifiable   │  │ SkillGraph       │  │ VideoAccess     │    │
+│  │Credential   │  │ (skill tree)     │  │ (content gate)  │    │
+│  │(SBT + VC)   │  │                  │  │                 │    │
+│  └─────────────┘  └──────────────────┘  └─────────────────┘    │
+│                                                                 │
+│  Gas Sponsor Relayer — subsidizes 100% of user gas costs        │
+│  Platform Treasury — receives 10% protocol fee                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      STORAGE LAYER                               │
+│  Cloudflare Stream (video, HLS signed tokens)                   │
+│  Cloudflare R2 (documents, presigned URLs)                      │
+│  Pinata IPFS (dispute evidence hashes)                          │
+│  Fallback: YouTube Unlisted / Google Drive Restricted           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Key Features
+
+### For Mentors
+
+| Feature | Description |
+| :--- | :--- |
+| **Dashboard** | Monthly earnings, active escrow pool, reputation score, hourly rate analytics |
+| **Curriculum Upload** | Native Cloudflare Stream (video) + R2 (documents) with signed URLs |
+| **Zero-Budget Hosting** | Unlisted YouTube / restricted Google Drive fallback with setup guides |
+| **Student View Simulator** | Preview curriculum from unpaid (locked) and paid (unlocked) perspectives before publishing |
+| **Escrow Wallet** | Track pending deposits, milestone status, withdraw settled earnings |
+| **Portfolio** | Live demo URLs, GitHub repos, tech stack tags |
+
+### For Learners
+
+| Feature | Description |
+| :--- | :--- |
+| **Live Balance Check** | Arbitrum Sepolia USDC + ETH balance in checkout card |
+| **Insufficient Balance Guard** | Pre-flight warnings + direct faucet links |
+| **Milestone Tracker** | Escrow Deposited → In Session → Confirmed & Released |
+| **Dispute Resolution** | 48-hour window, evidence hashed to IPFS |
+| **Soulbound Credentials** | Non-transferable completion certificates linked to Arbiscan |
+
+### Economic Model
+
+| Line Item | Amount |
+| :--- | :--- |
+| Mentor Listing (example) | $50.00 USDC |
+| Platform Fee (10%) | $5.00 USDC |
+| Gas Fee | $0 (subsidized) |
+| **Learner Pays** | **$55.00 USDC** |
+| **Mentor Receives** | **$50.00 USDC** |
+
+Fee parameter: `PLATFORM_FEE_BPS = 1000` (10%, adjustable by governance).
 
 ---
 
@@ -67,157 +150,125 @@ All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM target) and 
 
 | Layer | Technology |
 | :--- | :--- |
-| **Frontend Framework** | [Next.js 15](https://nextjs.org/) App Router + [React 19](https://react.dev/) |
-| **Styling & UI** | [Tailwind CSS v4](https://tailwindcss.com/) + [Radix UI](https://www.radix-ui.com/) + [Lucide React](https://lucide.dev/) |
-| **Backend & API** | Node.js Edge-ready [Hono](https://hono.dev/) Router (`app/api/[[...route]]`) |
-| **Database & ORM** | [Prisma ORM](https://www.prisma.io/) + SQLite (local development) / PostgreSQL |
-| **Smart Contracts** | [Solidity 0.8.20](https://soliditylang.org/) + [Hardhat](https://hardhat.org/) + [OpenZeppelin 5.x](https://openzeppelin.com/) |
-| **Blockchain L2** | [Arbitrum Sepolia](https://sepolia.arbiscan.io/) (Testnet) / [Arbitrum One](https://arbiscan.io/) (Mainnet) |
-| **Web3 Providers** | [Ethers.js v6](https://docs.ethers.org/) + [Viem](https://viem.sh/) (MetaMask, Rabby, Coinbase Wallet) |
-| **Fiat On-Ramp** | [Transak Gateway](https://transak.com/) (Visa, Mastercard, Apple Pay) |
-| **Media & Storage** | [Cloudflare Stream](https://www.cloudflare.com/products/cloudflare-stream/) (HLS Signed Tokens) + [Cloudflare R2](https://www.cloudflare.com/products/r2/) (Presigned AWS SigV4) + [Pinata IPFS](https://pinata.cloud/) |
-| **P2P Direct Messaging** | WebRTC DataChannels (RTCDataChannel) + Ephemeral In-Memory Signaling |
-| **Code Verification** | Automated SWC Syntax Validator (scripts/lint-check.js) |
+| **Frontend** | Next.js 15 App Router, React 19, Tailwind CSS v4, Radix UI |
+| **Backend** | Hono Edge Router, Prisma ORM, PostgreSQL / SQLite |
+| **Smart Contracts** | Solidity 0.8.24, Hardhat, OpenZeppelin 5.x |
+| **Web3** | Ethers.js v6, Viem, MetaMask / Rabby / Coinbase Wallet |
+| **Indexing** | Ponder (real-time event indexing) |
+| **Storage** | Cloudflare Stream, Cloudflare R2, Pinata IPFS |
+| **Fiat On-Ramp** | Transak (Visa, Mastercard, Apple Pay) |
+| **Messaging** | WebRTC DataChannels (P2P, ephemeral signaling) |
 
 ---
 
-## Key Features
+## Security
 
-### 1. Mentor Hub & Workspace
-- **Overview Dashboard**: Monthly earnings, active escrow pool, on-chain reputation score, and hourly rate analytics.
-- **Native Gated Curriculum Uploads**: Direct video upload pipeline to Cloudflare Stream and multi-document resources to private Cloudflare R2 storage.
-- **Cost-Free Hosting Tier**: Support for YouTube (Unlisted) videos and Google Drive (Restricted) documents with step-by-step upload guides for mentors with no storage budget.
-- **Student View Simulator**: Pre-publish verification modal to preview curriculum gating from both unpaid and paid student states.
-- **Escrow Wallet**: Track pending escrow deposits, milestone status, and withdraw settled earnings.
-- **Portfolio Showcase**: Interactive portfolio editor with live demo URLs, GitHub repositories, and tech stack tags.
+| Item | Status |
+| :--- | :--- |
+| **Test Coverage** | Hardhat test suite — run `npx hardhat test` for latest results |
+| **Static Analysis** | Automated SWC syntax validator (`npm run lint:check`) |
+| **Audit Status** | **Pre-audit.** Seeking professional security review post-hackathon. |
+| **Known Limitations** | See below |
 
-### 2. Student Workspace
-- **Live MetaMask Balance**: View connected Arbitrum Sepolia USDC and ETH balances directly in the checkout card.
-- **Insufficient Balance Protection**: Clear warning states and direct faucet links (Circle USDC & Sepolia ETH) when balance is below required deposit.
-- **Milestone Progress Tracker**: Step-by-step visibility (*Escrow Deposited -> In Session -> Confirmed & Released*).
-- **Dispute Resolution Engine**: Transparent 48-hour dispute resolution with evidence hashing to IPFS.
-- **Soulbound Credentials**: Automatic minting of tamper-proof completion certificates linked to Arbiscan.
+### Known Limitations (MVP Trade-offs)
 
-### 3. Economic Model & Fee Mechanics
-- **Mentor Listing**: e.g., **$50.00 USDC** base price.
-- **Platform Protocol Cut (10%)**: **$5.00 USDC** calculated upfront on-chain.
-- **Arbitrum Gas Fee**: **FREE** (100% subsidized by the Platform Gas Sponsor).
-- **Grand Total Paid by Learner**: **$55.00 USDC**.
-- **Net Payout to Mentor**: **$50.00 USDC** (100% of base price).
-
-### 4. Interactive Gig Classroom & Deliverables Engine
-- **Mentor Gig Command Center (`/dashboard/gigs/[gigId]`)**: Dedicated class management view per gig enabling mentors to inspect individual student progress, coordinate 1-on-1 meeting requests, and issue curriculum assignments.
-- **Student Classroom Hub (`/dashboard/classes/[enrollmentId]`)**: Real-time interactive classroom with curriculum roadmaps, modular lesson tracks, meeting session requester, and progress synchronization.
-- **Deliverables & Submission Review**: Multi-format submissions supporting file uploads (PDF, docs, source files) and external URLs (Google Forms, Google Docs, GitHub repositories), alongside mentor scoring (0-100), feedback notes, and status management (Approved, Rejected, Submitted).
-- **Direct Escrow Release & Dual-Party SBT Credentials**: Direct release triggers upon course completion, verifying deliveries and generating soulbound completion certificates for both learner and mentor.
-
-### 5. WebRTC P2P Direct Chat (Zero Database Overhead)
-- **Direct P2P DataChannel**: Direct browser-to-browser messaging between mentor and learner using WebRTC DataChannels.
-- **Zero Database Load**: In-memory ephemeral signaling (`/api/webrtc/signal`, `/api/webrtc/signals`) without storing chat messages in the database.
-- **Local Persistence & Status Monitoring**: Chat conversations saved locally in client `localStorage` with real-time peer connection badge indicators (`Connected P2P`, `Signaling`, `Offline`).
-- **Global Unread Alerts**: Live unread badge count and incoming notification toasts in the top navigation bar.
-
-### 6. High-Performance Instant Rendering
-- **0ms Instant Cache**: Stale-while-revalidate caching leveraging `sessionStorage` for instantaneous page transitions.
-- **Layout Skeleton Shell**: Replaced blocking modal overlays with responsive animated skeleton layouts for progressive rendering.
-- **Batched Database Sync**: Bulk task synchronization with Prisma `createMany` and concurrent DB lookups using `Promise.all`.
-- **Automated Syntax Check**: Automated linting tool (`npm run lint:check`) verifying all JavaScript/JSX files across the project.
+| Limitation | Rationale | Planned Fix |
+| :--- | :--- | :--- |
+| WebRTC signaling is ephemeral (in-memory) | Privacy-first: no chat messages stored server-side | Server-side encrypted persistence in v2 |
+| SkillGraph levels assigned by mentor | MVP simplicity — no oracle integration yet | Decentralized verification via credential attestation |
+| Gas subsidy from platform treasury | Bootstrap UX — users pay 0 gas | Transition to meta-transaction standard (EIP-2771) |
+| Dispute council jurors are whitelisted | MVP governance — prevents sybil attacks in testnet | Transition to token-weighted sortition |
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18.18.0 or higher recommended)
-- [MetaMask](https://metamask.io/) browser extension configured for Arbitrum Sepolia (`Chain ID: 421614`)
-- Testnet USDC from [Circle Faucet](https://faucet.circle.com/) and Sepolia ETH from [Google Web3 Faucet](https://cloud.google.com/application/web3/faucet/arbitrum/sepolia)
 
-### Installation & Local Setup
+- Node.js v18.18.0+
+- MetaMask configured for Arbitrum Sepolia (`Chain ID: 421614`)
+- Testnet USDC from [Circle Faucet](https://faucet.circle.com/)
+- Sepolia ETH from [Google Web3 Faucet](https://cloud.google.com/application/web3/faucet/arbitrum/sepolia)
 
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/zhao-leihan/Trust-Lesson.git
-   cd Trust-Lesson
-   ```
+### Local Setup
 
-2. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
+```bash
+# 1. Clone
+git clone https://github.com/zhao-leihan/Trust-Lesson.git
+cd Trust-Lesson
 
-3. **Initialize Database**:
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
+# 2. Install
+npm install
 
-4. **Start Development Server**:
-   ```bash
-   npm run dev
-   ```
-   Open your browser and navigate to `http://localhost:3000`.
+# 3. Database
+npx prisma generate
+npx prisma db push
 
-5. **Smart Contract Compilation & Testing**:
-   ```bash
-   npx hardhat compile
-   npx hardhat test
-   ```
+# 4. Run
+npm run dev
+# → http://localhost:3000
+
+# 5. Smart contracts
+npx hardhat compile
+npx hardhat test
+```
 
 ---
 
 ## Project Structure
 
-```text
+```
 Trust-Lesson/
 ├── app/                          # Next.js 15 App Router
-│   ├── api/[[...route]]/route.js # Unified Hono API router & WebRTC signaling
-│   ├── about/page.jsx            # Platform narrative & leadership profiles
-│   ├── book/[type]/[id]/page.jsx # Real Web3 checkout & live MetaMask balance
-│   ├── certificate/[id]/page.jsx # Soulbound SBT certificate verification
+│   ├── api/[[...route]]/route.js # Hono API router + WebRTC signaling
+│   ├── book/[type]/[id]/page.jsx # Web3 checkout & live balance
+│   ├── certificate/[id]/page.jsx # SBT certificate verification
 │   ├── dashboard/                # Role-based workspace
-│   │   ├── classes/[id]/page.jsx # Interactive student classroom & deliverables
-│   │   ├── gigs/[id]/page.jsx    # Mentor gig classroom management & grading
-│   │   ├── chat/page.jsx         # WebRTC direct P2P messaging interface
-│   │   └── page.jsx              # Main dashboard overview
-│   ├── explore/page.jsx          # Marketplace catalog with instant search
-│   └── page.jsx                  # Homepage with live ecosystem statistics
-├── contracts/                    # Solidity 0.8.20 Smart Contracts
-│   ├── EscrowRouter.sol          # Milestone escrow vault & 10% fee division
-│   ├── ReputationRegistry.sol    # Soulbound Token (SBT) reputation ledger
-│   ├── MentorStaking.sol         # Mentor stake pool & slashing engine
-│   └── VideoAccess.sol           # On-chain course content gating
-├── docs/                         # Engineering Specifications
-│   ├── code architecture.md      # Full-stack architectural blueprint
-│   ├── classroom-webrtc-architecture.md # Classroom, assignments & WebRTC specification
-│   ├── report.md                 # Technical audit & verification manual
-│   └── systematics.md            # Protocol lifecycle & state machine
-├── lib/                          # Core Protocol Utilities
-│   ├── access.js                 # Classroom authorization & access controller
-│   ├── networkConfig.js          # Master Multi-Chain Switcher (Testnet / Mainnet)
-│   ├── gasSponsor.js             # Gas Paymaster Relayer engine
+│   │   ├── classes/[id]/page.jsx # Student classroom & deliverables
+│   │   ├── gigs/[id]/page.jsx    # Mentor gig management & grading
+│   │   ├── chat/page.jsx         # WebRTC P2P messaging
+│   │   └── page.jsx              # Dashboard overview
+│   ├── explore/page.jsx          # Marketplace catalog
+│   └── page.jsx                  # Homepage
+├── contracts/                    # Solidity 0.8.24
+│   ├── EscrowRouter.sol          # Milestone escrow + fee division
+│   ├── ReputationRegistry.sol    # SBT reputation ledger
+│   ├── MentorStaking.sol         # Stake pool + slashing
+│   └── VideoAccess.sol           # Content access gating
+├── docs/                         # Engineering specs
+│   ├── code architecture.md      # Full-stack blueprint
+│   ├── classroom-webrtc-architecture.md
+│   ├── report.md                 # Technical audit manual
+│   └── systematics.md            # Protocol state machine
+├── lib/                          # Core utilities
+│   ├── access.js                 # Authorization controller
+│   ├── networkConfig.js          # Multi-chain switcher
+│   ├── gasSponsor.js             # Paymaster relayer
 │   ├── prisma.js                 # Database client
-│   └── jwt.js                    # SIWE token signing & verification
-├── src/                          # Shared Components & Custom Hooks
-│   ├── hooks/useWebRTCChat.js    # Browser-to-browser WebRTC DataChannel hook
-│   └── components/               # Navbar, Footer & reusable UI widgets
-├── prisma/                       # Prisma ORM schemas & SQLite database
-├── public/                       # Static brand assets & characters
-├── scripts/                      # Deployment & test automation scripts
-│   ├── lint-check.js             # Automated SWC syntax & lint check validator
-│   ├── deploy.cjs                # Full suite contract deployer
-│   └── deployEscrow10Percent.cjs # Dedicated EscrowRouter deployer
-└── hardhat.config.cjs            # Hardhat L2 compiler & network configuration
+│   └── jwt.js                    # SIWE token signing
+├── src/
+│   ├── hooks/useWebRTCChat.js    # WebRTC DataChannel hook
+│   └── components/               # Shared UI components
+├── prisma/                       # Schema + migrations
+├── public/                       # Static assets
+├── scripts/                      # Deploy + lint automation
+└── hardhat.config.cjs            # Hardhat configuration
 ```
 
 ---
 
-## Leadership & Creator
+## Team
 
-- **Rayhan Young** — *Founder, Lead Protocol Architect & Full-Stack Developer* (`@0xAnakMommy`)
+| Role | Name | Handle |
+| :--- | :--- | :--- |
+| Protocol Architect, Solidity, Full-Stack | **Rayhan Young** | [`@0xAnakMommy`](https://github.com/zhao-leihan) |
+
+*Solo-built: smart contract design, full-stack development, and deployment.*
 
 ---
 
 ## License & Security
 
-- **License**: Released under the [MIT License](./LICENSE).
-- **Security Policy**: For vulnerability disclosures and escrow safety guidelines, see [SECURITY.md](./SECURITY.md).
+- **License**: [MIT](./LICENSE)
+- **Security Policy**: [SECURITY.md](./SECURITY.md)
+- **Vulnerability Disclosure**: See SECURITY.md for responsible disclosure guidelines
