@@ -67,6 +67,11 @@ export default function Footer() {
                   About Trust Lesson
                 </Link>
               </li>
+              <li>
+                <Link href="/faucet" className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors">
+                  Testnet USDC Faucet
+                </Link>
+              </li>
             </ul>
           </div>
 
