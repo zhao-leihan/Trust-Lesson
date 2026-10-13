@@ -120,6 +120,7 @@ export default function BookingPage() {
   const [walletEthBalance, setWalletEthBalance] = useState(null);
   const [connectedAccount, setConnectedAccount] = useState(null);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+  const depositLockRef = useRef(false);
 
   const checkUsdcBalance = async (addr) => {
     let targetAddr = addr || walletAddress;
@@ -317,8 +318,6 @@ export default function BookingPage() {
       isWeb3: false,
     },
   ];
-
-  const depositLockRef = useRef(false);
 
   // Real Web3 Escrow Deposit via MetaMask & Arbitrum Sepolia
   const handleDepositEscrow = async () => {
