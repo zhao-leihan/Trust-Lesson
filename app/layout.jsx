@@ -23,6 +23,12 @@ export const metadata = {
     template: "%s | Trust Lesson",
   },
   description: "Decentralized peer-to-peer mentorship and milestone gig marketplace with smart contract escrow on Arbitrum One.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Trust Lesson",
+  },
   icons: {
     icon: "/logo.webp",
     shortcut: "/logo.webp",
@@ -40,11 +46,29 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" data-scroll-behavior="smooth" className={`${outfit.variable} ${poppins.variable}`}>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Trust Lesson" />
+      </head>
       <body className="min-h-screen flex flex-col font-sans bg-slate-50 text-slate-900 antialiased selection:bg-purple-600 selection:text-white">
         <AuthProvider>
           <Navbar />
           <main className="flex-1">{children}</main>
         </AuthProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function() {});
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

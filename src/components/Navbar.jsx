@@ -68,6 +68,7 @@ export default function Navbar() {
   if (isAdmin && currentRole === "admin") {
     navLinks = [
       { to: "/dashboard", label: "Dashboard", tab: "view" },
+      { to: "/dashboard?tab=transactions", label: "Financial & Audit", tab: "transactions" },
       { to: "/dashboard?tab=users", label: "Users", tab: "users" },
       { to: "/dashboard?tab=feedbacks", label: "Feedback & Reviews", tab: "feedbacks" },
       { to: "/dashboard?tab=wallet", label: "Wallet", tab: "wallet" },

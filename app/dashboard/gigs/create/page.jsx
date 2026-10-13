@@ -105,13 +105,11 @@ function MilestoneGigIcon({ className = "w-5 h-5" }) {
 // Official Platform Logos (Google Meet, Zoom)
 function GoogleMeetIcon({ className = "w-7 h-7" }) {
   return (
-    <svg className={className} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M29.5 24V14.5C29.5 12.57 27.93 11 26 11H8.5C6.57 11 5 12.57 5 14.5V33.5C5 35.43 6.57 37 8.5 37H26C27.93 37 29.5 35.43 29.5 33.5V24Z" fill="#00832D"/>
-      <path d="M29.5 19.5L39.84 12.61C40.94 11.88 42.5 12.67 42.5 14V34C42.5 35.33 40.94 36.12 39.84 35.39L29.5 28.5V19.5Z" fill="#00AA47"/>
-      <path d="M8.5 11H26C27.93 11 29.5 12.57 29.5 14.5V17.5H5V14.5C5 12.57 6.57 11 8.5 11Z" fill="#EA4335"/>
-      <path d="M29.5 30.5V33.5C29.5 35.43 27.93 37 26 37H8.5C6.57 37 5 35.43 5 33.5V30.5H29.5Z" fill="#2684FC"/>
-      <path d="M5 17.5H29.5V30.5H5V17.5Z" fill="#FFBA00"/>
-    </svg>
+    <img
+      src="https://cloud.gmelius.com/public/logos/google/Google_Meet_Logo.svg"
+      alt="Google Meet"
+      className={`${className} object-contain inline-block`}
+    />
   );
 }
 

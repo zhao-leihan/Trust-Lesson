@@ -57,6 +57,8 @@ import {
   Fuel,
   Droplets,
   RefreshCw,
+  Receipt,
+  BarChart3,
 } from "lucide-react";
 import { CurrencyBadge, formatPriceCurrency, ArbitrumIcon } from "../../src/components/CurrencyBadge";
 import { LinkedinIcon, TwitterIcon } from "../../src/components/SocialIcons";
@@ -65,6 +67,7 @@ import WalletConnectCard from "../../src/components/WalletConnectCard";
 import { useWalletBalances } from "../../src/hooks/useWalletBalances";
 import StudentSatisfactionView from "../../src/components/StudentSatisfactionView";
 import CertificateCard from "../../src/components/certificate/CertificateCard";
+import TransactionHistorySection from "../../src/components/TransactionHistorySection";
 import Footer from "../../src/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../src/components/ui/Tabs";
 import {
@@ -182,7 +185,7 @@ function AdminDashboardView({ user }) {
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
         const tabParam = params.get("tab");
-        if (tabParam && ["view", "users", "feedbacks", "wallet", "profile"].includes(tabParam)) {
+        if (tabParam && ["view", "transactions", "users", "feedbacks", "wallet", "profile"].includes(tabParam)) {
           setActiveTab(tabParam);
         } else if (!tabParam) {
           setActiveTab("view");
@@ -191,7 +194,7 @@ function AdminDashboardView({ user }) {
     };
     handleUrlTab();
     const handleCustomTab = (e) => {
-      if (e.detail && ["view", "users", "feedbacks", "wallet", "profile"].includes(e.detail)) {
+      if (e.detail && ["view", "transactions", "users", "feedbacks", "wallet", "profile"].includes(e.detail)) {
         setActiveTab(e.detail);
       }
     };
@@ -451,7 +454,7 @@ function AdminDashboardView({ user }) {
         {/* ══════════════════════════════════════════════════════════ */}
         {/* VIEW 1: VIEW (SEMUA DATA UANG / PLATFORM FINANCIAL DATA) */}
         {/* ══════════════════════════════════════════════════════════ */}
-        {activeTab === "view" && (
+        {(activeTab === "view" || activeTab === "transactions") && (
           <div className="space-y-6 animate-fadeInUp">
             {/* Top Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-purple-100/80">
@@ -462,13 +465,13 @@ function AdminDashboardView({ user }) {
                   </span>
                 </div>
                 <h2 className="text-slate-950 font-black text-2xl sm:text-3xl tracking-tight">
-                  Platform Financial{" "}
+                  Platform Financial &{" "}
                   <span className="text-purple-600 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 bg-clip-text text-transparent">
-                    View
+                    Audit Hub
                   </span>
                 </h2>
                 <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                  Live platform financial metrics and revenue calculations based directly on database records.
+                  Live platform financial metrics, GMV analytics, mentor disbursements, and non-custodial smart escrow audits on Arbitrum.
                 </p>
               </div>
 
@@ -501,52 +504,8 @@ function AdminDashboardView({ user }) {
               </div>
             )}
 
-            {/* Money Data Cards with Course Styling */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-              <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 sm:p-6 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/5 transition-all shadow-xs">
-                <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 shadow-xs">
-                  <Coins size={22} />
-                </div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Protocol Revenue (10%)</p>
-                <p className="text-slate-950 font-black text-2xl sm:text-3xl mt-1 tracking-tight">
-                  ${Number(stats.platformTreasury || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
-                </p>
-                <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">10% fee cut collected by platform</p>
-              </div>
-
-              <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 sm:p-6 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/5 transition-all shadow-xs">
-                <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 shadow-xs">
-                  <Lock size={22} />
-                </div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Active In Escrow Pool</p>
-                <p className="text-slate-950 font-black text-2xl sm:text-3xl mt-1 tracking-tight">
-                  ${Number(stats.activeEscrow || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
-                </p>
-                <p className="text-slate-500 text-[11px] mt-1.5">Locked in Arbitrum smart contracts</p>
-              </div>
-
-              <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 sm:p-6 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/5 transition-all shadow-xs">
-                <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 shadow-xs">
-                  <TrendingUp size={22} />
-                </div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Paid to Mentors (90%)</p>
-                <p className="text-slate-950 font-black text-2xl sm:text-3xl mt-1 tracking-tight">
-                  ${Number(stats.paidToMentors || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
-                </p>
-                <p className="text-emerald-700 text-[11px] mt-1.5 font-semibold">90% net payout on completed sessions</p>
-              </div>
-
-              <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 sm:p-6 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/5 transition-all shadow-xs">
-                <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 shadow-xs">
-                  <Sparkles size={22} />
-                </div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Total Escrow Volume</p>
-                <p className="text-slate-950 font-black text-2xl sm:text-3xl mt-1 tracking-tight">
-                  ${Number(stats.totalVolume || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
-                </p>
-                <p className="text-slate-500 text-[11px] mt-1.5">Lifetime throughput on Arbitrum One</p>
-              </div>
-            </div>
+            {/* Comprehensive GMV Recap, Interactive Trajectory Chart & Granular Settlement Audit */}
+            <TransactionHistorySection role="admin" />
 
             {/* Protocol Money Mechanism Card */}
             <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-6 sm:p-7 shadow-xs space-y-4">
@@ -2183,7 +2142,7 @@ function MentorDashboardView({ user }) {
                 </span>
               )}
             </h1>
-            <p className="text-slate-500 text-xs sm:text-sm mt-0.5 flex items-center gap-1.5 flex-wrap">
+            <div className="text-slate-500 text-xs sm:text-sm mt-0.5 flex items-center gap-1.5 flex-wrap">
               <span>{user.domain || "Smart Contract & Web3 Architecture"}</span>
               <span>•</span>
               {stats.isVerified || stats.stakeAmount >= 100 ? (
@@ -2202,7 +2161,7 @@ function MentorDashboardView({ user }) {
                   <span>Unverified (${stats.stakeAmount || 0}/100 USDC Staked)</span>
                 </span>
               )}
-            </p>
+            </div>
           </div>
         </div>
 
@@ -2268,6 +2227,10 @@ function MentorDashboardView({ user }) {
           <TabsTrigger value="courses" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
             <BookOpen size={14} />
             <span>Courses & Gigs ({mentorGigs.length})</span>
+          </TabsTrigger>
+          <TabsTrigger value="transactions" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
+            <Receipt size={14} />
+            <span>Transaction History</span>
           </TabsTrigger>
           <TabsTrigger value="wallet" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
             <Wallet size={14} />
@@ -2592,6 +2555,18 @@ function MentorDashboardView({ user }) {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════ */}
+        {/* TAB: TRANSACTION HISTORY & SETTLEMENT AUDIT           */}
+        {/* ══════════════════════════════════════════════════════ */}
+        <TabsContent value="transactions" className="space-y-6 pt-2">
+          <TransactionHistorySection
+            role="mentor"
+            userId={user?.id}
+            walletAddress={user?.walletAddress}
+            email={user?.email}
+          />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════ */}
@@ -4883,6 +4858,10 @@ function StudentDashboardView({ user }) {
             <Layers size={14} />
             <span>Overview</span>
           </TabsTrigger>
+          <TabsTrigger value="transactions" className="flex items-center gap-2 flex-1 sm:flex-none">
+            <Receipt size={14} />
+            <span>Transaction History</span>
+          </TabsTrigger>
           <TabsTrigger value="wallet" className="flex items-center gap-2 flex-1 sm:flex-none">
             <Wallet size={14} />
             <span>Escrow Wallet</span>
@@ -4958,7 +4937,15 @@ function StudentDashboardView({ user }) {
           </div>
         </TabsContent>
 
-
+        {/* STUDENT TAB 2: TRANSACTION HISTORY */}
+        <TabsContent value="transactions" className="space-y-6">
+          <TransactionHistorySection
+            role="learner"
+            userId={user?.id}
+            walletAddress={user?.walletAddress}
+            email={user?.email}
+          />
+        </TabsContent>
 
         {/* STUDENT TAB 3: ESCROW WALLET */}
         <TabsContent value="wallet" className="space-y-6">

@@ -1,0 +1,30 @@
+{
+  "name": "Trust Lesson | Peer-to-Peer Mentorship & Escrow",
+  "short_name": "TrustLesson",
+  "description": "Decentralized peer-to-peer mentorship and milestone gig marketplace with smart contract escrow on Arbitrum One.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-full.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/TL.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

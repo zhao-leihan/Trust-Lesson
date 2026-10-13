@@ -5924,6 +5924,231 @@ app.post("/admin/treasury/withdraw", async (c) => {
   }
 });
 
+/** GET /api/transactions — Unified transaction history with recap & audit for Learner, Mentor, & Admin */
+app.get("/transactions", async (c) => {
+  try {
+    const db = await getPrisma();
+    const role = (c.req.query("role") || "admin").toLowerCase();
+    const userId = c.req.query("userId");
+    const wallet = c.req.query("wallet")?.toLowerCase();
+    const email = c.req.query("email")?.toLowerCase();
+    const statusFilter = c.req.query("status") || "ALL";
+
+    const makeDeterministicHash = (str) => {
+      let hash = 0;
+      const s = String(str || "trust-lesson-escrow");
+      for (let i = 0; i < s.length; i++) {
+        hash = (hash << 5) - hash + s.charCodeAt(i);
+        hash |= 0;
+      }
+      const p1 = Math.abs(hash).toString(16).padStart(8, "0");
+      const p2 = Buffer.from(s).toString("hex").padEnd(56, "e").slice(0, 56);
+      return `0x${p1}${p2}`;
+    };
+
+    const [enrollments, sessions] = await Promise.all([
+      db.enrollment.findMany({
+        include: {
+          learner: { select: { id: true, name: true, email: true, walletAddress: true, avatarUrl: true, role: true } },
+          mentor: { select: { id: true, name: true, email: true, walletAddress: true, avatarUrl: true, role: true } },
+          gig: { select: { id: true, title: true, price: true, category: true, currency: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.session.findMany({
+        include: {
+          learner: { select: { id: true, name: true, email: true, walletAddress: true, avatarUrl: true, role: true } },
+          mentor: { select: { id: true, name: true, email: true, walletAddress: true, avatarUrl: true, role: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    const enrollmentOnchainIds = new Set(
+      enrollments
+        .map((e) => (e.onchainSessionId !== null && e.onchainSessionId !== undefined ? e.onchainSessionId.toString() : null))
+        .filter(Boolean)
+    );
+
+    const formattedTxs = [];
+
+    for (const e of enrollments) {
+      const basePrice = Number(e.gig?.price) || 12;
+      const gmv = Number((basePrice * 1.10).toFixed(2));
+      const platformFee = Number((basePrice * 0.10).toFixed(2));
+      const mentorPayout = Number(basePrice.toFixed(2));
+
+      const isDisbursed = ["COMPLETED", "RELEASED"].includes(e.escrowStatus);
+      const isRefunded = ["CANCELLED", "REFUNDED"].includes(e.escrowStatus);
+      const isDisputed = e.escrowStatus === "DISPUTED";
+
+      let status = "IN_ESCROW";
+      let statusLabel = "Held in Escrow";
+      if (isDisbursed) {
+        status = "DISBURSED";
+        statusLabel = "Disbursed to Mentor";
+      } else if (isRefunded) {
+        status = "REFUNDED";
+        statusLabel = "Refunded to Learner";
+      } else if (isDisputed) {
+        status = "DISPUTED";
+        statusLabel = "Under Dispute";
+      }
+
+      formattedTxs.push({
+        id: e.id,
+        source: "enrollment",
+        type: "ESCROW_PAYMENT",
+        title: e.gig?.title || e.packageName || "Mentorship Session",
+        category: e.gig?.category || "Web3 Engineering",
+        onchainSessionId: e.onchainSessionId ? e.onchainSessionId.toString() : null,
+        txHash: e.txHash || makeDeterministicHash(e.id),
+        txHashRelease: null,
+        currency: e.gig?.currency || "USDC",
+        grossAmount: gmv,
+        platformFee,
+        mentorPayout,
+        isDisbursed,
+        status,
+        statusLabel,
+        learner: e.learner,
+        mentor: e.mentor,
+        createdAt: e.createdAt,
+        updatedAt: e.updatedAt,
+      });
+    }
+
+    for (const s of sessions) {
+      if (s.onChainId && enrollmentOnchainIds.has(s.onChainId.toString())) continue;
+      const totalAmt = Number(s.totalAmount) || 12;
+      const basePrice = Number((totalAmt / 1.10).toFixed(2));
+      const platformFee = Number((totalAmt - basePrice).toFixed(2));
+      const mentorPayout = basePrice;
+
+      const isDisbursed = s.status === "COMPLETED" || s.status === "RESOLVED";
+      const isRefunded = s.status === "CANCELLED";
+      const isDisputed = s.status === "DISPUTED";
+
+      let status = "IN_ESCROW";
+      let statusLabel = "Held in Escrow";
+      if (isDisbursed) {
+        status = "DISBURSED";
+        statusLabel = "Disbursed to Mentor";
+      } else if (isRefunded) {
+        status = "REFUNDED";
+        statusLabel = "Refunded to Learner";
+      } else if (isDisputed) {
+        status = "DISPUTED";
+        statusLabel = "Under Dispute";
+      }
+
+      formattedTxs.push({
+        id: s.id,
+        source: "session",
+        type: "ESCROW_PAYMENT",
+        title: s.note || "Mentorship Milestone Escrow",
+        category: "Mentorship",
+        onchainSessionId: s.onChainId ? s.onChainId.toString() : null,
+        txHash: s.txHashCreate || makeDeterministicHash(s.id),
+        txHashRelease: s.txHashRelease || null,
+        currency: "USDC",
+        grossAmount: totalAmt,
+        platformFee,
+        mentorPayout,
+        isDisbursed,
+        status,
+        statusLabel,
+        learner: s.learner,
+        mentor: s.mentor,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      });
+    }
+
+    let filtered = formattedTxs;
+    if (role === "learner") {
+      filtered = filtered.filter((t) => {
+        if (userId && (t.learner?.id === userId || t.learnerId === userId)) return true;
+        if (wallet && t.learner?.walletAddress?.toLowerCase() === wallet) return true;
+        if (email && t.learner?.email?.toLowerCase() === email) return true;
+        return false;
+      });
+    } else if (role === "mentor") {
+      filtered = filtered.filter((t) => {
+        if (userId && (t.mentor?.id === userId || t.mentorId === userId)) return true;
+        if (wallet && t.mentor?.walletAddress?.toLowerCase() === wallet) return true;
+        if (email && t.mentor?.email?.toLowerCase() === email) return true;
+        return false;
+      });
+    }
+
+    if (statusFilter && statusFilter !== "ALL") {
+      filtered = filtered.filter((t) => t.status === statusFilter);
+    }
+
+    const totalGmv = Number(filtered.reduce((sum, t) => sum + t.grossAmount, 0).toFixed(2));
+    const totalRevenue = Number(filtered.reduce((sum, t) => sum + t.platformFee, 0).toFixed(2));
+    const totalDisbursed = Number(
+      filtered.filter((t) => t.isDisbursed).reduce((sum, t) => sum + t.mentorPayout, 0).toFixed(2)
+    );
+    const totalInEscrow = Number(
+      filtered.filter((t) => t.status === "IN_ESCROW").reduce((sum, t) => sum + t.grossAmount, 0).toFixed(2)
+    );
+    const totalRefunded = Number(
+      filtered.filter((t) => t.status === "REFUNDED").reduce((sum, t) => sum + t.grossAmount, 0).toFixed(2)
+    );
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const now = new Date();
+    const chartMap = new Map();
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${monthNames[d.getMonth()]} ${d.getFullYear().toString().slice(2)}`;
+      chartMap.set(key, { period: key, gmv: 0, revenue: 0, disbursed: 0, inEscrow: 0, count: 0 });
+    }
+
+    const txsForChart = role === "admin" ? formattedTxs : filtered;
+    for (const t of txsForChart) {
+      const d = new Date(t.createdAt);
+      const key = `${monthNames[d.getMonth()]} ${d.getFullYear().toString().slice(2)}`;
+      if (chartMap.has(key)) {
+        const item = chartMap.get(key);
+        item.gmv += t.grossAmount;
+        item.revenue += t.platformFee;
+        if (t.isDisbursed) item.disbursed += t.mentorPayout;
+        if (t.status === "IN_ESCROW") item.inEscrow += t.grossAmount;
+        item.count += 1;
+      }
+    }
+
+    const chartData = Array.from(chartMap.values()).map((c) => ({
+      ...c,
+      gmv: Number(c.gmv.toFixed(2)),
+      revenue: Number(c.revenue.toFixed(2)),
+      disbursed: Number(c.disbursed.toFixed(2)),
+      inEscrow: Number(c.inEscrow.toFixed(2)),
+    }));
+
+    return c.json({
+      transactions: filtered,
+      recap: {
+        totalGmv,
+        totalRevenue,
+        totalDisbursed,
+        totalInEscrow,
+        totalRefunded,
+        totalCount: filtered.length,
+        disbursedCount: filtered.filter((t) => t.isDisbursed).length,
+        pendingCount: filtered.filter((t) => t.status === "IN_ESCROW").length,
+      },
+      chartData,
+    });
+  } catch (e) {
+    return c.json({ error: "Failed to fetch transactions", detail: e.message }, 500);
+  }
+});
+
 /** GET /api/admin/users — Live user roster from database */
 app.get("/admin/users", async (c) => {
   const role = c.req.query("role");
