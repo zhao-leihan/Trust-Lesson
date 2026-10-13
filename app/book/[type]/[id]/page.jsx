@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ethers } from "ethers";
@@ -318,12 +318,18 @@ export default function BookingPage() {
     },
   ];
 
+  const depositLockRef = useRef(false);
+
   // Real Web3 Escrow Deposit via MetaMask & Arbitrum Sepolia
   const handleDepositEscrow = async () => {
+    if (depositLockRef.current || isProcessing) {
+      return;
+    }
     if (existingEnrollment) {
       alert("You already have an active enrollment for this course. Double payment is prevented.");
       return;
     }
+    depositLockRef.current = true;
     setIsProcessing(true);
     setWeb3Error(null);
     setInsufficientBalanceInfo(null);
@@ -409,6 +415,53 @@ export default function BookingPage() {
       // EscrowRouter PLATFORM_FEE_BPS is 1000 (10%)
       const feeUnits = (subtotalUnits * 1000n) / 10000n;
       const totalUnits = subtotalUnits + feeUnits;
+
+      let targetMentorAddress = item.mentorAddress;
+      if (!targetMentorAddress || !ethers.isAddress(targetMentorAddress) || targetMentorAddress === ethers.ZeroAddress) {
+        targetMentorAddress = "0x0db11e31a07dddec044472c7853fbbc3137f51db";
+      }
+
+      // Verify Mentor is Not Booking Their Own Gig
+      if (
+        isSelfMentor ||
+        (studentAddress && targetMentorAddress && studentAddress.toLowerCase() === targetMentorAddress.toLowerCase())
+      ) {
+        throw new Error(
+          "Self-booking restriction: You cannot book your own mentorship gig. Mentors are only permitted to book sessions with other mentors as a learner."
+        );
+      }
+
+      // Helper to recover an already-mined SessionCreated tx if a previous MetaMask queue item succeeded
+      const findRecentSessionReceipt = async (lookbackBlocks = 4000) => {
+        try {
+          const rpcProvider = new ethers.JsonRpcProvider(activeNet.rpcUrl);
+          const readRouter = new ethers.Contract(routerAddress, ESCROW_ROUTER_ABI, rpcProvider);
+          const latestBlock = await rpcProvider.getBlockNumber();
+          const fromBlock = Math.max(0, latestBlock - lookbackBlocks);
+          const logs = await readRouter.queryFilter(readRouter.filters.SessionCreated(), fromBlock, latestBlock);
+          const matching = [...logs]
+            .reverse()
+            .find(
+              (l) =>
+                l.args &&
+                String(l.args.learner).toLowerCase() === studentAddress.toLowerCase() &&
+                String(l.args.mentor).toLowerCase() === targetMentorAddress.toLowerCase() &&
+                BigInt(l.args.totalAmount) === totalUnits
+            );
+          if (matching) {
+            const rec = await rpcProvider.getTransactionReceipt(matching.transactionHash);
+            if (rec && rec.status === 1) {
+              return {
+                receipt: rec,
+                sessionId: matching.args.sessionId.toString(),
+              };
+            }
+          }
+        } catch (recErr) {
+          console.warn("[Session Recovery Check Warning]:", recErr);
+        }
+        return null;
+      };
 
       setWeb3Step("checking_balance");
       setWeb3StatusMessage("Checking your USDC balance on Arbitrum Sepolia...");
@@ -499,7 +552,7 @@ export default function BookingPage() {
       }
 
       // 6. Check Allowance and Approve USDC
-      const allowance = await usdcContract.allowance(studentAddress, routerAddress);
+      let allowance = await usdcContract.allowance(studentAddress, routerAddress);
       if (allowance < totalUnits) {
         setWeb3Step("approving");
         setWeb3StatusMessage(
@@ -516,45 +569,72 @@ export default function BookingPage() {
         setWeb3Step("confirming_approval");
         setWeb3StatusMessage("USDC Approval broadcasted. Waiting for confirmation on Arbitrum...");
         await approveTx.wait(1);
-      }
 
-      let targetMentorAddress = item.mentorAddress;
-      if (!targetMentorAddress || !ethers.isAddress(targetMentorAddress) || targetMentorAddress === ethers.ZeroAddress) {
-        targetMentorAddress = "0x0db11e31a07dddec044472c7853fbbc3137f51db";
-      }
-
-      // 7.1 Verify Mentor is Not Booking Their Own Gig
-      if (
-        isSelfMentor ||
-        (studentAddress && targetMentorAddress && studentAddress.toLowerCase() === targetMentorAddress.toLowerCase())
-      ) {
-        throw new Error(
-          "Self-booking restriction: You cannot book your own mentorship gig. Mentors are only permitted to book sessions with other mentors as a learner."
-        );
+        // Wait for RPC node to reflect updated allowance before calling createSession
+        for (let i = 0; i < 8; i++) {
+          allowance = await usdcContract.allowance(studentAddress, routerAddress);
+          if (allowance >= totalUnits) break;
+          await new Promise((r) => setTimeout(r, 600));
+        }
       }
 
       setWeb3Step("depositing");
       setWeb3StatusMessage(`Step 2/2: Confirming Escrow Vault Deposit in MetaMask...`);
 
-      const createOverrides = await getArbitrumGasOverrides();
-      try {
-        const estGas = await routerContract.createSession.estimateGas(targetMentorAddress, [subtotalUnits]);
-        createOverrides.gasLimit = (estGas * 130n) / 100n;
-      } catch (estErr) {
-        console.warn("[Gas Estimate Fallback]:", estErr.message);
-        createOverrides.gasLimit = 220000n;
+      let receipt = null;
+      let parsedSessionId = null;
+
+      // Verify allowance is still intact before sending createSession (in case a prior queued MetaMask tx just consumed it)
+      const preCreateAllowance = await usdcContract.allowance(studentAddress, routerAddress);
+      if (preCreateAllowance < totalUnits) {
+        const recovered = await findRecentSessionReceipt(150);
+        if (recovered) {
+          receipt = recovered.receipt;
+          parsedSessionId = recovered.sessionId;
+        } else {
+          throw new Error("USDC allowance was not confirmed yet on Arbitrum. Please click Deposit again.");
+        }
       }
 
-      const createTx = await routerContract.createSession(targetMentorAddress, [subtotalUnits], createOverrides);
+      if (!receipt) {
+        const createOverrides = await getArbitrumGasOverrides();
+        try {
+          const estGas = await routerContract.createSession.estimateGas(targetMentorAddress, [subtotalUnits]);
+          createOverrides.gasLimit = (estGas * 130n) / 100n;
+        } catch (estErr) {
+          // Check if an earlier queued transaction in MetaMask already succeeded and consumed the allowance
+          const recovered = await findRecentSessionReceipt(150);
+          if (recovered) {
+            receipt = recovered.receipt;
+            parsedSessionId = recovered.sessionId;
+          } else {
+            await new Promise((r) => setTimeout(r, 1000));
+            const retryGas = await routerContract.createSession.estimateGas(targetMentorAddress, [subtotalUnits]);
+            createOverrides.gasLimit = (retryGas * 130n) / 100n;
+          }
+        }
 
-      setWeb3Step("mining");
-      setWeb3StatusMessage("Escrow transaction broadcasted! Waiting for block confirmation on Arbitrum...");
-
-      const receipt = await createTx.wait(1);
+        if (!receipt) {
+          try {
+            const createTx = await routerContract.createSession(targetMentorAddress, [subtotalUnits], createOverrides);
+            setWeb3Step("mining");
+            setWeb3StatusMessage("Escrow transaction broadcasted! Waiting for block confirmation on Arbitrum...");
+            receipt = await createTx.wait(1);
+          } catch (txErr) {
+            // If a duplicate transaction in MetaMask reverted because the first one succeeded seconds ago, recover the first one
+            const recovered = await findRecentSessionReceipt(150);
+            if (recovered) {
+              receipt = recovered.receipt;
+              parsedSessionId = recovered.sessionId;
+            } else {
+              throw txErr;
+            }
+          }
+        }
+      }
 
       // 8. Parse Event to extract real on-chain sessionId
-      let parsedSessionId = null;
-      if (receipt.logs) {
+      if (!parsedSessionId && receipt?.logs) {
         for (const log of receipt.logs) {
           try {
             const parsed = routerContract.interface.parseLog(log);
@@ -661,6 +741,7 @@ export default function BookingPage() {
       }
       setWeb3Error(errorMsg);
     } finally {
+      depositLockRef.current = false;
       setIsProcessing(false);
       setWeb3Step(null);
       setWeb3StatusMessage("");
