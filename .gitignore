@@ -13,6 +13,8 @@ dist-ssr
 # Environment, Secrets & Local Reports
 .env
 .env*
+.secret*
+.config*
 .vercel
 .vercel/
 !.env.local.example

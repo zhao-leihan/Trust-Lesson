@@ -6,7 +6,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth";
 import { getCloudflareUploadUrl, getSignedPlaybackUrl, getSignedPlaybackToken } from "@/lib/cloudflare";
 import { uploadResourceToR2, getPresignedR2DownloadUrl, verifyAndGetDevResource } from "@/lib/cloudflareR2";
 import { uploadToIpfs, uploadJsonToIpfs } from "@/lib/ipfs";
-import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, PLATFORM_SPONSOR_WALLET } from "@/lib/gasSponsor";
+import { getSponsorVaultStatus, issueOnChainCredentialWithSubsidy, ensureWalletGasSubsidy, PLATFORM_SPONSOR_WALLET } from "@/lib/gasSponsor";
 
 // Leaderboard Scoring & Juror Sortition Helpers (Inlined for zero-dependency Vercel production builds)
 function calculateMentorScore({ stakeAmount = 0, completedSessions = 0, rating = null }) {
@@ -2437,7 +2437,7 @@ app.post("/faucet/claim", async (c) => {
     return c.json({ error: "Invalid Ethereum/Arbitrum wallet address." }, 400);
   }
 
-  const claimAmount = Math.min(Math.max(Number(amount) || 250, 50), 500);
+  const claimAmount = Math.min(Math.max(Number(amount) || 250, 50), 1000);
   const normalizedAddr = recipientAddress.toLowerCase();
 
   // Rate limiting: 60 seconds per address
@@ -2474,7 +2474,6 @@ app.post("/faucet/claim", async (c) => {
     if (balance >= parsedAmount) {
       tx = await contract.transfer(recipientAddress, parsedAmount);
     } else {
-      // Fallback: mint directly if MockUSDC allows public or owner mint
       tx = await contract.mint(recipientAddress, parsedAmount);
     }
 
@@ -5024,6 +5023,21 @@ app.get("/blockchain/sponsor-status", async (c) => {
     return c.json(status);
   } catch (e) {
     return c.json({ error: "Failed to fetch sponsor status", detail: e.message }, 500);
+  }
+});
+
+/** POST /api/blockchain/sponsor-gas — JIT transaction gas subsidy from Platform Sponsor Wallet */
+app.post("/blockchain/sponsor-gas", async (c) => {
+  try {
+    const body = await c.req.json();
+    const address = body?.address || body?.walletAddress || body?.recipientAddress;
+    if (!address) {
+      return c.json({ error: "Wallet address is required" }, 400);
+    }
+    const result = await ensureWalletGasSubsidy(address, body?.requiredWei || null);
+    return c.json(result, result.success ? 200 : 400);
+  } catch (e) {
+    return c.json({ error: "Failed to sponsor gas", detail: e.message }, 500);
   }
 });
 

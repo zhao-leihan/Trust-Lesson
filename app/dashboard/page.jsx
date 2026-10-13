@@ -1453,6 +1453,33 @@ function MentorDashboardView({ user }) {
         );
       }
 
+      // 2.5 Just-In-Time (JIT) Gas Subsidy from Sponsor Wallet at transaction time
+      const requiredStakeGasWei = ethers.parseEther("0.000045");
+      const mentorEthWei = await provider.getBalance(userAddress);
+      if (mentorEthWei < requiredStakeGasWei) {
+        setStakingStepMsg("Applying Gas Fee Subsidy from Platform Sponsor Wallet for this transaction...");
+        try {
+          const sponsorRes = await fetch("/api/blockchain/sponsor-gas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              address: userAddress,
+              requiredWei: requiredStakeGasWei.toString(),
+            }),
+          });
+          const sponsorData = await sponsorRes.json();
+          if (sponsorData?.sponsored || sponsorData?.success) {
+            for (let attempt = 0; attempt < 8; attempt++) {
+              const updatedEth = await provider.getBalance(userAddress);
+              if (updatedEth >= requiredStakeGasWei) break;
+              await new Promise((r) => setTimeout(r, 700));
+            }
+          }
+        } catch (sponsorErr) {
+          console.warn("[Staking Gas Subsidy Warning]:", sponsorErr);
+        }
+      }
+
       // 3. Check allowance and approve if required
       const currentAllowance = await usdc.allowance(userAddress, stakingAddress);
       if (currentAllowance < parsedAmount) {

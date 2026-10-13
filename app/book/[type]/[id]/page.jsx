@@ -434,14 +434,13 @@ export default function BookingPage() {
           const overrides = {};
 
           if (feeData.maxFeePerGas) {
-            // Buffer by 80% to absorb rapid Arbitrum block baseFee fluctuations
-            overrides.maxFeePerGas = (feeData.maxFeePerGas * 180n) / 100n;
+            overrides.maxFeePerGas = (feeData.maxFeePerGas * 135n) / 100n;
           } else if (feeData.gasPrice) {
-            overrides.gasPrice = (feeData.gasPrice * 180n) / 100n;
+            overrides.gasPrice = (feeData.gasPrice * 135n) / 100n;
           }
 
           if (feeData.maxPriorityFeePerGas) {
-            overrides.maxPriorityFeePerGas = (feeData.maxPriorityFeePerGas * 150n) / 100n;
+            overrides.maxPriorityFeePerGas = (feeData.maxPriorityFeePerGas * 120n) / 100n;
           }
 
           // Ensure minimum safe floor for Arbitrum Sepolia (0.1 gwei = 100,000,000 wei)
@@ -457,11 +456,47 @@ export default function BookingPage() {
         } catch (feeErr) {
           console.warn("[Gas Fee Estimation Fallback]:", feeErr);
           return {
-            maxFeePerGas: 150000000n, // 0.15 gwei safe floor
-            maxPriorityFeePerGas: 20000000n,
+            maxFeePerGas: 120000000n, // 0.12 gwei safe floor
+            maxPriorityFeePerGas: 10000000n,
           };
         }
       };
+
+      // 5.5 Just-In-Time (JIT) Gas Subsidy from Sponsor Wallet at the moment of payment
+      const gasOverrides = await getArbitrumGasOverrides();
+      const feePerGas = gasOverrides.maxFeePerGas || gasOverrides.gasPrice || 120000000n;
+      const estimatedTxGasWei = 290000n * feePerGas;
+      const minPaymentGasWei = ethers.parseEther("0.000045");
+      const requiredGasWei = estimatedTxGasWei > minPaymentGasWei ? estimatedTxGasWei : minPaymentGasWei;
+
+      const currentEthWei = await provider.getBalance(studentAddress);
+      if (currentEthWei < requiredGasWei) {
+        setWeb3Step("sponsoring_gas");
+        setWeb3StatusMessage("Applying Gas Fee Subsidy from Platform Sponsor Wallet for this payment...");
+        try {
+          const sponsorRes = await fetch("/api/blockchain/sponsor-gas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              address: studentAddress,
+              requiredWei: requiredGasWei.toString(),
+            }),
+          });
+          const sponsorData = await sponsorRes.json();
+          if (sponsorData?.sponsored || sponsorData?.success) {
+            for (let attempt = 0; attempt < 8; attempt++) {
+              const updatedEth = await provider.getBalance(studentAddress);
+              if (updatedEth >= requiredGasWei) {
+                setWalletEthBalance(Number(ethers.formatEther(updatedEth)));
+                break;
+              }
+              await new Promise((r) => setTimeout(r, 700));
+            }
+          }
+        } catch (sponsorErr) {
+          console.warn("[Gas Subsidy Pre-flight Warning]:", sponsorErr);
+        }
+      }
 
       // 6. Check Allowance and Approve USDC
       const allowance = await usdcContract.allowance(studentAddress, routerAddress);
@@ -473,9 +508,9 @@ export default function BookingPage() {
         const approveOverrides = await getArbitrumGasOverrides();
         try {
           const estApprove = await usdcContract.approve.estimateGas(routerAddress, totalUnits);
-          approveOverrides.gasLimit = (estApprove * 130n) / 100n;
+          approveOverrides.gasLimit = (estApprove * 125n) / 100n;
         } catch {
-          approveOverrides.gasLimit = 100000n;
+          approveOverrides.gasLimit = 68000n;
         }
         const approveTx = await usdcContract.approve(routerAddress, totalUnits, approveOverrides);
         setWeb3Step("confirming_approval");
@@ -504,10 +539,10 @@ export default function BookingPage() {
       const createOverrides = await getArbitrumGasOverrides();
       try {
         const estGas = await routerContract.createSession.estimateGas(targetMentorAddress, [subtotalUnits]);
-        createOverrides.gasLimit = (estGas * 140n) / 100n;
+        createOverrides.gasLimit = (estGas * 130n) / 100n;
       } catch (estErr) {
         console.warn("[Gas Estimate Fallback]:", estErr.message);
-        createOverrides.gasLimit = 450000n;
+        createOverrides.gasLimit = 220000n;
       }
 
       const createTx = await routerContract.createSession(targetMentorAddress, [subtotalUnits], createOverrides);
