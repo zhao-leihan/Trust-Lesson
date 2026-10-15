@@ -458,9 +458,494 @@ function AdminDashboardView({ user }) {
   return (
     <main className="w-full relative z-10 space-y-6">
         {/* ══════════════════════════════════════════════════════════ */}
-        {/* VIEW 1: VIEW (SEMUA DATA UANG / PLATFORM FINANCIAL DATA) */}
+        {/* VIEW 1: OVERVIEW / COMMAND CENTER (DASHBOARD)            */}
         {/* ══════════════════════════════════════════════════════════ */}
-        {(activeTab === "view" || activeTab === "transactions") && (
+        {activeTab === "view" && (
+          <div className="space-y-6 animate-fadeInUp">
+            {/* Top Header - Platform Operations Command Center */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-purple-100/80">
+              <div>
+                <div className="inline-flex items-center gap-2 mb-2">
+                  <span className="px-3.5 py-1 rounded-full bg-purple-100/80 text-purple-700 font-extrabold text-[10px] tracking-widest uppercase border border-purple-200/50 shadow-xs">
+                    Admin Operations
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Arbitrum Escrow Active
+                  </span>
+                </div>
+                <h2 className="text-slate-950 font-black text-2xl sm:text-3xl tracking-tight">
+                  Protocol Command &{" "}
+                  <span className="text-purple-600 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 bg-clip-text text-transparent">
+                    System Telemetry
+                  </span>
+                </h2>
+                <p className="text-slate-500 text-xs sm:text-sm mt-1">
+                  High-level platform health, community user telemetry, smart contract state, and quick governance shortcuts.
+                </p>
+              </div>
+
+              {/* Quick Navigation Buttons */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => handleTabChange("transactions")}
+                  className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                >
+                  <Receipt size={14} />
+                  <span>Financial & Audit Hub</span>
+                </button>
+                <button
+                  onClick={() => handleTabChange("users")}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-purple-600/20 active:scale-95"
+                >
+                  <Users size={14} />
+                  <span>Manage Users</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Executive Platform KPI Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Card 1: Registered Users */}
+              <div
+                onClick={() => handleTabChange("users")}
+                className="bg-white rounded-3xl p-5 border-2 border-purple-100/90 shadow-xs hover:border-purple-300 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Accounts</span>
+                  <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Users size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-slate-950 font-mono">
+                  {stats.usersCount || usersList.length || 0}
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">
+                  <span className="text-slate-500">Mentors & Students</span>
+                  <span className="text-purple-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                    Manage <ArrowRight size={12} />
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 2: Verified Mentors */}
+              <div
+                onClick={() => {
+                  setUserRoleFilter("MENTOR");
+                  handleTabChange("users");
+                }}
+                className="bg-white rounded-3xl p-5 border-2 border-indigo-100/90 shadow-xs hover:border-indigo-300 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Verified Mentors</span>
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <GraduationCap size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-slate-950 font-mono">
+                  {stats.mentorsCount || 0}
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">
+                  <span className="text-slate-500">Staked & Approved</span>
+                  <span className="text-indigo-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                    Filter <ArrowRight size={12} />
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 3: Active Students */}
+              <div
+                onClick={() => {
+                  setUserRoleFilter("LEARNER");
+                  handleTabChange("users");
+                }}
+                className="bg-white rounded-3xl p-5 border-2 border-emerald-100/90 shadow-xs hover:border-emerald-300 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Students</span>
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <BookOpen size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-slate-950 font-mono">
+                  {stats.learnersCount || 0}
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">
+                  <span className="text-slate-500">Enrolled & Learning</span>
+                  <span className="text-emerald-700 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                    Inspect <ArrowRight size={12} />
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 4: Published Offerings */}
+              <div className="bg-white rounded-3xl p-5 border-2 border-purple-100/90 shadow-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Published Modules</span>
+                  <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
+                    <Layers size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-slate-950 font-mono">
+                  {stats.offeringsCount || 0}
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">
+                  <span className="text-slate-500">Live Mentorships & Gigs</span>
+                  <span className="text-emerald-600 font-bold">100% On-Chain Escrow</span>
+                </div>
+              </div>
+
+              {/* Card 5: Smart Escrow Vault */}
+              <div
+                onClick={() => handleTabChange("transactions")}
+                className="bg-white rounded-3xl p-5 border-2 border-purple-100/90 shadow-xs hover:border-purple-300 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Smart Escrow Vault</span>
+                  <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Lock size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-slate-950 font-mono">
+                  ${Number(stats.activeEscrow || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">
+                  <span className="text-slate-500">USDC Locked</span>
+                  <span className="text-purple-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                    Audit <ArrowRight size={12} />
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 6: Arbitration & Disputes */}
+              <div className="bg-white rounded-3xl p-5 border-2 border-slate-200/90 shadow-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Disputes & Juror</span>
+                  <div className="w-9 h-9 rounded-xl bg-slate-50 text-slate-700 flex items-center justify-center">
+                    <Scale size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-slate-950 font-mono flex items-center gap-2">
+                  <span>{stats.disputesCount || 0}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                    0 Pending
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">
+                  <span className="text-slate-500">Decentralized Council</span>
+                  <span className="text-slate-600 font-bold">100% Solved</span>
+                </div>
+              </div>
+            </div>
+
+            {/* System Status & On-Chain Security Banner */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Box 1: Smart Contract & Gas Subsidy Relayer */}
+              <div className="bg-white rounded-3xl p-6 border-2 border-purple-100/90 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center border border-purple-200/60">
+                      <ShieldCheck size={20} />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-sm">Arbitrum Escrow Architecture</h4>
+                      <span className="text-[11px] text-slate-500">Smart Escrow Router v2 • Sepolia & One</span>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold">
+                    HEALTHY
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block font-medium">Escrow Router Contract</span>
+                      <span className="font-mono text-slate-900 font-bold text-[11px]">
+                        0xF3Ca9731772781e19852E9cE3b1ec7A68Eb3edcA
+                      </span>
+                    </div>
+                    <a
+                      href="https://sepolia.arbiscan.io/address/0xF3Ca9731772781e19852E9cE3b1ec7A68Eb3edcA"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded-lg bg-white border border-purple-200 text-purple-700 hover:text-purple-900 font-bold text-[10px] flex items-center gap-1 shadow-2xs cursor-pointer"
+                    >
+                      <span>Arbiscan</span>
+                      <ExternalLink size={10} />
+                    </a>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] text-emerald-800 block font-bold">100% Gas Subsidy Relayer</span>
+                      <span className="text-[11px] text-emerald-700">Platform sponsor wallet covers network fees for student transactions</span>
+                    </div>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Zero Gas Active
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block font-medium">Settlement Currency</span>
+                      <span className="font-bold text-slate-900 text-xs">USDC (Arbitrum Native 6 Decimals)</span>
+                    </div>
+                    <span className="font-mono text-[10px] text-slate-500">0x65Bf...6A44</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 2: Treasury & Student Satisfaction Snapshot */}
+              <div className="bg-white rounded-3xl p-6 border-2 border-purple-100/90 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center border border-purple-200/60">
+                      <BarChart3 size={20} />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-sm">Protocol Treasury & Trust Metric</h4>
+                      <span className="text-[11px] text-slate-500">10% Platform fee accumulation & student sentiment</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleTabChange("transactions")}
+                    className="text-purple-600 hover:text-purple-800 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Full Ledger</span>
+                    <ArrowRight size={12} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-100">
+                    <span className="text-[11px] text-slate-500 block font-medium">Treasury Balance</span>
+                    <span className="text-xl sm:text-2xl font-black text-purple-900 font-mono block mt-1">
+                      ${Number(stats.platformTreasury || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-purple-700 font-semibold block mt-1">
+                      10% Cut of Volume
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200">
+                    <span className="text-[11px] text-slate-500 block font-medium">Avg Satisfaction</span>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Star size={18} className="fill-amber-400 text-amber-500" />
+                      <span className="text-xl sm:text-2xl font-black text-amber-950 font-mono">
+                        {feedbackStats.avgRating ? Number(feedbackStats.avgRating).toFixed(1) : "5.0"}
+                      </span>
+                      <span className="text-xs text-slate-400">/ 5.0</span>
+                    </div>
+                    <span className="text-[10px] text-amber-800 font-semibold block mt-1">
+                      {feedbackStats.totalCount || 0} Verified Reviews
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-[11px] text-slate-500 block font-medium">Treasury Recipient Vault</span>
+                    <span className="font-mono text-slate-800 font-bold text-[11px]">
+                      {stats.treasuryWallet ? `${stats.treasuryWallet.slice(0, 10)}...${stats.treasuryWallet.slice(-6)}` : "0x656c...7E02"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleWithdrawTreasury}
+                    disabled={withdrawing}
+                    className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] transition-all cursor-pointer shadow-xs active:scale-95"
+                  >
+                    {withdrawing ? "Processing..." : "Withdraw"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Registered Users Section */}
+            <div className="bg-white rounded-3xl p-6 border-2 border-purple-100/90 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                    <Users size={18} className="text-purple-600" />
+                    <span>Recent Registered Accounts</span>
+                  </h3>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    Latest learners, mentors, and administrators authenticated on the platform
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleTabChange("users")}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <span>View All Users ({usersList.length})</span>
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+
+              {loadingUsers ? (
+                <div className="p-8 text-center text-slate-500 text-xs flex items-center justify-center gap-2">
+                  <RefreshCw size={14} className="animate-spin text-purple-600" />
+                  <span>Loading user telemetry...</span>
+                </div>
+              ) : usersList.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs">
+                  No registered users found yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-slate-400 text-[11px] uppercase tracking-wider font-bold">
+                        <th className="pb-3 pl-1">User</th>
+                        <th className="pb-3">Role</th>
+                        <th className="pb-3">Wallet Address</th>
+                        <th className="pb-3">Verification</th>
+                        <th className="pb-3 text-right pr-1">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {usersList.slice(0, 5).map((u) => {
+                        const role = u.role?.toUpperCase() || "LEARNER";
+                        return (
+                          <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="py-3 pl-1">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-purple-100 border border-purple-200 text-purple-800 font-bold flex items-center justify-center text-xs shrink-0 overflow-hidden">
+                                  {u.avatarUrl ? (
+                                    <img src={u.avatarUrl} alt={u.name || "User"} className="w-full h-full object-cover" />
+                                  ) : (
+                                    (u.name || u.email || "U")[0]?.toUpperCase()
+                                  )}
+                                </div>
+                                <div>
+                                  <span className="font-bold text-slate-900 block">{u.name || "Unnamed"}</span>
+                                  <span className="text-[11px] text-slate-500 font-mono block">{u.email || "-"}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide border ${
+                                role === "ADMIN"
+                                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                                  : role === "MENTOR"
+                                  ? "bg-purple-50 text-purple-700 border-purple-200"
+                                  : "bg-blue-50 text-blue-700 border-blue-200"
+                              }`}>
+                                {role}
+                              </span>
+                            </td>
+                            <td className="py-3 font-mono text-[11px] text-slate-600">
+                              {u.walletAddress ? (
+                                <span title={u.walletAddress}>
+                                  {u.walletAddress.slice(0, 6)}...{u.walletAddress.slice(-4)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 italic">Not connected</span>
+                              )}
+                            </td>
+                            <td className="py-3">
+                              {u.isVerified ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold text-[10px]">
+                                  <CheckCircle2 size={11} className="text-emerald-600" />
+                                  <span>Verified</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px]">
+                                  <span>Unverified</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 text-right pr-1">
+                              <button
+                                onClick={() => handleToggleVerify(u.id)}
+                                disabled={isVerifying[u.id]}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                  u.isVerified
+                                    ? "bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200"
+                                    : "bg-purple-600 hover:bg-purple-700 text-white shadow-xs"
+                                }`}
+                              >
+                                {isVerifying[u.id] ? "Updating..." : u.isVerified ? "Revoke" : "Verify"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Community Reviews Snapshot */}
+            <div className="bg-white rounded-3xl p-6 border-2 border-purple-100/90 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                    <MessageSquareQuote size={18} className="text-purple-600" />
+                    <span>Recent Community Testimonials</span>
+                  </h3>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    Live feedback submitted by verified learners and mentors
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleTabChange("feedbacks")}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <span>Manage All Reviews ({feedbacksList.length})</span>
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+
+              {loadingFeedbacks ? (
+                <div className="p-8 text-center text-slate-500 text-xs flex items-center justify-center gap-2">
+                  <RefreshCw size={14} className="animate-spin text-purple-600" />
+                  <span>Loading testimonials...</span>
+                </div>
+              ) : feedbacksList.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs">
+                  No feedback entries recorded yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  {feedbacksList.slice(0, 3).map((f) => (
+                    <div key={f.id} className="p-4 rounded-2xl bg-purple-50/40 border border-purple-100 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                size={13}
+                                className={star <= f.rating ? "fill-amber-400 text-amber-500" : "text-slate-300"}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-purple-200 text-purple-700">
+                            {f.role || "LEARNER"}
+                          </span>
+                        </div>
+                        <p className="text-slate-700 text-xs leading-relaxed italic line-clamp-3">
+                          "{f.comment}"
+                        </p>
+                      </div>
+                      <div className="pt-3 border-t border-purple-100/70 mt-3 flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-slate-900">{f.name || "Anonymous"}</span>
+                        <span className="text-[10px] text-slate-400">{new Date(f.createdAt || Date.now()).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* VIEW 1B: FINANCIAL & AUDIT HUB (DEDICATED LEDGER)         */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {activeTab === "transactions" && (
           <div className="space-y-6 animate-fadeInUp">
             {/* Top Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-purple-100/80">
