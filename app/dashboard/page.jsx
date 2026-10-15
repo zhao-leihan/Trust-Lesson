@@ -62,7 +62,13 @@ import {
 } from "lucide-react";
 import { CurrencyBadge, formatPriceCurrency, ArbitrumIcon } from "../../src/components/CurrencyBadge";
 import { LinkedinIcon, TwitterIcon } from "../../src/components/SocialIcons";
-import { MetaMaskIcon, CoinbaseWalletIcon } from "../../src/components/WalletIcons";
+import {
+  MetaMaskIcon,
+  CoinbaseWalletIcon,
+  RabbyIcon,
+  RainbowIcon,
+  WalletConnectIcon,
+} from "../../src/components/WalletIcons";
 import WalletConnectCard from "../../src/components/WalletConnectCard";
 import { useWalletBalances } from "../../src/hooks/useWalletBalances";
 import StudentSatisfactionView from "../../src/components/StudentSatisfactionView";
@@ -2743,7 +2749,7 @@ function MentorDashboardView({ user }) {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                   {/* ── BRANCH 1: METAMASK ── */}
                   <div
                     onClick={() => setSelectedWalletProvider("metamask")}
@@ -2778,7 +2784,7 @@ function MentorDashboardView({ user }) {
                       </div>
 
                       <p className="text-slate-600 text-[11px] leading-relaxed mb-3">
-                        Popular browser extension & mobile app. Ideal for Arbitrum gas management and hardware wallets (Ledger/Trezor).
+                        Popular browser extension & mobile app. Ideal for Arbitrum gas management and hardware wallets.
                       </p>
 
                       <div className="space-y-1.5 text-[11px] text-slate-500 border-t border-slate-200/60 pt-2.5">
@@ -2789,10 +2795,6 @@ function MentorDashboardView({ user }) {
                         <div className="flex items-center gap-1.5">
                           <Check size={12} className="text-purple-600 shrink-0" />
                           <span>Arbitrum One Native Routing</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Check size={12} className="text-purple-600 shrink-0" />
-                          <span>Hardware Wallet Compatible</span>
                         </div>
                       </div>
                     </div>
@@ -2863,11 +2865,7 @@ function MentorDashboardView({ user }) {
                         </div>
                         <div className="flex items-center gap-1.5">
                           <Check size={12} className="text-blue-600 shrink-0" />
-                          <span>Direct USDT & USDC Settlement</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Check size={12} className="text-blue-600 shrink-0" />
-                          <span>Fast Mobile QR Scanning</span>
+                          <span>Direct Settlement</span>
                         </div>
                       </div>
                     </div>
@@ -2893,6 +2891,219 @@ function MentorDashboardView({ user }) {
                       </span>
                     </button>
                   </div>
+
+                  {/* ── BRANCH 3: RABBY WALLET ── */}
+                  <div
+                    onClick={() => setSelectedWalletProvider("rabby")}
+                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between group ${
+                      selectedWalletProvider === "rabby"
+                        ? "border-indigo-600 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-500/20"
+                        : "border-slate-200 hover:border-indigo-300 bg-white hover:bg-slate-50/50"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center p-1.5 shadow-2xs group-hover:scale-105 transition-transform">
+                            <RabbyIcon size={24} />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-sm">Rabby Wallet</h4>
+                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/90 px-2 py-0.5 rounded-full inline-block">
+                              DeFi Safe
+                            </span>
+                          </div>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          selectedWalletProvider === "rabby"
+                            ? "border-indigo-600 bg-indigo-600"
+                            : "border-slate-300"
+                        }`}>
+                          {selectedWalletProvider === "rabby" && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-slate-600 text-[11px] leading-relaxed mb-3">
+                        Pre-sign transaction simulation & automated risk alerts. Dedicated for Ethereum & Arbitrum DeFi users.
+                      </p>
+
+                      <div className="space-y-1.5 text-[11px] text-slate-500 border-t border-slate-200/60 pt-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-indigo-600 shrink-0" />
+                          <span>Pre-Execution Simulation</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-indigo-600 shrink-0" />
+                          <span>Anti-Phishing Shield</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAndConnectWallet("rabby");
+                      }}
+                      disabled={walletConnectStatus === "connecting"}
+                      className={`mt-4 w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        selectedWalletProvider === "rabby"
+                          ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-600/20 active:scale-[0.98]"
+                          : "bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700"
+                      }`}
+                    >
+                      <RabbyIcon size={15} />
+                      <span>
+                        {walletConnectStatus === "connecting" && selectedWalletProvider === "rabby"
+                          ? "Connecting..."
+                          : "Connect with Rabby"}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* ── BRANCH 4: RAINBOW WALLET ── */}
+                  <div
+                    onClick={() => setSelectedWalletProvider("rainbow")}
+                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between group ${
+                      selectedWalletProvider === "rainbow"
+                        ? "border-emerald-600 bg-emerald-50/50 shadow-sm ring-1 ring-emerald-500/20"
+                        : "border-slate-200 hover:border-emerald-300 bg-white hover:bg-slate-50/50"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center p-1.5 shadow-2xs group-hover:scale-105 transition-transform">
+                            <RainbowIcon size={24} />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-sm">Rainbow</h4>
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-full inline-block">
+                              Fast EVM
+                            </span>
+                          </div>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          selectedWalletProvider === "rainbow"
+                            ? "border-emerald-600 bg-emerald-600"
+                            : "border-slate-300"
+                        }`}>
+                          {selectedWalletProvider === "rainbow" && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-slate-600 text-[11px] leading-relaxed mb-3">
+                        Speedy, modern Ethereum ecosystem wallet. Instant connection and slick mobile-to-desktop bridging.
+                      </p>
+
+                      <div className="space-y-1.5 text-[11px] text-slate-500 border-t border-slate-200/60 pt-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-emerald-600 shrink-0" />
+                          <span>Smooth Browser Integration</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-emerald-600 shrink-0" />
+                          <span>Arbitrum Token Support</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAndConnectWallet("rainbow");
+                      }}
+                      disabled={walletConnectStatus === "connecting"}
+                      className={`mt-4 w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        selectedWalletProvider === "rainbow"
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 active:scale-[0.98]"
+                          : "bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-700"
+                      }`}
+                    >
+                      <RainbowIcon size={15} />
+                      <span>
+                        {walletConnectStatus === "connecting" && selectedWalletProvider === "rainbow"
+                          ? "Connecting..."
+                          : "Connect with Rainbow"}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* ── BRANCH 5: WALLETCONNECT ── */}
+                  <div
+                    onClick={() => setSelectedWalletProvider("walletconnect")}
+                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between group ${
+                      selectedWalletProvider === "walletconnect"
+                        ? "border-sky-600 bg-sky-50/50 shadow-sm ring-1 ring-sky-500/20"
+                        : "border-slate-200 hover:border-sky-300 bg-white hover:bg-slate-50/50"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center p-1.5 shadow-2xs group-hover:scale-105 transition-transform">
+                            <WalletConnectIcon size={24} />
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-sm">WalletConnect</h4>
+                            <span className="text-[10px] font-bold text-sky-700 bg-sky-100/90 px-2 py-0.5 rounded-full inline-block">
+                              Universal QR
+                            </span>
+                          </div>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          selectedWalletProvider === "walletconnect"
+                            ? "border-sky-600 bg-sky-600"
+                            : "border-slate-300"
+                        }`}>
+                          {selectedWalletProvider === "walletconnect" && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-slate-600 text-[11px] leading-relaxed mb-3">
+                        Connect 300+ mobile wallets seamlessly via QR code scan or deep-link bridge on any device.
+                      </p>
+
+                      <div className="space-y-1.5 text-[11px] text-slate-500 border-t border-slate-200/60 pt-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-sky-600 shrink-0" />
+                          <span>300+ Mobile EVM Wallets</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Check size={12} className="text-sky-600 shrink-0" />
+                          <span>No Extension Required</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAndConnectWallet("walletconnect");
+                      }}
+                      disabled={walletConnectStatus === "connecting"}
+                      className={`mt-4 w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        selectedWalletProvider === "walletconnect"
+                          ? "bg-sky-600 hover:bg-sky-700 text-white shadow-sm shadow-sky-600/20 active:scale-[0.98]"
+                          : "bg-slate-100 hover:bg-sky-100 text-slate-700 hover:text-sky-700"
+                      }`}
+                    >
+                      <WalletConnectIcon size={15} />
+                      <span>
+                        {walletConnectStatus === "connecting" && selectedWalletProvider === "walletconnect"
+                          ? "Connecting..."
+                          : "Connect with WalletConnect"}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2901,7 +3112,15 @@ function MentorDashboardView({ user }) {
                 <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-200 text-purple-900 text-xs font-semibold flex items-center gap-3 animate-fadeIn mb-3">
                   <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin shrink-0" />
                   <span>
-                    Requesting account authorization from {selectedWalletProvider === "coinbase" ? "Coinbase Wallet" : "MetaMask"}... Please review the prompt in your wallet extension or mobile app.
+                    Requesting account authorization from {
+                      {
+                        metamask: "MetaMask",
+                        coinbase: "Coinbase Wallet",
+                        rabby: "Rabby Wallet",
+                        rainbow: "Rainbow Wallet",
+                        walletconnect: "WalletConnect",
+                      }[selectedWalletProvider] || "wallet"
+                    }... Please review the prompt in your wallet extension or mobile app.
                   </span>
                 </div>
               )}

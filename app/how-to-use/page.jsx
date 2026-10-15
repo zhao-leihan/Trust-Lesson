@@ -13,6 +13,8 @@ import {
   MetaMaskIcon,
   RabbyIcon,
   CoinbaseWalletIcon,
+  RainbowIcon,
+  WalletConnectIcon,
 } from "@/src/components/WalletIcons";
 import {
   ShieldCheck,
@@ -398,12 +400,20 @@ export default function HowToUsePage() {
                             <span>MetaMask</span>
                           </span>
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-purple-200 shadow-2xs hover:border-purple-300 transition-colors">
+                            <CoinbaseWalletIcon size={16} />
+                            <span>Coinbase</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-purple-200 shadow-2xs hover:border-purple-300 transition-colors">
                             <RabbyIcon size={16} />
                             <span>Rabby</span>
                           </span>
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-purple-200 shadow-2xs hover:border-purple-300 transition-colors">
-                            <CoinbaseWalletIcon size={16} />
-                            <span>Coinbase</span>
+                            <RainbowIcon size={16} />
+                            <span>Rainbow</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-purple-200 shadow-2xs hover:border-purple-300 transition-colors">
+                            <WalletConnectIcon size={16} />
+                            <span>WalletConnect</span>
                           </span>
                         </div>
                       </div>

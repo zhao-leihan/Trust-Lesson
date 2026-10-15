@@ -295,7 +295,7 @@ export function AuthProvider({ children }) {
       // 2. window.ethereum.providers array
       if (window.ethereum?.providers?.length) {
         const mm = window.ethereum.providers.find(
-          (p) => p.isMetaMask && !p.isCoinbaseWallet && !p.isBraveWallet
+          (p) => p.isMetaMask && !p.isCoinbaseWallet && !p.isRabby && !p.isRainbow && !p.isBraveWallet
         );
         if (mm) return mm;
       }
@@ -305,8 +305,13 @@ export function AuthProvider({ children }) {
         return window.ethereum.providerMap.get("MetaMask");
       }
 
-      // 4. Standalone window.ethereum ONLY if it's genuinely MetaMask and NOT Coinbase
-      if (window.ethereum?.isMetaMask && !window.ethereum?.isCoinbaseWallet) {
+      // 4. Standalone window.ethereum ONLY if it's genuinely MetaMask and NOT others
+      if (
+        window.ethereum?.isMetaMask &&
+        !window.ethereum?.isCoinbaseWallet &&
+        !window.ethereum?.isRabby &&
+        !window.ethereum?.isRainbow
+      ) {
         return window.ethereum;
       }
 
@@ -339,12 +344,78 @@ export function AuthProvider({ children }) {
       return null;
     }
 
+    if (walletType === "rabby") {
+      // 1. EIP-6963 Announcement
+      const eipMatch = announced.find(
+        (p) =>
+          p.info?.rdns === "io.rabby" ||
+          p.info?.name?.toLowerCase().includes("rabby")
+      );
+      if (eipMatch?.provider) return eipMatch.provider;
+
+      // 2. window.rabby direct injection
+      if (window.rabby) return window.rabby;
+
+      // 3. window.ethereum.providers array
+      if (window.ethereum?.providers?.length) {
+        const rb = window.ethereum.providers.find((p) => p.isRabby);
+        if (rb) return rb;
+      }
+
+      // 4. Standalone window.ethereum if marked as Rabby
+      if (window.ethereum?.isRabby) return window.ethereum;
+
+      return null;
+    }
+
+    if (walletType === "rainbow") {
+      // 1. EIP-6963 Announcement
+      const eipMatch = announced.find(
+        (p) =>
+          p.info?.rdns === "me.rainbow" ||
+          p.info?.name?.toLowerCase().includes("rainbow")
+      );
+      if (eipMatch?.provider) return eipMatch.provider;
+
+      // 2. window.rainbow direct injection
+      if (window.rainbow) return window.rainbow;
+
+      // 3. window.ethereum.providers array
+      if (window.ethereum?.providers?.length) {
+        const rb = window.ethereum.providers.find((p) => p.isRainbow);
+        if (rb) return rb;
+      }
+
+      // 4. Standalone window.ethereum if marked as Rainbow
+      if (window.ethereum?.isRainbow) return window.ethereum;
+
+      return null;
+    }
+
+    if (walletType === "walletconnect") {
+      // 1. EIP-6963 Announcement
+      const eipMatch = announced.find(
+        (p) =>
+          p.info?.rdns?.toLowerCase().includes("walletconnect") ||
+          p.info?.name?.toLowerCase().includes("walletconnect")
+      );
+      if (eipMatch?.provider) return eipMatch.provider;
+
+      // 2. Dedicated provider or fallback to injected provider
+      if (window.walletConnectProvider) return window.walletConnectProvider;
+
+      // 3. In mobile / injected environments, fallback to window.ethereum if available
+      if (window.ethereum) return window.ethereum;
+
+      return null;
+    }
+
     // Default "any"
     if (window.ethereum?.providers?.length) return window.ethereum.providers[0];
-    return window.ethereum || window.coinbaseWalletExtension || null;
+    return window.ethereum || window.coinbaseWalletExtension || window.rabby || window.rainbow || null;
   };
 
-  // ─── Wallet Connection (MetaMask / Coinbase / SIWE) ────────────────────────
+  // ─── Wallet Connection (MetaMask / Coinbase / Rabby / Rainbow / WalletConnect / SIWE) ───
   const connectWallet = async (walletType = "any") => {
     let address = null;
     const targetProvider = getWalletProvider(walletType);
@@ -363,12 +434,19 @@ export function AuthProvider({ children }) {
         throw new Error(err.message || `Failed to connect with ${walletType}`);
       }
     } else if (walletType !== "any") {
-      const name = walletType === "coinbase" ? "Coinbase Wallet" : "MetaMask";
+      const names = {
+        metamask: "MetaMask",
+        coinbase: "Coinbase Wallet",
+        rabby: "Rabby Wallet",
+        rainbow: "Rainbow Wallet",
+        walletconnect: "WalletConnect",
+      };
+      const name = names[walletType] || walletType;
       throw new Error(
-        `${name} extension is not detected in your browser. Please install or unlock ${name}, or enter your address manually.`
+        `${name} is not detected in your browser. Please install or unlock ${name}, or enter your address manually.`
       );
     } else {
-      throw new Error("No Web3 wallet extension detected. Please install MetaMask or Coinbase Wallet, or enter your address manually.");
+      throw new Error("No Web3 wallet extension detected. Please install a supported Web3 wallet (MetaMask, Coinbase, Rabby, Rainbow, or WalletConnect).");
     }
 
     if (!address) {

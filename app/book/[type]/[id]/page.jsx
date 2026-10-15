@@ -304,7 +304,7 @@ export default function BookingPage() {
     {
       id: "crypto",
       label: `${currency} (Web3 Connected Wallet)`,
-      sub: `Deposit directly from MetaMask, Coinbase, or Rabby with 100% Subsidized Gas`,
+      sub: `Deposit directly from MetaMask, Coinbase, Rabby, Rainbow, or WalletConnect with 100% Subsidized Gas`,
       Icon: Wallet,
       isWeb3: true,
     },
@@ -334,7 +334,7 @@ export default function BookingPage() {
     try {
       if (typeof window === "undefined" || !window.ethereum) {
         throw new Error(
-          "No Web3 wallet extension detected in your browser. Please install MetaMask to interact with Arbitrum Smart Contracts."
+          "No Web3 wallet extension detected in your browser. Please install MetaMask, Coinbase, Rabby, Rainbow, or WalletConnect to interact with Arbitrum Smart Contracts."
         );
       }
 
@@ -342,10 +342,10 @@ export default function BookingPage() {
 
       // 1. Connect Account
       setWeb3Step("connecting");
-      setWeb3StatusMessage("Connecting to MetaMask wallet...");
+      setWeb3StatusMessage("Connecting to Web3 wallet...");
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
       if (!accounts || accounts.length === 0) {
-        throw new Error("No account authorized in MetaMask. Please connect your wallet to continue.");
+        throw new Error("No account authorized in wallet. Please connect your wallet to continue.");
       }
       const studentAddress = accounts[0];
 
@@ -1287,7 +1287,7 @@ export default function BookingPage() {
 
                     {(connectedAccount || walletAddress) && (
                       <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-purple-200/70">
-                        <span className="text-purple-800/80 font-medium">MetaMask Balance:</span>
+                        <span className="text-purple-800/80 font-medium">Wallet Balance:</span>
                         <span className="font-mono font-bold text-purple-950">
                           {walletUsdcBalance !== null ? `${walletUsdcBalance.toFixed(2)} USDC` : "0.00 USDC"}
                           {walletEthBalance !== null ? ` • ${walletEthBalance.toFixed(4)} ETH` : ""}
@@ -1296,7 +1296,7 @@ export default function BookingPage() {
                     )}
 
                     <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Compatible with MetaMask, Coinbase Wallet, Rabby, and OKX Wallet on Arbitrum Sepolia. Non-custodial smart escrow with platform gas subsidy.
+                      Compatible with MetaMask, Coinbase Wallet, Rabby, Rainbow, and WalletConnect on Arbitrum Sepolia. Non-custodial smart escrow with platform gas subsidy.
                     </p>
                   </div>
                 )}
@@ -1424,7 +1424,7 @@ export default function BookingPage() {
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <Wallet size={15} className="text-purple-600" />
-                      <span className="font-bold text-slate-900">Connected MetaMask</span>
+                      <span className="font-bold text-slate-900">Connected Web3 Wallet</span>
                     </div>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-bold">
                       Arbitrum Sepolia
@@ -1642,7 +1642,7 @@ export default function BookingPage() {
                     {isProcessing ? (
                       <span className="flex items-center gap-2">
                         <RefreshCw size={16} className="animate-spin text-purple-200" />
-                        <span>{web3StatusMessage || "Interacting with MetaMask..."}</span>
+                        <span>{web3StatusMessage || "Interacting with Web3 wallet..."}</span>
                       </span>
                     ) : paymentMethod === "transak" ? (
                       <>
@@ -1653,7 +1653,7 @@ export default function BookingPage() {
                     ) : (
                       <>
                         <Lock size={16} />
-                        <span>Deposit {formatPriceCurrency(grandTotal, currency)} via MetaMask</span>
+                        <span>Deposit {formatPriceCurrency(grandTotal, currency)} via Web3 Wallet</span>
                         <ArrowRight size={15} />
                       </>
                     )}
@@ -1772,7 +1772,7 @@ export default function BookingPage() {
                   className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
                 >
                   <Check size={13} />
-                  <span>Deposit Escrow via MetaMask</span>
+                  <span>Deposit Escrow via Web3 Wallet</span>
                 </button>
               </div>
             </div>

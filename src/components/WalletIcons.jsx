@@ -156,3 +156,67 @@ export function CoinbaseWalletIcon({ size = 20, className = "" }) {
     </svg>
   );
 }
+
+/**
+ * Official Rainbow Wallet SVG Icon
+ */
+export function RainbowIcon({ size = 20, className = "" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={`inline-block shrink-0 ${className}`}
+    >
+      <rect width="24" height="24" rx="6" fill="#0E1118" />
+      <path
+        d="M4.5 18C4.5 13.8579 7.85786 10.5 12 10.5C16.1421 10.5 19.5 13.8579 19.5 18"
+        stroke="#FF4000"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6.8 18C6.8 15.1281 9.12812 12.8 12 12.8C14.8719 12.8 17.2 15.1281 17.2 18"
+        stroke="#FFB100"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9.1 18C9.1 16.3984 10.3984 15.1 12 15.1C13.6016 15.1 14.9 16.3984 14.9 18"
+        stroke="#00E599"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M11.4 18C11.4 17.6686 11.6686 17.4 12 17.4C12.3314 17.4 12.6 17.6686 12.6 18"
+        stroke="#0088FF"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Official WalletConnect SVG Icon
+ */
+export function WalletConnectIcon({ size = 20, className = "" }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={`inline-block shrink-0 ${className}`}
+    >
+      <rect width="24" height="24" rx="6" fill="#3B99FC" />
+      <path
+        d="M7.4 9.2C9.94 6.7 14.06 6.7 16.6 9.2L17.2 9.8C17.34 9.94 17.34 10.16 17.2 10.3L15.9 11.6C15.82 11.68 15.7 11.68 15.62 11.6L14.78 10.76C13.25 9.23 10.75 9.23 9.22 10.76L8.34 11.64C8.26 11.72 8.14 11.72 8.06 11.64L6.76 10.34C6.62 10.2 6.62 9.98 6.76 9.84L7.4 9.2ZM18.9 11.5L20.08 12.68C20.22 12.82 20.22 13.04 20.08 13.18L14.54 18.72C14.4 18.86 14.18 18.86 14.04 18.72L12 16.68L9.96 18.72C9.82 18.86 9.6 18.86 9.46 18.72L3.92 13.18C3.78 13.04 3.78 12.82 3.92 12.68L5.1 11.5C5.24 11.36 5.46 11.36 5.6 11.5L9.7 15.6C9.84 15.74 10.06 15.74 10.2 15.6L12.24 13.56C12.38 13.42 12.6 13.42 12.74 13.56L14.78 15.6C14.92 15.74 15.14 15.74 15.28 15.6L19.38 11.5C19.46 11.42 19.58 11.42 19.66 11.5H18.9Z"
+        fill="white"
+      />
+    </svg>
+  );
+}

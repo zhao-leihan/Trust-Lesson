@@ -12,7 +12,13 @@ import {
   UsdtIcon,
   ArbitrumIcon,
 } from "@/src/components/CurrencyBadge";
-import { MetaMaskIcon, CoinbaseWalletIcon } from "@/src/components/WalletIcons";
+import {
+  MetaMaskIcon,
+  CoinbaseWalletIcon,
+  RabbyIcon,
+  RainbowIcon,
+  WalletConnectIcon,
+} from "@/src/components/WalletIcons";
 import { YouTubeIcon, GoogleDriveIcon } from "@/src/components/PlatformIcons";
 import Footer from "@/src/components/Footer";
 import ExploreCard from "@/src/components/ExploreCard";
@@ -977,15 +983,15 @@ export default function CreateGigPage() {
                       />
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+                    <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                       <button
                         type="button"
                         onClick={() => handleConnectAndQuickLock("metamask")}
                         disabled={isLockingWallet}
-                        className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        className="px-2.5 py-2 rounded-xl bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
                         title="Connect with MetaMask"
                       >
-                        <MetaMaskIcon size={16} />
+                        <MetaMaskIcon size={15} />
                         <span>MetaMask</span>
                       </button>
 
@@ -993,18 +999,51 @@ export default function CreateGigPage() {
                         type="button"
                         onClick={() => handleConnectAndQuickLock("coinbase")}
                         disabled={isLockingWallet}
-                        className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        className="px-2.5 py-2 rounded-xl bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
                         title="Connect with Coinbase Wallet"
                       >
-                        <CoinbaseWalletIcon size={16} />
+                        <CoinbaseWalletIcon size={15} />
                         <span>Coinbase</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleConnectAndQuickLock("rabby")}
+                        disabled={isLockingWallet}
+                        className="px-2.5 py-2 rounded-xl bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        title="Connect with Rabby Wallet"
+                      >
+                        <RabbyIcon size={15} />
+                        <span>Rabby</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleConnectAndQuickLock("rainbow")}
+                        disabled={isLockingWallet}
+                        className="px-2.5 py-2 rounded-xl bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        title="Connect with Rainbow Wallet"
+                      >
+                        <RainbowIcon size={15} />
+                        <span>Rainbow</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleConnectAndQuickLock("walletconnect")}
+                        disabled={isLockingWallet}
+                        className="px-2.5 py-2 rounded-xl bg-white border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        title="Connect with WalletConnect"
+                      >
+                        <WalletConnectIcon size={15} />
+                        <span>WalletConnect</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handleLockWallet(inputAddress)}
                         disabled={isLockingWallet || !inputAddress.trim()}
-                        className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-600/20 active:scale-95"
+                        className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-600/20 active:scale-95"
                       >
                         <Lock size={14} />
                         <span>{isLockingWallet ? "Locking..." : "Lock Payout Wallet"}</span>
