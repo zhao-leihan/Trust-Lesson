@@ -36,28 +36,26 @@ import {
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 import ClassroomLeaderboard from "@/src/components/ClassroomLeaderboard";
+import {
+  PrimaryButton,
+  SecondaryButton,
+  GhostButton,
+  Card,
+  StatusPill,
+} from "@/src/components/ui/DesignTokens";
 
 function StatusBadge({ status }) {
   const map = {
-    FUNDED: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", label: "Funded" },
-    IN_SESSION: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", label: "In Session" },
-    COMPLETED: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", label: "Completed" },
-    DISPUTED: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", label: "Disputed" },
-    CANCELLED: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", label: "Cancelled" },
-    RESOLVED: { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", label: "Resolved" },
-    CREATED: { bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-200", label: "Pending Escrow" },
+    FUNDED: { label: "Funded" },
+    IN_SESSION: { label: "In Session" },
+    COMPLETED: { label: "Completed" },
+    DISPUTED: { label: "Disputed" },
+    CANCELLED: { label: "Cancelled" },
+    RESOLVED: { label: "Resolved" },
+    CREATED: { label: "Pending Escrow" },
   };
-
-  const current = map[status] || map.FUNDED;
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${current.bg} ${current.text} ${current.border}`}
-    >
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      <span>{current.label}</span>
-    </span>
-  );
+  const label = map[status]?.label || status;
+  return <StatusPill status={status} label={label} />;
 }
 
 export default function MentorGigClassroomPage() {
@@ -340,60 +338,60 @@ export default function MentorGigClassroomPage() {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex border-b border-slate-200 space-x-6 text-sm font-bold overflow-x-auto">
+          <div className="flex flex-wrap items-center gap-2 bg-gray-100/80 p-1.5 rounded-full max-w-full overflow-x-auto scrollbar-none">
             <button
               onClick={() => setActiveTab("learners")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer shrink-0 ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "learners"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <Users size={16} />
+              <Users size={15} />
               <span>Learners & Progress ({learners.length})</span>
             </button>
             <button
               onClick={() => setActiveTab("chat")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer shrink-0 ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "chat"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <MessageSquare size={16} />
+              <MessageSquare size={15} />
               <span>Chat with Learners</span>
             </button>
             <button
               onClick={() => setActiveTab("meetings")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer shrink-0 ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "meetings"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <Calendar size={16} />
+              <Calendar size={15} />
               <span>Meeting Requests ({meetings.length})</span>
             </button>
             <button
               onClick={() => setActiveTab("tasks")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer shrink-0 ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "tasks"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <ClipboardList size={16} />
+              <ClipboardList size={15} />
               <span>Tasks & Assignments ({assignments.length})</span>
             </button>
             <button
               onClick={() => setActiveTab("leaderboard")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer shrink-0 ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "leaderboard"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <Trophy size={16} />
+              <Trophy size={15} />
               <span>Leaderboard</span>
             </button>
           </div>

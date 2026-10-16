@@ -83,22 +83,22 @@ export default function MentorAnalyticsCard({
   }, [timeRange, analytics]);
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-7 shadow-xs space-y-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-2xs space-y-6">
       {/* Header and Filter Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-700 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gray-50 border border-gray-200 text-purple-600 flex items-center justify-center shrink-0">
               <BarChart3 size={18} />
             </div>
-            <h3 className="font-extrabold text-base text-slate-900 tracking-tight">
+            <h3 className="font-bold text-base text-slate-900 tracking-tight">
               Mentor Performance Analytics
             </h3>
-            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+            <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
               Live Verified
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-gray-500 mt-1">
             Real-time on-chain payout distributions, completion SLA, and student feedback.
           </p>
         </div>

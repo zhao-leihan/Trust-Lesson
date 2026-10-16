@@ -24,6 +24,13 @@ import Footer from "@/src/components/Footer";
 import ExploreCard from "@/src/components/ExploreCard";
 import GatedModulePlayer from "@/src/components/GatedModulePlayer";
 import {
+  PrimaryButton,
+  SecondaryButton,
+  GhostButton,
+  Card,
+  StatusPill,
+} from "@/src/components/ui/DesignTokens";
+import {
   ArrowLeft,
   ArrowRight,
   Sparkles,
@@ -862,7 +869,7 @@ export default function CreateGigPage() {
           {!createdGigId && (
             <>
               {/* ── Modern Step-by-Step Wizard Header ── */}
-              <div className="bg-white rounded-3xl border-2 border-purple-100 p-4 sm:p-5 shadow-xs">
+              <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-xs">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
                   {STEPS.map((step) => {
                     const isActive = currentStep === step.id;
@@ -876,28 +883,28 @@ export default function CreateGigPage() {
                         }}
                         className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-2.5 ${
                           isActive
-                            ? "bg-purple-50/80 border-purple-300 ring-2 ring-purple-400/20 shadow-xs"
+                            ? "bg-violet-50 text-violet-700 border-violet-200 shadow-xs"
                             : isCompleted
-                            ? "bg-emerald-50/50 border-emerald-200 cursor-pointer hover:bg-emerald-50"
-                            : "bg-slate-50/50 border-slate-100 opacity-60 cursor-not-allowed"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-100 cursor-pointer hover:bg-emerald-50/80"
+                            : "bg-gray-50 border-gray-100 text-gray-400 opacity-60 cursor-not-allowed"
                         }`}
                       >
                         <div
-                          className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs shrink-0 transition-colors ${
+                          className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
                             isActive
-                              ? "bg-purple-600 text-white shadow-xs"
+                              ? "bg-violet-600 text-white"
                               : isCompleted
                               ? "bg-emerald-600 text-white"
-                              : "bg-slate-200 text-slate-500"
+                              : "bg-gray-200 text-gray-500"
                           }`}
                         >
-                          {isCompleted ? <Check size={14} strokeWidth={3} /> : step.id}
+                          {isCompleted ? <Check size={14} strokeWidth={2.5} /> : step.id}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                             Step {step.id}
                           </p>
-                          <p className={`text-xs font-black truncate ${isActive ? "text-purple-950" : "text-slate-800"}`}>
+                          <p className={`text-xs font-bold truncate ${isActive ? "text-violet-900" : "text-gray-700"}`}>
                             {step.title}
                           </p>
                         </div>
@@ -2261,55 +2268,47 @@ export default function CreateGigPage() {
               )}
 
               {/* ── Sticky Bottom Step Navigation Controls ── */}
-              <div className="bg-white rounded-2xl border-2 border-purple-100 p-4 shadow-sm flex items-center justify-between gap-3">
+              <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-center justify-between gap-3">
                 {currentStep > 1 ? (
-                  <button
-                    type="button"
+                  <SecondaryButton
                     onClick={handlePrevStep}
-                    className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+                    className="!min-h-[44px] !px-5"
                   >
                     <ArrowLeft size={14} />
                     <span>Back</span>
-                  </button>
+                  </SecondaryButton>
                 ) : (
                   <div />
                 )}
 
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 font-medium hidden sm:inline">
+                  <span className="text-xs text-gray-400 font-medium hidden sm:inline">
                     Step {currentStep} of 4: {STEPS[currentStep - 1]?.title}
                   </span>
 
                   {currentStep === 4 && (
-                    <button
-                      type="button"
+                    <SecondaryButton
                       onClick={() => setShowStudentPreview(true)}
-                      className="px-4 py-2.5 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="!min-h-[44px] !px-4"
                     >
                       <Eye size={14} />
                       <span>Preview as Student</span>
-                    </button>
+                    </SecondaryButton>
                   )}
 
                   {currentStep < 4 ? (
-                    <button
-                      type="button"
+                    <PrimaryButton
                       onClick={handleNextStep}
-                      className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center gap-2 cursor-pointer shadow-md shadow-purple-600/20 active:scale-95 transition-all"
+                      className="!min-h-[44px] !px-6"
                     >
                       <span>Continue to {STEPS[currentStep]?.title}</span>
                       <ArrowRight size={14} />
-                    </button>
+                    </PrimaryButton>
                   ) : (
-                    <button
-                      type="button"
+                    <PrimaryButton
                       disabled={isSubmitting}
                       onClick={handlePublishGig}
-                      className={`px-7 py-3 rounded-xl text-white font-black text-xs sm:text-sm flex items-center gap-2 transition-all shadow-lg active:scale-95 cursor-pointer disabled:opacity-50 ${
-                        !isWalletLocked
-                          ? "bg-slate-500 hover:bg-slate-600 shadow-slate-500/20"
-                          : "bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 shadow-purple-600/25"
-                      }`}
+                      className="!min-h-[44px] !px-7 font-bold text-sm"
                     >
                       {!isWalletLocked ? (
                         <>
@@ -2322,7 +2321,7 @@ export default function CreateGigPage() {
                           <span>{isSubmitting ? "Deploying Offering to Arbitrum..." : "Publish Gig to Explore"}</span>
                         </>
                       )}
-                    </button>
+                    </PrimaryButton>
                   )}
                 </div>
               </div>

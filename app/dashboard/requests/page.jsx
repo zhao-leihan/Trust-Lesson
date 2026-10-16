@@ -23,6 +23,14 @@ import {
   Copy,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
+import {
+  PrimaryButton,
+  SecondaryButton,
+  GhostButton,
+  Card,
+  StatusPill,
+  EmptyState,
+} from "@/src/components/ui/DesignTokens";
 
 function GoogleMeetIcon({ className = "w-4 h-4" }) {
   return (
@@ -45,26 +53,7 @@ function ZoomIcon({ className = "w-4 h-4" }) {
 }
 
 function StatusBadge({ status }) {
-  const map = {
-    ACCEPTED: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", label: "Accepted" },
-    PENDING: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", label: "Pending Response" },
-    DECLINED: { bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-200", label: "Declined" },
-    SUPERSEDED: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", label: "Counter-Proposed" },
-    CANCELLED_BY_LEARNER: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", label: "Cancelled by Student" },
-    CANCELLED_BY_MENTOR: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", label: "Cancelled by Mentor" },
-    COMPLETED: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", label: "Completed" },
-  };
-
-  const current = map[status] || { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", label: status };
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${current.bg} ${current.text} ${current.border}`}
-    >
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      <span>{current.label}</span>
-    </span>
-  );
+  return <StatusPill status={status} />;
 }
 
 export default function RequestsInboxPage() {
@@ -249,117 +238,117 @@ export default function RequestsInboxPage() {
       : historyMeetings;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
-      <main className="pt-28 pb-20 px-4 sm:px-6 flex-1">
-        <div className="max-w-5xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-violet-500 selection:text-white">
+      <main className="pt-24 sm:pt-28 pb-16 px-4 sm:px-6 lg:px-8 flex-1">
+        <div className="max-w-5xl mx-auto space-y-6">
           {/* Breadcrumb Navigation */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 text-slate-500 hover:text-purple-700 text-xs font-bold transition-colors group"
+              className="inline-flex items-center gap-2 text-gray-500 hover:text-violet-700 text-xs font-semibold transition-colors group"
             >
               <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
               <span>Back to Dashboard</span>
             </Link>
 
-            <span className="text-xs font-bold text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
+            <span className="text-xs font-semibold text-violet-700 bg-violet-50 px-3 py-1 rounded-full border border-violet-100">
               Meeting Inbox
             </span>
           </div>
 
-          {/* Header */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          {/* Header Card */}
+          <Card className="p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div>
-              <span className="text-xs font-bold text-purple-700 uppercase tracking-wider">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                 Session Requests Inbox
               </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight mt-1">
                 Meeting Management
               </h1>
-              <p className="text-slate-500 text-xs sm:text-sm mt-1">
+              <p className="text-gray-500 text-xs sm:text-sm mt-1">
                 Review incoming meeting requests, confirm slots, counter-propose alternate times, or cancel.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="px-4 py-2 rounded-2xl bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-xs font-semibold">
                 {pendingMeetings.length} Pending
               </span>
-              <span className="px-4 py-2 rounded-2xl bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-bold">
+              <span className="px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-semibold">
                 {confirmedMeetings.length} Confirmed
               </span>
             </div>
-          </div>
+          </Card>
 
           {/* Action Message Alert */}
           {actionMessage && (
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl text-purple-900 text-xs font-bold flex items-center justify-between">
+            <div className="p-4 bg-violet-50 border border-violet-100 rounded-2xl text-violet-900 text-xs font-semibold flex items-center justify-between">
               <span>{actionMessage}</span>
               <button
                 type="button"
                 onClick={() => setActionMessage("")}
-                className="text-purple-600 hover:text-purple-800"
+                className="text-violet-600 hover:text-violet-800 cursor-pointer"
               >
                 <X size={14} />
               </button>
             </div>
           )}
 
-          {/* Tabs */}
-          <div className="flex border-b border-slate-200 space-x-6 text-sm font-bold">
+          {/* Pill Tabs */}
+          <div className="flex flex-wrap items-center gap-2 bg-gray-100 p-1.5 rounded-full w-fit">
             <button
               onClick={() => setActiveTab("pending")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                 activeTab === "pending"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-violet-50 text-violet-700 font-semibold shadow-2xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <Clock size={16} />
+              <Clock size={14} />
               <span>Pending Requests ({pendingMeetings.length})</span>
             </button>
             <button
               onClick={() => setActiveTab("confirmed")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                 activeTab === "confirmed"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-violet-50 text-violet-700 font-semibold shadow-2xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <CheckCircle2 size={16} />
-              <span>Confirmed Meetings ({confirmedMeetings.length})</span>
+              <CheckCircle2 size={14} />
+              <span>Confirmed ({confirmedMeetings.length})</span>
             </button>
             <button
               onClick={() => setActiveTab("history")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                 activeTab === "history"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-violet-50 text-violet-700 font-semibold shadow-2xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <Calendar size={16} />
-              <span>History & Completed ({historyMeetings.length})</span>
+              <Calendar size={14} />
+              <span>History ({historyMeetings.length})</span>
             </button>
           </div>
 
           {/* Meetings List */}
           {loading ? (
-            <div className="p-12 text-center text-slate-400 text-xs">
-              <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+            <div className="p-12 text-center text-gray-400 text-xs">
+              <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               Loading meeting requests...
             </div>
           ) : currentList.length === 0 ? (
-            <div className="p-16 bg-white rounded-3xl border border-slate-200 text-center space-y-3">
-              <Calendar size={36} className="mx-auto text-slate-300" />
-              <h4 className="font-bold text-slate-800 text-sm">No Meetings Found</h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                {activeTab === "pending"
+            <EmptyState
+              icon={Calendar}
+              title="No Meetings Found"
+              description={
+                activeTab === "pending"
                   ? "There are no pending meeting requests awaiting response."
                   : activeTab === "confirmed"
                   ? "You have no upcoming confirmed meetings scheduled."
-                  : "No past or cancelled meeting history."}
-              </p>
-            </div>
+                  : "No past or cancelled meeting history."
+              }
+            />
           ) : (
             <div className="space-y-4">
               {currentList.map((meeting) => {
@@ -374,48 +363,48 @@ export default function RequestsInboxPage() {
                 const isActionLoading = actionLoadingId === meeting.id;
 
                 return (
-                  <div
+                  <Card
                     key={meeting.id}
-                    className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6"
+                    className="p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-6"
                   >
                     {/* Left: Details */}
                     <div className="space-y-3 flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2.5">
                         <StatusBadge status={meeting.status} />
-                        <span className="text-xs text-slate-400">•</span>
-                        <span className="text-xs font-bold text-purple-700">
+                        <span className="text-xs text-gray-300">•</span>
+                        <span className="text-xs font-semibold text-violet-700">
                           {meeting.gig?.title || "1:1 Mentorship Session"}
                         </span>
                       </div>
 
                       {/* Date & Time */}
-                      <div className="flex items-center gap-2 text-slate-900 font-extrabold text-sm sm:text-base">
-                        <Calendar size={16} className="text-purple-600 shrink-0" />
+                      <div className="flex items-center gap-2 text-gray-900 font-bold text-sm sm:text-base">
+                        <Calendar size={16} className="text-violet-600 shrink-0" />
                         <span>
                           {start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                         </span>
-                        <span className="text-slate-300 font-normal">|</span>
-                        <span className="text-purple-700">
+                        <span className="text-gray-300 font-normal">|</span>
+                        <span className="text-violet-700 font-medium">
                           {start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} - {end.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
 
                       {/* Counterparty & Platform */}
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 pt-1 border-t border-slate-100">
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 pt-2 border-t border-gray-100">
                         <div className="flex items-center gap-2">
                           <img
                             src={counterparty?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"}
                             alt={counterparty?.name || "User"}
-                            className="w-6 h-6 rounded-full object-cover border border-purple-200"
+                            className="w-6 h-6 rounded-full object-cover ring-2 ring-violet-100"
                           />
-                          <span className="font-bold text-slate-900">
+                          <span className="font-semibold text-gray-900">
                             {isMentor ? `Student: ${counterparty?.name || "Student"}` : `Mentor: ${counterparty?.name || "Mentor"}`}
                           </span>
                         </div>
-                        <span>•</span>
-                        <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                        <span className="text-gray-300">•</span>
+                        <div className="flex items-center gap-1.5 font-medium text-gray-600">
                           <span>Platform:</span>
-                          <span className="inline-flex items-center gap-1 font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                          <span className="inline-flex items-center gap-1 font-semibold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-full text-xs">
                             {(meeting.platform || "").toLowerCase().includes("zoom") ? (
                               <ZoomIcon className="w-3.5 h-3.5" />
                             ) : (
@@ -428,9 +417,9 @@ export default function RequestsInboxPage() {
 
                       {/* Generated Room Link banner when accepted */}
                       {meeting.status === "ACCEPTED" && meeting.joinUrl && (
-                        <div className="p-3 bg-gradient-to-r from-purple-50/90 to-indigo-50/80 rounded-2xl border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="p-3 bg-violet-50/70 rounded-2xl border border-violet-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-xl bg-white border border-purple-200/80 shadow-2xs flex items-center justify-center shrink-0">
+                            <div className="w-8 h-8 rounded-xl bg-white border border-violet-100 shadow-2xs flex items-center justify-center shrink-0">
                               {(meeting.platform || "").toLowerCase().includes("zoom") ? (
                                 <ZoomIcon className="w-4 h-4" />
                               ) : (
@@ -438,10 +427,10 @@ export default function RequestsInboxPage() {
                               )}
                             </div>
                             <div className="min-w-0">
-                              <span className="text-[10px] uppercase font-black text-purple-900 tracking-wider block">
+                              <span className="text-[10px] uppercase font-semibold text-violet-900 tracking-wider block">
                                 Generated {(meeting.platform || "").toLowerCase().includes("zoom") ? "Zoom" : "Google Meet"} Room
                               </span>
-                              <span className="text-xs font-mono font-bold text-slate-800 truncate block">
+                              <span className="text-xs font-mono font-medium text-gray-800 truncate block">
                                 {meeting.joinUrl}
                               </span>
                             </div>
@@ -450,7 +439,7 @@ export default function RequestsInboxPage() {
                             <button
                               type="button"
                               onClick={() => handleCopyLink(meeting.id, meeting.joinUrl)}
-                              className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                              className="px-3 py-1.5 rounded-full bg-white hover:bg-violet-100 text-violet-800 border border-violet-200 text-xs font-medium transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                               title="Copy meeting link"
                             >
                               {copiedId === meeting.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
@@ -460,11 +449,7 @@ export default function RequestsInboxPage() {
                               href={meeting.joinUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`px-3 py-1.5 rounded-xl text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer ${
-                                (meeting.platform || "").toLowerCase().includes("zoom")
-                                  ? "bg-blue-600 hover:bg-blue-700"
-                                  : "bg-emerald-600 hover:bg-emerald-700"
-                              }`}
+                              className="px-4 py-1.5 rounded-full bg-violet-600 hover:bg-violet-700 text-white font-medium text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                             >
                               <span>{(meeting.platform || "").toLowerCase().includes("zoom") ? "Join Zoom" : "Join Meet"}</span>
                               <ExternalLink size={12} />
@@ -474,92 +459,72 @@ export default function RequestsInboxPage() {
                       )}
 
                       {meeting.agenda && (
-                        <p className="text-xs text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <p className="text-xs text-gray-500 italic bg-gray-50 p-2.5 rounded-xl border border-gray-100">
                           &ldquo;{meeting.agenda}&rdquo;
                         </p>
                       )}
                     </div>
 
-                    {/* Right: Actions */}
-                    <div className="flex flex-wrap md:flex-col items-end justify-center gap-2 shrink-0">
-                      {meeting.status === "PENDING" && (
+                    {/* Right: Actions (1 Primary CTA, 1 Ghost Button) */}
+                    <div className="flex flex-wrap sm:flex-nowrap md:flex-col items-stretch gap-2 shrink-0">
+                      {meeting.status === "PENDING" && isMentor && (
                         <>
-                          <button
-                            type="button"
+                          {/* 1 PRIMARY CTA: Accept */}
+                          <PrimaryButton
                             disabled={isActionLoading}
                             onClick={() => handleAccept(meeting.id)}
-                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                            className="min-h-[40px] px-4 py-2"
                           >
                             <Check size={14} />
                             <span>Accept</span>
-                          </button>
-                          <button
-                            type="button"
+                          </PrimaryButton>
+
+                          <GhostButton
                             disabled={isActionLoading}
                             onClick={() => {
                               setCounterMeeting(meeting);
                               setCounterDate(new Date(meeting.startAt).toISOString().split("T")[0]);
                             }}
-                            className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="min-h-[38px] text-violet-700 hover:bg-violet-50"
                           >
                             <RotateCcw size={14} />
                             <span>Counter Propose</span>
-                          </button>
-                          <button
-                            type="button"
+                          </GhostButton>
+
+                          {/* Secondary Ghost Decline */}
+                          <GhostButton
                             disabled={isActionLoading}
                             onClick={() => handleDecline(meeting.id)}
-                            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="min-h-[38px] text-gray-500 hover:text-rose-600 hover:bg-rose-50"
                           >
                             <X size={14} />
                             <span>Decline</span>
-                          </button>
+                          </GhostButton>
                         </>
                       )}
 
                       {meeting.status === "ACCEPTED" && (
                         <>
-                          {meeting.joinUrl && (
-                            <a
-                              href={meeting.joinUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`px-4 py-2 rounded-xl text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-xs ${
-                                (meeting.platform || "").toLowerCase().includes("zoom")
-                                  ? "bg-blue-600 hover:bg-blue-700"
-                                  : "bg-emerald-600 hover:bg-emerald-700"
-                              }`}
-                            >
-                              {(meeting.platform || "").toLowerCase().includes("zoom") ? (
-                                <ZoomIcon className="w-3.5 h-3.5" />
-                              ) : (
-                                <GoogleMeetIcon className="w-3.5 h-3.5" />
-                              )}
-                              <span>{(meeting.platform || "").toLowerCase().includes("zoom") ? "Join Zoom Meeting" : "Join Google Meet"}</span>
-                              <ExternalLink size={13} />
-                            </a>
-                          )}
-                          <button
-                            type="button"
+                          <PrimaryButton
                             disabled={isActionLoading}
                             onClick={() => handleComplete(meeting.id)}
-                            className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="min-h-[40px] px-4 py-2"
                           >
                             <CheckCircle2 size={13} />
                             <span>Mark Completed</span>
-                          </button>
-                          <button
-                            type="button"
+                          </PrimaryButton>
+
+                          <GhostButton
                             disabled={isActionLoading}
                             onClick={() => handleCancel(meeting.id)}
-                            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            className="min-h-[38px] text-gray-500 hover:text-rose-600 hover:bg-rose-50"
                           >
                             <span>Cancel Session</span>
-                          </button>
+                          </GhostButton>
                         </>
                       )}
                     </div>
-                  </div>
+                  </Card>
                 );
               })}
             </div>

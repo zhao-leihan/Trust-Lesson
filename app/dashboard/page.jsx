@@ -2619,10 +2619,10 @@ function MentorDashboardView({ user }) {
       </div>
 
       {/* ── Top Bar Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-purple-100 relative z-10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-gray-200 relative z-10">
         <div className="flex items-center gap-4">
           {/* Avatar with Verified Green Border & Checkmark Badge */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0 flex items-center justify-center">
             <Avatar className="w-14 h-14 rounded-full border-2 border-emerald-500 ring-2 ring-emerald-400/50 shadow-xs shrink-0 overflow-hidden">
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt={user.name} width={56} height={56} fetchPriority="high" decoding="async" className="w-full h-full object-cover rounded-full" />
@@ -2638,52 +2638,12 @@ function MentorDashboardView({ user }) {
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="px-3 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-1">
-                <Sparkles size={11} /> Level: {stats.mentorLevel}
+          <div className="flex flex-col justify-center">
+            {/* Badges: Max 3, white bg, rounded-full, subtle borders */}
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className="px-3 py-0.5 rounded-full bg-white text-gray-700 border border-gray-200 font-semibold text-xs flex items-center gap-1 shadow-2xs">
+                <Sparkles size={11} className="text-gray-400" /> Level: {stats.mentorLevel}
               </span>
-              {isWalletLocked ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[11px] flex items-center gap-1">
-                  <Lock size={11} /> Wallet Locked
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[11px] flex items-center gap-1">
-                  <Unlock size={11} /> Wallet Setup Pending
-                </span>
-              )}
-              <Link
-                href={`/mentor/${encodeURIComponent(user.id || user.name || "me")}`}
-                className="px-2.5 py-0.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
-                title="View your public mentor profile page"
-              >
-                <ExternalLink size={11} /> View Public Profile
-              </Link>
-            </div>
-            <h1 className="text-slate-950 font-black text-2xl sm:text-3xl tracking-tight flex items-center gap-2 flex-wrap">
-              <Link
-                href={`/mentor/${encodeURIComponent(user.id || user.name || "me")}`}
-                className="hover:text-purple-700 hover:underline transition-colors cursor-pointer flex items-center gap-2"
-                title="Click to view public mentor profile"
-              >
-                <span>{user.name}</span>
-                {stats.isVerified || stats.stakeAmount >= 100 ? (
-                  <CheckCircle2 size={20} className="fill-emerald-500 text-white" />
-                ) : (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                    Unverified
-                  </span>
-                )}
-              </Link>
-              {user.nickname && (
-                <span className="text-purple-600 text-sm sm:text-base font-bold bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200 font-mono">
-                  @{user.nickname.replace(/^@/, "")}
-                </span>
-              )}
-            </h1>
-            <div className="text-slate-500 text-xs sm:text-sm mt-0.5 flex items-center gap-1.5 flex-wrap">
-              <span>{user.domain || "Smart Contract & Web3 Architecture"}</span>
-              <span>•</span>
               {stats.isVerified || stats.stakeAmount >= 100 ? (
                 <button
                   type="button"
@@ -2692,16 +2652,11 @@ function MentorDashboardView({ user }) {
                     setShowStakeModal(true);
                     fetchMentorWalletBalance().catch(() => {});
                   }}
-                  className="inline-flex items-center gap-2 text-purple-900 bg-purple-50/90 hover:bg-purple-100 px-3.5 py-1 rounded-full border-2 border-purple-200 font-extrabold text-xs shadow-xs transition-all cursor-pointer group"
-                  title="Click to view and manage Collateral Vault"
+                  className="px-3 py-0.5 rounded-full bg-white text-gray-800 border border-gray-200 font-semibold text-xs flex items-center gap-1.5 shadow-2xs hover:border-gray-300 transition-colors cursor-pointer"
+                  title="Collateral Vault"
                 >
-                  <div className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-xs animate-badge-glow shrink-0">
-                    <Coins size={10} />
-                  </div>
-                  <ShieldCheck size={14} className="text-purple-700" />
-                  <span className="font-bold">
-                    Verified Mentor (${stats.stakeAmount} USDC Staked)
-                  </span>
+                  <ShieldCheck size={12} className="text-purple-600" />
+                  <span>Verified Mentor (${stats.stakeAmount} USDC Staked)</span>
                 </button>
               ) : (
                 <button
@@ -2711,29 +2666,69 @@ function MentorDashboardView({ user }) {
                     setShowStakeModal(true);
                     fetchMentorWalletBalance().catch(() => {});
                   }}
-                  className="inline-flex items-center gap-1.5 text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200 font-bold text-xs transition-all cursor-pointer group"
-                  title="Click to stake 100 USDC and become verified"
+                  className="px-3 py-0.5 rounded-full bg-white text-gray-700 border border-gray-200 font-semibold text-xs flex items-center gap-1.5 shadow-2xs hover:border-gray-300 transition-colors cursor-pointer"
+                  title="Stake USDC to Verify"
                 >
-                  <AlertCircle size={13} className="text-amber-600" />
+                  <AlertCircle size={12} className="text-amber-500" />
                   <span>Unverified (${stats.stakeAmount || 0}/100 USDC Staked)</span>
                 </button>
               )}
+              {isWalletLocked ? (
+                <span className="px-3 py-0.5 rounded-full bg-white text-gray-700 border border-gray-200 font-semibold text-xs flex items-center gap-1 shadow-2xs">
+                  <Lock size={11} className="text-gray-400" /> Wallet: Locked
+                </span>
+              ) : (
+                <span className="px-3 py-0.5 rounded-full bg-white text-gray-700 border border-gray-200 font-semibold text-xs flex items-center gap-1 shadow-2xs">
+                  <Unlock size={11} className="text-gray-400" /> Wallet: Setup Pending
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-slate-950 font-black text-2xl sm:text-3xl tracking-tight flex items-center gap-2">
+                <span>{user.name}</span>
+                {stats.isVerified || stats.stakeAmount >= 100 ? (
+                  <CheckCircle2 size={20} className="fill-emerald-500 text-white" />
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                    Unverified
+                  </span>
+                )}
+              </h1>
+              {user.nickname && (
+                <span className="text-purple-600 text-sm font-semibold bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200 font-mono">
+                  @{user.nickname.replace(/^@/, "")}
+                </span>
+              )}
+            </div>
+
+            <div className="text-gray-500 text-xs sm:text-sm mt-1 flex items-center gap-2 flex-wrap">
+              <span>{user.domain || "Smart Contract & Web3 Architecture"}</span>
+              <span className="text-gray-300">•</span>
+              <Link
+                href={`/mentor/${encodeURIComponent(user.id || user.name || "me")}`}
+                className="text-purple-600 hover:text-purple-700 underline underline-offset-4 text-xs font-medium inline-flex items-center gap-1 transition-colors"
+                title="View your public mentor profile page"
+              >
+                <span>View Public Profile</span>
+                <ExternalLink size={11} />
+              </Link>
             </div>
           </div>
         </div>
 
-        {/* Header Action Buttons — Pushed all the way to the far right (Mentok Kanan) */}
-        <div className="flex items-center gap-3 flex-wrap self-end sm:self-auto ml-auto justify-end shrink-0">
-          {/* Create New Gig Button */}
+        {/* Header Action Buttons — Primary CTA + Secondary Outline */}
+        <div className="flex items-center gap-3 flex-wrap self-end sm:self-center ml-auto justify-end shrink-0">
+          {/* PRIMARY CTA: Create New Gig */}
           <Link
             href="/dashboard/gigs/create"
-            className="px-5 py-2.5 rounded-2xl bg-white hover:bg-purple-50 text-purple-700 border-2 border-purple-200 hover:border-purple-300 font-extrabold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
           >
             <PlusCircle size={15} />
             <span>Create New Gig</span>
           </Link>
 
-          {/* Staking Action Button — Far Right */}
+          {/* SECONDARY OUTLINE: Collateral Vault */}
           {!(stats.isVerified || stats.stakeAmount >= 100) ? (
             <button
               type="button"
@@ -2742,11 +2737,9 @@ function MentorDashboardView({ user }) {
                 setShowStakeModal(true);
                 fetchMentorWalletBalance().catch(() => {});
               }}
-              className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 border-b-4 border-purple-900 active:border-b-0 active:translate-y-1 transition-all flex items-center gap-2 cursor-pointer group"
+              className="px-4 py-2.5 rounded-2xl bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-semibold text-xs shadow-2xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
             >
-              <div className="w-5 h-5 rounded-full bg-white/20 text-white flex items-center justify-center shrink-0">
-                <ShieldCheck size={12} />
-              </div>
+              <ShieldCheck size={14} className="text-gray-400" />
               <span>Stake 100 USDC to Verify</span>
             </button>
           ) : (
@@ -2757,61 +2750,54 @@ function MentorDashboardView({ user }) {
                 setShowStakeModal(true);
                 fetchMentorWalletBalance().catch(() => {});
               }}
-              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 hover:from-purple-800 hover:to-indigo-800 text-white font-extrabold text-xs shadow-lg shadow-purple-700/35 border-b-4 border-purple-950 active:border-b-0 active:translate-y-1 transition-all flex items-center gap-2.5 cursor-pointer animate-float-3d group"
+              className="px-4 py-2.5 rounded-2xl bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-semibold text-xs shadow-2xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
             >
-              <div className="w-5 h-5 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-md animate-badge-glow shrink-0">
-                <Coins size={12} />
-              </div>
-              <span className="font-black tracking-tight">
-                Collateral Vault ({stats.stakeAmount} USDC)
-              </span>
-              <span className="px-2 py-0.5 rounded-full bg-white/20 text-white font-black text-[10px] uppercase tracking-wider border border-white/20">
-                Active
-              </span>
+              <Coins size={14} className="text-gray-400" />
+              <span>Collateral Vault ({stats.stakeAmount} USDC)</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Sub-Navbar Tabs ── */}
+      {/* ── Sub-Navbar Tabs: flex-wrap, no overflow cut-off at 1280px, no visual scrollbar ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full relative z-10">
-        <TabsList className="w-full justify-start overflow-x-auto bg-purple-50/70 p-1.5 rounded-2xl flex-nowrap border border-purple-100">
-          <TabsTrigger value="overview" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
-            <Layers size={14} />
+        <TabsList className="w-full flex flex-wrap items-center justify-start gap-1.5 bg-gray-50 p-1.5 rounded-2xl border border-gray-200 no-scrollbar">
+          <TabsTrigger value="overview" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+            <Layers size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
             <span>Overview</span>
           </TabsTrigger>
-          <TabsTrigger value="courses" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
-            <BookOpen size={14} />
+          <TabsTrigger value="courses" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+            <BookOpen size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
             <span>Courses & Gigs ({mentorGigs.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="transactions" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
-            <Receipt size={14} />
+          <TabsTrigger value="transactions" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+            <Receipt size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
             <span>Transaction History</span>
           </TabsTrigger>
-          <TabsTrigger value="wallet" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
-            <Wallet size={14} />
+          <TabsTrigger value="wallet" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+            <Wallet size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
             <span>Payout Wallet & Security</span>
           </TabsTrigger>
-          <TabsTrigger value="leveling" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
-            <Award size={14} />
+          <TabsTrigger value="leveling" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+            <Award size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
             <span>Leveling & Membership</span>
           </TabsTrigger>
-          <TabsTrigger value="portfolio" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
-            <Briefcase size={14} />
+          <TabsTrigger value="portfolio" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+            <Briefcase size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
             <span>Portfolio & Bio</span>
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
-            <BarChart3 size={14} />
+          <TabsTrigger value="analytics" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+            <BarChart3 size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
             <span>Analytics</span>
           </TabsTrigger>
           {isJurorMentor && (
             <TabsTrigger
               value="juror"
-              className="flex items-center gap-2 flex-1 sm:flex-none text-xs font-bold text-slate-900 transition-all rounded-xl"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
             >
-              <Scale size={14} className="text-slate-900" />
+              <Scale size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
               <span>Dispute Juror</span>
-              <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 text-[9px] font-extrabold uppercase tracking-wider">
+              <span className="px-1.5 py-0.2 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[9px] font-bold uppercase tracking-wider">
                 Council
               </span>
             </TabsTrigger>
@@ -2821,51 +2807,63 @@ function MentorDashboardView({ user }) {
         {/* ══════════════════════════════════════════════════════ */}
         {/* TAB 1: OVERVIEW (REAL FINANCIAL DATA - ZERO MOCKUP)    */}
         {/* ══════════════════════════════════════════════════════ */}
-        <TabsContent value="overview" className="space-y-6 pt-2">
-          {/* Real Metrics Cards from SQLite DB */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
-              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-2.5 shadow-xs">
+        <TabsContent value="overview" className="space-y-8 pt-4">
+          {/* Real Metrics Cards directly in section container with no redundant wrapper */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+            {/* Card 1: 30-Day Earnings (Hero Highlight with Purple Accent Icon) */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-2xs hover:border-gray-300 transition-all flex flex-col justify-between">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3">
                 <TrendingUp size={20} />
               </div>
-              <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">30-Day Earnings</p>
-              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
-                ${Number(stats.monthlyEarnings || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
-              </p>
-              <p className="text-purple-700 font-semibold text-[11px] mt-1">90% net escrow payout (10% protocol fee)</p>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">30-Day Earnings</p>
+                <p className="text-slate-900 text-3xl font-bold mt-1 tracking-tight">
+                  ${Number(stats.monthlyEarnings || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
+                </p>
+                <p className="text-xs text-gray-400 mt-1">90% net escrow payout (10% protocol fee)</p>
+              </div>
             </div>
 
-            <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
-              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-2.5 shadow-xs">
+            {/* Card 2: In Escrow Pool */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-2xs hover:border-gray-300 transition-all flex flex-col justify-between">
+              <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-400 flex items-center justify-center mb-3">
                 <Lock size={20} />
               </div>
-              <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">In Escrow Pool</p>
-              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
-                ${Number(stats.activeEscrow || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
-              </p>
-              <p className="text-slate-500 text-[11px] mt-1">{stats.pendingSessionsCount || 0} active milestones</p>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">In Escrow Pool</p>
+                <p className="text-slate-900 text-3xl font-bold mt-1 tracking-tight">
+                  ${Number(stats.activeEscrow || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC
+                </p>
+                <p className="text-xs text-gray-400 mt-1">{stats.pendingSessionsCount || 0} active milestones</p>
+              </div>
             </div>
 
-            <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
-              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-2.5 shadow-xs">
+            {/* Card 3: Reputation Score */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-2xs hover:border-gray-300 transition-all flex flex-col justify-between">
+              <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-400 flex items-center justify-center mb-3">
                 <Award size={20} />
               </div>
-              <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Reputation Score</p>
-              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
-                {stats.reputationScore} / 100
-              </p>
-              <p className="text-emerald-700 text-[11px] mt-1 font-semibold">{stats.completedSessionsCount} sessions completed</p>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Reputation Score</p>
+                <p className="text-slate-900 text-3xl font-bold mt-1 tracking-tight">
+                  {stats.reputationScore} / 100
+                </p>
+                <p className="text-xs text-gray-400 mt-1">{stats.completedSessionsCount} sessions completed</p>
+              </div>
             </div>
 
-            <div className="bg-white border-2 border-purple-100/90 rounded-3xl p-5 shadow-xs hover:border-purple-300 transition-all">
-              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-2.5 shadow-xs">
+            {/* Card 4: Base Hourly Rate */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-2xs hover:border-gray-300 transition-all flex flex-col justify-between">
+              <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-400 flex items-center justify-center mb-3">
                 <Clock size={20} />
               </div>
-              <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Base Hourly Rate</p>
-              <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
-                ${stats.hourlyRate} / hr
-              </p>
-              <p className="text-slate-500 text-[11px] mt-1">Multi-currency supported</p>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Base Hourly Rate</p>
+                <p className="text-slate-900 text-3xl font-bold mt-1 tracking-tight">
+                  ${stats.hourlyRate} / hr
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Multi-currency supported</p>
+              </div>
             </div>
           </div>
 
@@ -2877,43 +2875,43 @@ function MentorDashboardView({ user }) {
           />
 
           {/* Wallet Security Notice & Quick Action Banner */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-5 rounded-3xl bg-gradient-to-br from-purple-50 via-white to-purple-50/40 border-2 border-purple-100 flex flex-col justify-between space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div className="p-6 rounded-2xl bg-white border border-gray-200 flex flex-col justify-between space-y-4 shadow-2xs">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1.5">
                   <span className="w-2 h-2 rounded-full bg-purple-600" />
-                  <h4 className="font-extrabold text-slate-900 text-sm">Package & Gig Creator</h4>
+                  <h4 className="font-bold text-slate-900 text-sm">Package & Gig Creator</h4>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed">
-                  You have <span className="font-bold text-purple-700">{mentorGigs.length}</span> published offerings in the database. Create up to 3 package tiers with video curriculum and multi-currency pricing (USDT, USDC).
+                <p className="text-gray-500 text-xs leading-relaxed">
+                  You have <span className="font-semibold text-gray-800">{mentorGigs.length}</span> published offerings in the database. Create up to 3 package tiers with video curriculum and multi-currency pricing (USDT, USDC).
                 </p>
               </div>
               <Link
                 href="/dashboard/gigs/create"
-                className="self-start px-5 py-2.5 rounded-full bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition-all flex items-center gap-1.5 shadow-sm"
+                className="self-start px-4 py-2 rounded-xl bg-purple-600 text-white font-semibold text-xs hover:bg-purple-700 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
               >
                 <PlusCircle size={14} />
                 <span>Open Create Gig Page</span>
               </Link>
             </div>
 
-            <div className="p-5 rounded-3xl bg-gradient-to-br from-indigo-50 via-white to-indigo-50/40 border-2 border-indigo-100 flex flex-col justify-between space-y-3">
+            <div className="p-6 rounded-2xl bg-white border border-gray-200 flex flex-col justify-between space-y-4 shadow-2xs">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1.5">
                   {isWalletLocked ? (
                     <Lock size={14} className="text-emerald-600" />
                   ) : (
-                    <Unlock size={14} className="text-amber-600" />
+                    <Unlock size={14} className="text-amber-500" />
                   )}
-                  <h4 className="font-extrabold text-slate-900 text-sm">
+                  <h4 className="font-bold text-slate-900 text-sm">
                     {isWalletLocked ? "Escrow Payout Wallet Locked" : "Payout Wallet Configuration"}
                   </h4>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed">
+                <p className="text-gray-500 text-xs leading-relaxed">
                   {isWalletLocked ? (
                     <>
                       Your payout address is locked:{" "}
-                      <code className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded font-mono text-[11px] font-bold">
+                      <code className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded font-mono text-[11px] font-semibold">
                         {stats.walletAddress?.slice(0, 8)}...{stats.walletAddress?.slice(-6)}
                       </code>
                       . Escrow payouts are safely routed to this verified address.
@@ -2925,9 +2923,9 @@ function MentorDashboardView({ user }) {
               </div>
               <button
                 onClick={() => setActiveTab("wallet")}
-                className="self-start px-5 py-2.5 rounded-full bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                className="self-start px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 font-semibold text-xs hover:bg-gray-50 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
               >
-                <Wallet size={14} />
+                <Wallet size={14} className="text-gray-400" />
                 <span>Configure Wallet</span>
               </button>
             </div>

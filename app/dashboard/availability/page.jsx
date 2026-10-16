@@ -20,6 +20,7 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
+import { Card, PrimaryButton, GhostButton } from "@/src/components/ui/DesignTokens";
 
 const COMMON_TIMEZONES = [
   "Asia/Jakarta",
@@ -241,46 +242,46 @@ export default function MentorAvailabilityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-between selection:bg-violet-500 selection:text-white">
       <main className="pt-28 pb-20 px-4 sm:px-6 flex-1">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 text-slate-500 hover:text-purple-700 text-xs font-bold transition-colors group"
+              className="inline-flex items-center gap-2 text-gray-500 hover:text-violet-600 text-xs font-semibold transition-colors group"
             >
               <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
               <span>Back to Mentor Dashboard</span>
             </Link>
 
-            <span className="text-xs font-bold text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
+            <span className="text-xs font-semibold text-violet-700 bg-violet-50 px-3 py-1 rounded-full border border-violet-100">
               Availability Manager
             </span>
           </div>
 
           {/* Title Card */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-2">
-            <span className="text-xs font-bold text-purple-700 uppercase tracking-wider">
+          <Card className="p-6 sm:p-8 space-y-2">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
               Scheduling Configuration
             </span>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
               Mentor Calendar & Working Hours
             </h1>
-            <p className="text-slate-500 text-xs sm:text-sm">
+            <p className="text-gray-500 text-xs sm:text-sm">
               Define your recurring available hours, timezone, buffer periods, and permanent meeting room fallback.
             </p>
-          </div>
+          </Card>
 
           {/* Feedback Banners */}
           {saveSuccess && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-emerald-800 text-xs font-bold animate-fadeIn">
+            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-2.5 text-emerald-800 text-xs font-semibold">
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
               <span>Your availability rules and scheduling settings have been saved!</span>
             </div>
           )}
           {errorMsg && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-2.5 text-rose-800 text-xs font-bold">
+            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-2.5 text-rose-800 text-xs font-semibold">
               <AlertCircle size={16} className="text-rose-600 shrink-0" />
               <span>{errorMsg}</span>
             </div>
@@ -288,22 +289,22 @@ export default function MentorAvailabilityPage() {
 
           <form onSubmit={handleSave} className="space-y-8">
             {/* General Settings */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
-              <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                <Globe size={18} className="text-purple-600" />
+            <Card className="p-6 sm:p-8 space-y-6">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                <Globe size={18} className="text-violet-600" />
                 <span>General Scheduling Settings</span>
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {/* Timezone */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
+                  <label className="block text-xs font-semibold text-gray-700">
                     Primary Timezone
                   </label>
                   <select
                     value={timezone}
                     onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600 cursor-pointer"
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white cursor-pointer"
                   >
                     {COMMON_TIMEZONES.map((tz) => (
                       <option key={tz} value={tz}>
@@ -315,7 +316,7 @@ export default function MentorAvailabilityPage() {
 
                 {/* Min Notice Hours */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
+                  <label className="block text-xs font-semibold text-gray-700">
                     Minimum Notice (Hours)
                   </label>
                   <input
@@ -324,14 +325,14 @@ export default function MentorAvailabilityPage() {
                     max="72"
                     value={minNoticeHours}
                     onChange={(e) => setMinNoticeHours(Number(e.target.value))}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-600"
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white"
                   />
-                  <span className="text-[10px] text-slate-400">Min hours before first booking</span>
+                  <span className="text-[10px] text-gray-400">Min hours before first booking</span>
                 </div>
 
                 {/* Buffer After Min */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
+                  <label className="block text-xs font-semibold text-gray-700">
                     Buffer After Session (Min)
                   </label>
                   <input
@@ -341,20 +342,20 @@ export default function MentorAvailabilityPage() {
                     step="5"
                     value={bufferAfterMin}
                     onChange={(e) => setBufferAfterMin(Number(e.target.value))}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-600"
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white"
                   />
-                  <span className="text-[10px] text-slate-400">Cooldown between back-to-back sessions</span>
+                  <span className="text-[10px] text-gray-400">Cooldown between back-to-back sessions</span>
                 </div>
 
                 {/* Slot Step Min */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
+                  <label className="block text-xs font-semibold text-gray-700">
                     Slot Step Interval (Min)
                   </label>
                   <select
                     value={slotStepMin}
                     onChange={(e) => setSlotStepMin(Number(e.target.value))}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600 cursor-pointer"
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white cursor-pointer"
                   >
                     <option value={15}>Every 15 minutes</option>
                     <option value={30}>Every 30 minutes</option>
@@ -364,7 +365,7 @@ export default function MentorAvailabilityPage() {
 
                 {/* Max Sessions Per Day */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
+                  <label className="block text-xs font-semibold text-gray-700">
                     Max Sessions Per Day
                   </label>
                   <input
@@ -373,14 +374,14 @@ export default function MentorAvailabilityPage() {
                     max="20"
                     value={maxSessionsPerDay}
                     onChange={(e) => setMaxSessionsPerDay(Number(e.target.value))}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-600"
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white"
                   />
-                  <span className="text-[10px] text-slate-400">Cap on daily workload</span>
+                  <span className="text-[10px] text-gray-400">Cap on daily workload</span>
                 </div>
 
                 {/* Max Horizon Days */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
+                  <label className="block text-xs font-semibold text-gray-700">
                     Booking Horizon (Days)
                   </label>
                   <input
@@ -389,20 +390,20 @@ export default function MentorAvailabilityPage() {
                     max="180"
                     value={maxHorizonDays}
                     onChange={(e) => setMaxHorizonDays(Number(e.target.value))}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-600"
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white"
                   />
-                  <span className="text-[10px] text-slate-400">How far in advance students can book</span>
+                  <span className="text-[10px] text-gray-400">How far in advance students can book</span>
                 </div>
               </div>
-            </div>
+            </Card>
 
-            {/* Permanent Room Link (ManualLinkProvider fallback) */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-4">
-              <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                <LinkIcon size={18} className="text-purple-600" />
+            {/* Permanent Room Link */}
+            <Card className="p-6 sm:p-8 space-y-4">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                <LinkIcon size={18} className="text-violet-600" />
                 <span>Permanent Meeting Room Link (Fallback)</span>
               </h3>
-              <p className="text-slate-500 text-xs">
+              <p className="text-gray-500 text-xs">
                 Your personal Google Meet, Zoom, or Teams link used when students book meetings.
               </p>
               <input
@@ -410,25 +411,25 @@ export default function MentorAvailabilityPage() {
                 value={meetingLink}
                 onChange={(e) => setMeetingLink(e.target.value)}
                 placeholder="https://meet.google.com/abc-defg-hij or personal Zoom URL"
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-600"
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white"
               />
-            </div>
+            </Card>
 
             {/* Weekly Recurring Availability Matrix */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
+            <Card className="p-6 sm:p-8 space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                    <Clock size={18} className="text-purple-600" />
+                  <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                    <Clock size={18} className="text-violet-600" />
                     <span>Weekly Working Hours</span>
                   </h3>
-                  <p className="text-slate-500 text-xs mt-0.5">
+                  <p className="text-gray-400 text-xs mt-0.5">
                     Specify hours in your local timezone ({timezone}).
                   </p>
                 </div>
               </div>
 
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-gray-100">
                 {WEEKDAY_NAMES.map(({ day, name }) => {
                   const schedule = weeklySchedule[day] || { enabled: false, start: "09:00", end: "17:00" };
 
@@ -449,12 +450,12 @@ export default function MentorAvailabilityPage() {
                               [day]: { ...prev[day], enabled: e.target.checked },
                             }))
                           }
-                          className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer"
+                          className="w-4 h-4 text-violet-600 rounded border-gray-300 focus:ring-violet-500 accent-violet-600 cursor-pointer"
                         />
                         <label
                           htmlFor={`day-${day}`}
-                          className={`text-xs font-bold cursor-pointer ${
-                            schedule.enabled ? "text-slate-900" : "text-slate-400"
+                          className={`text-xs font-semibold cursor-pointer ${
+                            schedule.enabled ? "text-gray-900" : "text-gray-400"
                           }`}
                         >
                           {name}
@@ -473,9 +474,9 @@ export default function MentorAvailabilityPage() {
                                 [day]: { ...prev[day], start: e.target.value },
                               }))
                             }
-                            className="p-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-purple-600"
+                            className="p-2 bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white"
                           />
-                          <span className="text-slate-400">to</span>
+                          <span className="text-gray-400">to</span>
                           <input
                             type="time"
                             value={schedule.end}
@@ -485,43 +486,43 @@ export default function MentorAvailabilityPage() {
                                 [day]: { ...prev[day], end: e.target.value },
                               }))
                             }
-                            className="p-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-purple-600"
+                            className="p-2 bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white"
                           />
                         </div>
                       ) : (
-                        <span className="text-xs text-slate-400 italic">Unavailable</span>
+                        <span className="text-xs text-gray-400 italic">Unavailable</span>
                       )}
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </Card>
 
             {/* Date Exceptions & Vacation Blocks */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
+            <Card className="p-6 sm:p-8 space-y-6">
               <div>
-                <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                  <Calendar size={18} className="text-purple-600" />
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                  <Calendar size={18} className="text-violet-600" />
                   <span>Date Overrides & Vacation Blocks</span>
                 </h3>
-                <p className="text-slate-500 text-xs mt-0.5">
+                <p className="text-gray-400 text-xs mt-0.5">
                   Block specific vacation days from student booking.
                 </p>
               </div>
 
               {/* Add Exception Controls */}
-              <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/80">
+              <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                 <input
                   type="date"
                   value={newExceptionDate}
                   onChange={(e) => setNewExceptionDate(e.target.value)}
-                  className="p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
+                  className="p-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-violet-600"
                 />
 
                 <select
                   value={newExceptionKind}
                   onChange={(e) => setNewExceptionKind(e.target.value)}
-                  className="p-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
+                  className="p-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-violet-600"
                 >
                   <option value="BLOCK">Block Full Day (Unavailable)</option>
                   <option value="EXTRA">Extra Available Day</option>
@@ -532,18 +533,18 @@ export default function MentorAvailabilityPage() {
                   placeholder="Note (e.g. Vacation, Holiday)"
                   value={newExceptionNote}
                   onChange={(e) => setNewExceptionNote(e.target.value)}
-                  className="p-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-purple-600 flex-1 min-w-[140px]"
+                  className="p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-violet-600 flex-1 min-w-[140px]"
                 />
 
-                <button
+                <PrimaryButton
                   type="button"
                   onClick={handleAddException}
                   disabled={!newExceptionDate}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="!min-h-[38px] !py-2 !px-4 text-xs"
                 >
                   <Plus size={14} />
                   <span>Add Override</span>
-                </button>
+                </PrimaryButton>
               </div>
 
               {/* List of Exceptions */}
@@ -560,26 +561,26 @@ export default function MentorAvailabilityPage() {
                     return (
                       <div
                         key={idx}
-                        className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs"
+                        className="p-3 bg-white border border-gray-100 rounded-xl flex items-center justify-between text-xs"
                       >
                         <div className="flex items-center gap-2.5">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                               exc.kind === "BLOCK"
-                                ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                ? "bg-rose-50 text-rose-700 border border-rose-100"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-100"
                             }`}
                           >
                             {exc.kind === "BLOCK" ? "BLOCKED" : "EXTRA"}
                           </span>
-                          <span className="font-bold text-slate-800">{startStr}</span>
-                          {exc.note && <span className="text-slate-500">• {exc.note}</span>}
+                          <span className="font-semibold text-gray-800">{startStr}</span>
+                          {exc.note && <span className="text-gray-400">• {exc.note}</span>}
                         </div>
 
                         <button
                           type="button"
                           onClick={() => handleRemoveException(idx)}
-                          className="text-slate-400 hover:text-rose-600 transition-colors p-1"
+                          className="text-gray-400 hover:text-rose-600 transition-colors p-1 cursor-pointer"
                           title="Remove override"
                         >
                           <Trash2 size={14} />
@@ -589,14 +590,14 @@ export default function MentorAvailabilityPage() {
                   })}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* Save Button */}
-            <div className="p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs flex items-center justify-end">
-              <button
+            <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-xs flex items-center justify-end">
+              <PrimaryButton
                 type="submit"
                 disabled={saving}
-                className="px-8 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs transition-all shadow-md shadow-purple-500/25 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-8 py-3 text-xs"
               >
                 {saving ? (
                   <>
@@ -609,7 +610,7 @@ export default function MentorAvailabilityPage() {
                     <span>Save Availability Rules</span>
                   </>
                 )}
-              </button>
+              </PrimaryButton>
             </div>
           </form>
         </div>

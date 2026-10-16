@@ -45,28 +45,26 @@ import Footer from "@/src/components/Footer";
 import ClassroomLeaderboard from "@/src/components/ClassroomLeaderboard";
 import TransactionStatusTimeline from "@/src/components/TransactionStatusTimeline";
 import CourseCompletionFeedbackModal from "@/src/components/CourseCompletionFeedbackModal";
+import {
+  PrimaryButton,
+  SecondaryButton,
+  GhostButton,
+  Card,
+  StatusPill,
+} from "@/src/components/ui/DesignTokens";
 
 function StatusBadge({ status }) {
   const map = {
-    FUNDED: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", label: "Escrow Funded" },
-    IN_SESSION: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", label: "In Session" },
-    COMPLETED: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", label: "Completed (Read-Only)" },
-    DISPUTED: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", label: "Frozen (Disputed)" },
-    CANCELLED: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", label: "Cancelled" },
-    RESOLVED: { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", label: "Resolved" },
-    CREATED: { bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-200", label: "Pending Escrow" },
+    FUNDED: { label: "Escrow Funded" },
+    IN_SESSION: { label: "In Session" },
+    COMPLETED: { label: "Completed" },
+    DISPUTED: { label: "Frozen (Disputed)" },
+    CANCELLED: { label: "Cancelled" },
+    RESOLVED: { label: "Resolved" },
+    CREATED: { label: "Pending Escrow" },
   };
-
-  const current = map[status] || map.FUNDED;
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${current.bg} ${current.text} ${current.border}`}
-    >
-      <span className="w-2 h-2 rounded-full bg-current" />
-      <span>{current.label}</span>
-    </span>
-  );
+  const label = map[status]?.label || status;
+  return <StatusPill status={status} label={label} />;
 }
 
 export default function ClassroomDetailPage() {
@@ -475,14 +473,14 @@ export default function ClassroomDetailPage() {
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-violet-500 selection:text-white">
       <main className="pt-28 pb-20 px-4 sm:px-6 flex-1">
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Breadcrumb Navigation */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 gap-3">
             <Link
               href="/dashboard/classes"
-              className="inline-flex items-center gap-2 text-slate-500 hover:text-purple-700 text-xs font-bold transition-colors group"
+              className="inline-flex items-center gap-2 text-gray-500 hover:text-violet-700 text-xs font-semibold transition-colors group"
             >
               <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
               <span>Back to My Classes</span>
@@ -491,40 +489,37 @@ export default function ClassroomDetailPage() {
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={effectiveStatus} />
               {enrollment.onchainSessionId && (
-                <span className="font-mono text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
+                <span className="font-mono text-xs font-semibold text-violet-700 bg-violet-50 px-2.5 py-0.5 rounded-full border border-violet-100">
                   Session #{enrollment.onchainSessionId}
                 </span>
               )}
               {!isCompleted ? (
-                <button
-                  type="button"
+                <PrimaryButton
                   onClick={() => setShowReleaseModal(true)}
-                  className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                  className="!min-h-[38px] !py-1.5 !px-4"
                 >
-                  <CheckCircle2 size={13} />
+                  <CheckCircle2 size={14} />
                   <span>End Mentorship & Release Escrow</span>
-                </button>
+                </PrimaryButton>
               ) : (
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
+                  <PrimaryButton
                     onClick={() => {
                       fetchCertificate();
                       setShowCertModal(true);
                     }}
-                    className="px-3.5 py-1.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105"
+                    className="!min-h-[38px] !py-1.5 !px-4"
                   >
-                    <Award size={13} />
+                    <Award size={14} />
                     <span>View On-Chain Certificate</span>
-                  </button>
-                  <button
-                    type="button"
+                  </PrimaryButton>
+                  <SecondaryButton
                     onClick={() => setShowFeedbackModal(true)}
-                    className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105"
+                    className="!min-h-[38px] !py-1.5 !px-4"
                   >
-                    <Share2 size={13} />
+                    <Share2 size={14} />
                     <span>Feedback & Share</span>
-                  </button>
+                  </SecondaryButton>
                 </div>
               )}
             </div>
@@ -666,60 +661,60 @@ export default function ClassroomDetailPage() {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex border-b border-slate-200 space-x-6 text-sm font-bold">
+          <div className="flex flex-wrap items-center gap-2 bg-gray-100/80 p-1.5 rounded-full max-w-full overflow-x-auto scrollbar-none">
             <button
               onClick={() => setActiveTab("materials")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "materials"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <Layers size={16} />
+              <Layers size={15} />
               <span>Curriculum Roadmap ({modules.length})</span>
             </button>
             <button
               onClick={() => setActiveTab("meetings")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "meetings"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <Video size={16} />
+              <Video size={15} />
               <span>Live Meetings ({meetings.length})</span>
             </button>
             <button
               onClick={() => setActiveTab("tasks")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "tasks"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <ClipboardList size={16} />
+              <ClipboardList size={15} />
               <span>Assignments & Tasks ({assignments.length})</span>
             </button>
             <button
               onClick={() => setActiveTab("chat")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "chat"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <MessageSquare size={16} />
+              <MessageSquare size={15} />
               <span>Chat with Mentor</span>
             </button>
             <button
               onClick={() => setActiveTab("leaderboard")}
-              className={`pb-3.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeTab === "leaderboard"
-                  ? "border-purple-600 text-purple-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              <Trophy size={16} />
+              <Trophy size={15} />
               <span>Leaderboard</span>
             </button>
           </div>

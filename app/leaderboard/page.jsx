@@ -23,7 +23,10 @@ import {
   Flame,
   ChevronLeft,
   ChevronRight,
+  TrendingUp,
+  ArrowUpRight,
 } from "lucide-react";
+import { Card, StatCard, PrimaryButton, GhostButton, StatusPill } from "@/src/components/ui/DesignTokens";
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState("mentors"); // "mentors" | "students"
@@ -120,66 +123,61 @@ export default function LeaderboardPage() {
   const getRankBadge = (rank) => {
     if (rank === 1) {
       return (
-        <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-amber-300">
+        <div className="w-8 h-8 rounded-full bg-violet-600 text-white font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-violet-300">
           1
         </div>
       );
     }
     if (rank === 2) {
       return (
-        <div className="w-8 h-8 rounded-full bg-slate-300 text-slate-900 font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-slate-200">
+        <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-800 font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-violet-200">
           2
         </div>
       );
     }
     if (rank === 3) {
       return (
-        <div className="w-8 h-8 rounded-full bg-amber-700 text-white font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-amber-600">
+        <div className="w-8 h-8 rounded-full bg-violet-50 text-violet-700 font-black text-xs flex items-center justify-center shadow-xs ring-1 ring-violet-200">
           3
         </div>
       );
     }
     return (
-      <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center border border-slate-200">
+      <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 font-bold text-xs flex items-center justify-center border border-gray-200">
         {rank}
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-slate-50 text-slate-900">
-      {/* ── Full-Width Hero Section (Bright & Light, styled like About hero with bright leaderboard.webp background) ── */}
-      <section className="relative w-full pt-32 pb-24 text-center px-6 overflow-hidden border-b border-slate-200 bg-white">
-        {/* Panoramic Background Image: Bright & Vibrant */}
+    <div className="min-h-screen flex flex-col justify-between bg-gray-50 text-gray-900">
+      {/* ── Full-Width Hero Section ── */}
+      <section className="relative w-full pt-32 pb-24 text-center px-6 overflow-hidden border-b border-gray-100 bg-white">
+        {/* Panoramic Background Image */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
           style={{ backgroundImage: "url('/leaderboard.webp')" }}
         />
-        {/* Soft Light Overlay to keep the bright image vibrant while ensuring high contrast for text */}
-        <div className="absolute inset-0 bg-white/75 sm:bg-white/70 backdrop-blur-[1px] pointer-events-none" />
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] pointer-events-none" />
 
         <div className="relative z-10 max-w-4xl mx-auto">
-          <span className="inline-flex items-center gap-2 bg-white/95 text-purple-950 text-xs sm:text-sm px-4 py-1.5 rounded-full mb-6 border border-purple-200 shadow-sm backdrop-blur-md font-bold">
-            <Trophy size={14} className="text-amber-500" />
+          <span className="inline-flex items-center gap-2 bg-violet-50 text-violet-700 text-xs sm:text-sm px-4 py-1.5 rounded-full mb-6 border border-violet-100 shadow-xs font-semibold">
+            <Trophy size={14} className="text-violet-600" />
             The Protocol Leaderboard
           </span>
 
           <h1
-            className="font-extrabold tracking-tight text-slate-950 mb-6"
+            className="font-extrabold tracking-tight text-gray-900 mb-6"
             style={{
               fontSize: "clamp(34px, 5vw, 56px)",
               lineHeight: 1.1,
-              textShadow: "0 2px 10px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3)",
             }}
           >
             Transparent On-Chain<br />Performance Leaderboard
           </h1>
 
           <p
-            className="text-slate-800 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto font-semibold"
-            style={{
-              textShadow: "0 1px 6px rgba(0, 0, 0, 0.3)",
-            }}
+            className="text-gray-500 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto font-normal"
           >
             On-chain performance rankings for mentors and students. Rankings are earned through verified teaching delivery and student ratings — economic stake acts as a safety collateral tier.
           </p>
@@ -192,84 +190,59 @@ export default function LeaderboardPage() {
 
           {/* ── KPI Metric Cards ── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-10">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-purple-300 transition-all">
-              <div className="flex items-center justify-between text-slate-500 mb-2">
-                <span className="text-xs sm:text-sm font-medium">Total Staked in Vault</span>
-                <Coins className="w-4 h-4 text-emerald-500" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                ${stats.totalStakedUsdc.toLocaleString()} <span className="text-xs sm:text-sm font-semibold text-slate-500">USDC</span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1 font-medium">Locked in MentorStaking.sol</p>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-purple-300 transition-all">
-              <div className="flex items-center justify-between text-slate-500 mb-2">
-                <span className="text-xs sm:text-sm font-medium">Dispute Juror Pool</span>
-                <Scale className="w-4 h-4 text-purple-500" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {stats.activeJurorsCount} <span className="text-xs sm:text-sm font-semibold text-purple-600">Active</span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1 font-medium">Stake ≥ $100, 5+ Sess & Rating ≥ 4.8</p>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-purple-300 transition-all">
-              <div className="flex items-center justify-between text-slate-500 mb-2">
-                <span className="text-xs sm:text-sm font-medium">Settled Sessions</span>
-                <Users className="w-4 h-4 text-indigo-500" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {stats.totalCompletedSessions} <span className="text-xs sm:text-sm font-semibold text-slate-500">Completed</span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1 font-medium">Non-custodial Escrow releases</p>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-purple-300 transition-all">
-              <div className="flex items-center justify-between text-slate-500 mb-2">
-                <span className="text-xs sm:text-sm font-medium">On-Chain Credentials</span>
-                <Award className="w-4 h-4 text-amber-500" />
-              </div>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {stats.totalCertificates} <span className="text-xs sm:text-sm font-semibold text-slate-500">Issued</span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1 font-medium">W3C JSON-LD pinned to IPFS</p>
-            </div>
+            <StatCard
+              icon={Coins}
+              label="Total Staked in Vault"
+              value={`$${stats.totalStakedUsdc.toLocaleString()} USDC`}
+              subtext="Locked in MentorStaking.sol"
+            />
+            <StatCard
+              icon={Scale}
+              label="Dispute Juror Pool"
+              value={`${stats.activeJurorsCount} Active`}
+              subtext="Stake ≥ $100, 5+ Sess & Rating ≥ 4.8"
+            />
+            <StatCard
+              icon={Users}
+              label="Settled Sessions"
+              value={`${stats.totalCompletedSessions} Done`}
+              subtext="Non-custodial Escrow releases"
+            />
+            <StatCard
+              icon={Award}
+              label="On-Chain Credentials"
+              value={`${stats.totalCertificates} Issued`}
+              subtext="W3C JSON-LD pinned to IPFS"
+            />
           </div>
 
-          {/* ── TOP 3 SPOTLIGHT PODIUM (Visual Engagement) ── */}
+          {/* ── TOP 3 SPOTLIGHT PODIUM ── */}
           {!loading && !error && (
             <div className="mb-10">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <Flame className="w-4 h-4 text-amber-500" />
+                <h2 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                  <Flame className="w-4 h-4 text-violet-600" />
                   Top Performers Spotlight
                 </h2>
-                <span className="text-xs text-slate-400 font-medium">Ranked by Protocol Score</span>
+                <span className="text-xs text-gray-400 font-medium">Ranked by Protocol Score</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-end">
                 {(activeTab === "mentors" ? top3Mentors : top3Students).map((item, idx) => {
                   const isGold = idx === 0;
-                  const isSilver = idx === 1;
-                  const isBronze = idx === 2;
 
                   const borderClass = isGold
-                    ? "border-amber-400/80 shadow-md shadow-amber-500/10 ring-1 ring-amber-300/40"
-                    : isSilver
-                    ? "border-slate-300 shadow-sm"
-                    : "border-amber-700/40 shadow-sm";
+                    ? "ring-2 ring-violet-400 bg-violet-50/30 shadow-md md:scale-[1.02]"
+                    : "ring-2 ring-violet-200 bg-white shadow-xs";
 
                   const tagBg = isGold
-                    ? "bg-amber-100 text-amber-900 border-amber-300"
-                    : isSilver
-                    ? "bg-slate-100 text-slate-800 border-slate-300"
-                    : "bg-amber-50 text-amber-800 border-amber-200";
+                    ? "bg-violet-600 text-white"
+                    : "bg-violet-50 text-violet-700 border border-violet-100";
 
                   return (
-                    <div
+                    <Card
                       key={item.id}
-                      className={`bg-white rounded-2xl p-5 border ${borderClass} relative overflow-hidden transition-all hover:-translate-y-0.5`}
+                      className={`p-5 relative overflow-hidden transition-all duration-200 ${borderClass}`}
                     >
                       {/* Top Rank Badge */}
                       <div className="flex items-start justify-between gap-3 mb-4">
@@ -279,18 +252,16 @@ export default function LeaderboardPage() {
                               <img
                                 src={item.avatarUrl}
                                 alt={item.name}
-                                className={`w-13 h-13 rounded-full object-cover transition-all cursor-pointer ${
-                                  item.isVerified
-                                    ? "border-2 border-emerald-500 ring-2 ring-emerald-400/50 shadow-xs shadow-emerald-500/20 group-hover/avatar:ring-emerald-500"
-                                    : "border border-slate-200 shadow-xs group-hover/avatar:border-purple-300"
+                                className={`w-14 h-14 rounded-full object-cover transition-all cursor-pointer ${
+                                  isGold ? "ring-2 ring-violet-400" : "ring-2 ring-violet-200"
                                 }`}
                               />
                               {item.isVerified && (
                                 <span
-                                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs"
+                                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center border-2 border-white shadow-xs"
                                   title="Verified"
                                 >
-                                  <CheckCircle2 className="w-3.5 h-3.5 fill-emerald-500 text-white" />
+                                  <CheckCircle2 className="w-3.5 h-3.5 fill-emerald-600 text-white" />
                                 </span>
                               )}
                             </Link>
@@ -299,57 +270,52 @@ export default function LeaderboardPage() {
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <Link
                                 href={`/mentor/${encodeURIComponent(item.id)}`}
-                                className="font-extrabold text-slate-900 text-base hover:text-purple-700 hover:underline transition-colors cursor-pointer"
+                                className="font-bold text-gray-900 text-base hover:text-violet-600 transition-colors cursor-pointer"
                               >
                                 {item.name}
                               </Link>
                               {activeTab === "mentors" && item.role === "ADMIN" && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[9px] font-black uppercase border border-purple-200">
+                                <span className="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold uppercase">
                                   Admin
                                 </span>
                               )}
-                              {activeTab === "mentors" && item.isVerified && (
-                                <span title="Verified">
-                                  <CheckCircle2 className="w-4 h-4 fill-emerald-500 text-white" />
-                                </span>
-                              )}
                             </div>
-                            <p className="text-xs text-slate-500 font-medium line-clamp-1">
+                            <p className="text-xs text-gray-500 font-normal line-clamp-1">
                               {activeTab === "mentors" ? item.domain : item.university}
                             </p>
                           </div>
                         </div>
 
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black border ${tagBg}`}>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${tagBg}`}>
                           <Medal className="w-3.5 h-3.5" />
                           Rank #{item.rank}
                         </span>
                       </div>
 
                       {/* Stats Grid inside Spotlight */}
-                      <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 text-xs">
+                      <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100 text-xs">
                         {activeTab === "mentors" ? (
                           <>
-                            <div className="bg-slate-50 rounded-xl p-2.5">
-                              <span className="text-[11px] text-slate-500 font-medium block">Staked Vault</span>
-                              <span className="font-extrabold text-emerald-700 text-sm">${item.stakeAmount} USDC</span>
+                            <div className="bg-gray-50 rounded-xl p-2.5">
+                              <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider block">Staked Vault</span>
+                              <span className="font-bold text-emerald-600 text-sm tabular-nums">${item.stakeAmount} USDC</span>
                             </div>
-                            <div className="bg-slate-50 rounded-xl p-2.5">
-                              <span className="text-[11px] text-slate-500 font-medium block">Rating & Sessions</span>
-                              <span className="font-extrabold text-slate-900 text-sm">
-                                {item.rating !== null ? `${item.rating} ★ (${item.sessionsCount})` : `New (${item.sessionsCount} sess)`}
+                            <div className="bg-gray-50 rounded-xl p-2.5">
+                              <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider block">Rating & Sessions</span>
+                              <span className="font-bold text-gray-900 text-sm tabular-nums">
+                                {item.rating !== null ? `${item.rating} (${item.sessionsCount})` : `New (${item.sessionsCount})`}
                               </span>
                             </div>
                           </>
                         ) : (
                           <>
-                            <div className="bg-slate-50 rounded-xl p-2.5">
-                              <span className="text-[11px] text-slate-500 font-medium block">Sessions Completed</span>
-                              <span className="font-extrabold text-indigo-700 text-sm">{item.sessionsCount} Sessions</span>
+                            <div className="bg-gray-50 rounded-xl p-2.5">
+                              <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider block">Sessions</span>
+                              <span className="font-bold text-violet-600 text-sm tabular-nums">{item.sessionsCount} Done</span>
                             </div>
-                            <div className="bg-slate-50 rounded-xl p-2.5">
-                              <span className="text-[11px] text-slate-500 font-medium block">Credentials</span>
-                              <span className="font-extrabold text-amber-700 text-sm">{item.certificatesCount} Verified</span>
+                            <div className="bg-gray-50 rounded-xl p-2.5">
+                              <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider block">Credentials</span>
+                              <span className="font-bold text-gray-900 text-sm tabular-nums">{item.certificatesCount} Verified</span>
                             </div>
                           </>
                         )}
@@ -359,48 +325,52 @@ export default function LeaderboardPage() {
                       <div className="mt-3.5 flex items-center justify-between">
                         {activeTab === "mentors" ? (
                           item.isJurorEligible ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
-                              <Scale className="w-3 h-3 text-purple-600" />
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 bg-violet-50 px-2.5 py-0.5 rounded-full border border-violet-100">
+                              <Scale className="w-3 h-3 text-violet-600" />
                               Council Juror Eligible
                             </span>
                           ) : (
-                            <span className="text-[11px] text-slate-400 font-medium">
+                            <span className="text-[11px] text-gray-400 font-normal">
                               {item.stakeAmount >= 100 ? (item.sessionsCount < 5 ? "Need 5+ Sessions" : "Rating < 4.8") : "Need $100 Stake"}
                             </span>
                           )
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             On-Chain Verified
                           </span>
                         )}
 
-                        <span className="text-xs font-black text-slate-400">Score: {item.score}</span>
+                        <span className="text-xs font-semibold text-gray-500 tabular-nums flex items-center gap-1">
+                          <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                          Score: {item.score}
+                        </span>
                       </div>
-                    </div>
+                    </Card>
                   );
                 })}
               </div>
             </div>
           )}
 
+
           {/* ── Tabs & Search Filter ── */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs mb-8">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-xs mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               {/* Tab Buttons */}
-              <div className="inline-flex p-1 bg-slate-100 rounded-xl">
+              <div className="inline-flex p-1 bg-gray-100 rounded-full">
                 <button
                   onClick={() => {
                     setActiveTab("mentors");
                     setSearchQuery("");
                   }}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                     activeTab === "mentors"
-                      ? "bg-white text-slate-950 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-violet-50 text-violet-700 shadow-xs"
+                      : "text-gray-500 hover:text-gray-900"
                   }`}
                 >
-                  <ShieldCheck className="w-4 h-4 text-purple-600" />
+                  <ShieldCheck className="w-4 h-4 text-violet-600" />
                   Top Mentors & Jurors ({data.mentors.length})
                 </button>
                 <button
@@ -408,13 +378,13 @@ export default function LeaderboardPage() {
                     setActiveTab("students");
                     setSearchQuery("");
                   }}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                     activeTab === "students"
-                      ? "bg-white text-slate-950 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-violet-50 text-violet-700 shadow-xs"
+                      : "text-gray-500 hover:text-gray-900"
                   }`}
                 >
-                  <GraduationCap className="w-4 h-4 text-indigo-600" />
+                  <GraduationCap className="w-4 h-4 text-violet-600" />
                   Certified Learners ({data.students.length})
                 </button>
               </div>
@@ -422,26 +392,26 @@ export default function LeaderboardPage() {
               {/* Search Input & Juror Filter Toggle */}
               <div className="flex items-center gap-3">
                 <div className="relative flex-1 sm:w-64">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder={activeTab === "mentors" ? "Search mentors, skills..." : "Search students, university..."}
+                    placeholder={activeTab === "mentors" ? "Search mentors, skills..." : "Search students..."}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                    className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-full text-xs sm:text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-600 focus:bg-white transition-all"
                   />
                 </div>
 
                 {activeTab === "mentors" && (
                   <button
                     onClick={() => setFilterJurorOnly(!filterJurorOnly)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
                       filterJurorOnly
-                        ? "bg-purple-50 border-purple-300 text-purple-800 font-bold shadow-xs"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        ? "bg-violet-50 border-violet-200 text-violet-700 shadow-xs"
+                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                     }`}
                   >
-                    <Scale className="w-3.5 h-3.5 text-purple-600" />
+                    <Scale className="w-3.5 h-3.5 text-violet-600" />
                     Jurors Only
                   </button>
                 )}
@@ -451,34 +421,32 @@ export default function LeaderboardPage() {
 
           {/* ── Table Content ── */}
           {loading ? (
-            <div className="bg-white rounded-3xl border border-slate-200/90 p-12 sm:p-16 text-center shadow-xs relative overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-100 p-12 sm:p-16 text-center shadow-xs relative overflow-hidden">
               <div className="relative inline-flex items-center justify-center mb-4">
-                <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center border border-purple-100 shadow-2xs">
-                  <RefreshCw className="w-7 h-7 text-purple-600 animate-spin" />
+                <div className="w-12 h-12 rounded-xl bg-violet-50 flex items-center justify-center border border-violet-100">
+                  <RefreshCw className="w-6 h-6 text-violet-600 animate-spin" />
                 </div>
-                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 animate-ping opacity-75" />
               </div>
-              <h3 className="text-base font-extrabold text-slate-900 tracking-tight">Syncing Leaderboard</h3>
-              <p className="text-xs text-slate-500 mt-1 font-medium">Fetching verified on-chain metrics & juror reputation...</p>
+              <h3 className="text-base font-bold text-gray-900 tracking-tight">Syncing Leaderboard</h3>
+              <p className="text-xs text-gray-400 mt-1 font-medium">Fetching verified on-chain metrics and juror reputation...</p>
 
-              {/* Sleek skeleton placeholder rows for realistic Web3 feel */}
               <div className="mt-8 space-y-3 max-w-2xl mx-auto">
-                <div className="h-12 bg-slate-50 border border-slate-100 rounded-xl animate-pulse" />
-                <div className="h-12 bg-slate-50 border border-slate-100 rounded-xl animate-pulse opacity-70" />
-                <div className="h-12 bg-slate-50 border border-slate-100 rounded-xl animate-pulse opacity-40" />
+                <div className="h-10 bg-gray-50 border border-gray-100 rounded-xl animate-pulse" />
+                <div className="h-10 bg-gray-50 border border-gray-100 rounded-xl animate-pulse opacity-70" />
+                <div className="h-10 bg-gray-50 border border-gray-100 rounded-xl animate-pulse opacity-40" />
               </div>
             </div>
           ) : error ? (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-6 text-center text-sm font-medium">
+            <div className="bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl p-6 text-center text-sm font-medium">
               Error loading leaderboard: {error}
             </div>
           ) : activeTab === "mentors" ? (
             /* ── MENTORS TABLE ── */
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    <tr className="bg-gray-50/70 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                       <th className="py-4 px-4 sm:px-6 w-16">Rank</th>
                       <th className="py-4 px-4 sm:px-6">Mentor & Expertise</th>
                       <th className="py-4 px-4 sm:px-6 text-center">USDC Stake</th>
@@ -488,16 +456,16 @@ export default function LeaderboardPage() {
                       <th className="py-4 px-4 sm:px-6 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-gray-100">
                     {filteredMentors.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-500 text-sm">
+                        <td colSpan={7} className="py-12 text-center text-gray-400 text-sm">
                           No mentors match your filter criteria.
                         </td>
                       </tr>
                     ) : (
                       paginatedMentors.map((m) => (
-                        <tr key={m.id} className="hover:bg-purple-50/30 transition-colors group">
+                        <tr key={m.id} className="hover:bg-violet-50/40 transition-colors group">
                           {/* Rank */}
                           <td className="py-4 px-4 sm:px-6">{getRankBadge(m.rank)}</td>
 
@@ -511,16 +479,16 @@ export default function LeaderboardPage() {
                                     alt={m.name}
                                     className={`w-11 h-11 rounded-full object-cover transition-all flex-shrink-0 cursor-pointer ${
                                       m.isVerified
-                                        ? "border-2 border-emerald-500 ring-2 ring-emerald-400/50 shadow-xs shadow-emerald-500/20 group-hover/avatar:ring-emerald-500"
-                                        : "border border-slate-200 ring-2 ring-transparent group-hover/avatar:ring-purple-400"
+                                        ? "ring-2 ring-emerald-400"
+                                        : "border border-gray-200 ring-2 ring-transparent group-hover/avatar:ring-violet-300"
                                     }`}
                                   />
                                   {m.isVerified && (
                                     <span
-                                      className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs"
+                                      className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center border-2 border-white shadow-xs"
                                       title="Verified Mentor"
                                     >
-                                      <CheckCircle2 className="w-3 h-3 fill-emerald-500 text-white" />
+                                      <CheckCircle2 className="w-3 h-3 fill-emerald-600 text-white" />
                                     </span>
                                   )}
                                 </Link>
@@ -529,32 +497,32 @@ export default function LeaderboardPage() {
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <Link
                                     href={`/mentor/${encodeURIComponent(m.id)}`}
-                                    className="font-bold text-slate-900 hover:text-purple-700 hover:underline transition-colors cursor-pointer"
+                                    className="font-bold text-gray-900 hover:text-violet-600 transition-colors cursor-pointer"
                                   >
                                     {m.name}
                                   </Link>
                                   {m.nickname && (
-                                    <span className="text-xs text-slate-500 font-medium">(@{m.nickname})</span>
+                                    <span className="text-xs text-gray-400 font-normal">(@{m.nickname})</span>
                                   )}
                                   {m.role === "ADMIN" && (
-                                    <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-black uppercase border border-purple-200">
+                                    <span className="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold uppercase">
                                       Admin
                                     </span>
                                   )}
                                   {m.isVerified && (
                                     <span title="Verified">
-                                      <CheckCircle2 className="w-4 h-4 fill-emerald-500 text-white flex-shrink-0" />
+                                      <CheckCircle2 className="w-4 h-4 fill-emerald-600 text-white flex-shrink-0" />
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-xs text-slate-500 font-medium line-clamp-1">{m.domain}</p>
+                                <p className="text-xs text-gray-500 font-normal line-clamp-1">{m.domain}</p>
 
                                 {/* Skills Pills */}
                                 <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                                   {(m.skills || []).map((skill, idx) => (
                                     <span
                                       key={idx}
-                                      className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700"
+                                      className="px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600"
                                     >
                                       {skill}
                                     </span>
@@ -566,64 +534,57 @@ export default function LeaderboardPage() {
 
                           {/* Stake Amount */}
                           <td className="py-4 px-4 sm:px-6 text-center">
-                            <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 tabular-nums">
                               <Lock className="w-3 h-3 text-emerald-600" />
                               ${m.stakeAmount} USDC
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-1 font-medium">{m.mentorLevel}</p>
+                            <p className="text-[10px] text-gray-400 mt-1 font-medium">{m.mentorLevel}</p>
                           </td>
 
                           {/* Rating */}
                           <td className="py-4 px-4 sm:px-6 text-center">
                             {m.rating !== null ? (
                               <>
-                                <div className="inline-flex items-center gap-1 font-black text-slate-900 text-sm">
-                                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                                <div className="inline-flex items-center gap-1 font-bold text-gray-900 text-sm tabular-nums">
+                                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
                                   {m.rating}
                                 </div>
-                                <p className="text-[10px] text-slate-500 mt-0.5 font-medium">100% Satisfied</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">100% Satisfied</p>
                               </>
                             ) : (
                               <div className="inline-flex flex-col items-center">
-                                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md">New</span>
-                                <p className="text-[10px] text-slate-400 mt-0.5 font-medium">No sessions yet</p>
+                                <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-0.5 rounded-full">New</span>
+                                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">No sessions</p>
                               </div>
                             )}
                           </td>
 
                           {/* Sessions Completed */}
                           <td className="py-4 px-4 sm:px-6 text-center">
-                            <div className="font-bold text-slate-900">{m.sessionsCount} Sessions</div>
-                            <p className="text-[10px] text-slate-500 font-medium">${m.totalVolume} settled</p>
+                            <div className="font-bold text-gray-900 tabular-nums">{m.sessionsCount} Sessions</div>
+                            <p className="text-[10px] text-gray-400 font-medium tabular-nums">${m.totalVolume} settled</p>
                           </td>
 
                           {/* Dispute Juror Status */}
                           <td className="py-4 px-4 sm:px-6 text-center">
                             {m.isJurorEligible ? (
                               <div className="inline-flex flex-col items-center">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-100/80 text-purple-800 border border-purple-300 shadow-xs">
-                                  <Scale className="w-3.5 h-3.5 text-purple-700" />
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100">
+                                  <Scale className="w-3.5 h-3.5 text-violet-600" />
                                   Council Juror
                                 </span>
-                                <span className="text-[10px] text-purple-600 font-semibold mt-1">
+                                <span className="text-[10px] text-violet-600 font-medium mt-1">
                                   {m.role === "ADMIN" ? "Ex-Officio Authority" : "Eligible for 3-of-5 Quorum"}
                                 </span>
                               </div>
                             ) : (
                               <div className="inline-flex flex-col items-center">
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
                                   {m.stakeAmount < 100
                                     ? "Need $100 Stake"
                                     : m.sessionsCount < 5
                                     ? "Need 5+ Sessions"
                                     : "Rating < 4.8"}
-                                </span>
-                                <span className="text-[10px] text-slate-500 mt-1">
-                                  {m.stakeAmount < 100
-                                    ? "Requires $100 USDC"
-                                    : m.sessionsCount < 5
-                                    ? `${5 - m.sessionsCount} more sessions needed`
-                                    : "Requires 4.8+ rating"}
                                 </span>
                               </div>
                             )}
@@ -631,12 +592,11 @@ export default function LeaderboardPage() {
 
                           {/* Action */}
                           <td className="py-4 px-4 sm:px-6 text-right">
-                            <Link
-                              href="/explore"
-                              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-sm hover:shadow-md hover:shadow-purple-500/25 active:scale-95 transition-all duration-200 border border-purple-400/30 whitespace-nowrap group cursor-pointer"
-                            >
-                              <span>Book Session</span>
-                              <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-1" />
+                            <Link href="/explore">
+                              <PrimaryButton className="!min-h-[36px] !py-1.5 !px-3.5 text-xs">
+                                <span>Book</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </PrimaryButton>
                             </Link>
                           </td>
                         </tr>
@@ -646,15 +606,15 @@ export default function LeaderboardPage() {
                 </table>
               </div>
 
-              {/* ── Thematic Web3 Pagination for Mentors ── */}
+              {/* ── Pagination for Mentors ── */}
               {filteredMentors.length > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-slate-50/80 border-t border-slate-200">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-gray-50/50 border-t border-gray-100">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
                     <span>
-                      Showing <strong className="text-slate-900 font-bold">{(mentorPage - 1) * itemsPerPage + 1}</strong>–
-                      <strong className="text-slate-900 font-bold">{Math.min(mentorPage * itemsPerPage, filteredMentors.length)}</strong> of{" "}
-                      <strong className="text-slate-900 font-bold">{filteredMentors.length}</strong> Ranked Mentors
+                      Showing <strong className="text-gray-900 font-semibold">{(mentorPage - 1) * itemsPerPage + 1}</strong>–
+                      <strong className="text-gray-900 font-semibold">{Math.min(mentorPage * itemsPerPage, filteredMentors.length)}</strong> of{" "}
+                      <strong className="text-gray-900 font-semibold">{filteredMentors.length}</strong> Ranked Mentors
                     </span>
                   </div>
 
@@ -662,7 +622,7 @@ export default function LeaderboardPage() {
                     <button
                       onClick={() => setMentorPage((p) => Math.max(p - 1, 1))}
                       disabled={mentorPage === 1}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:border-purple-300 hover:text-purple-700 disabled:opacity-40 disabled:pointer-events-none shadow-2xs transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-gray-700 border border-gray-200 hover:border-violet-200 hover:text-violet-700 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
                       <span>Prev</span>
@@ -673,10 +633,10 @@ export default function LeaderboardPage() {
                         <button
                           key={pageNum}
                           onClick={() => setMentorPage(pageNum)}
-                          className={`w-8 h-8 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                          className={`w-8 h-8 rounded-full text-xs font-bold transition-all cursor-pointer ${
                             mentorPage === pageNum
-                              ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm shadow-purple-500/30 ring-2 ring-purple-300/40"
-                              : "bg-white text-slate-700 border border-slate-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200"
+                              ? "bg-violet-600 text-white shadow-xs"
+                              : "bg-white text-gray-600 border border-gray-200 hover:bg-violet-50 hover:text-violet-700 hover:border-violet-200"
                           }`}
                         >
                           {pageNum}
@@ -687,7 +647,7 @@ export default function LeaderboardPage() {
                     <button
                       onClick={() => setMentorPage((p) => Math.min(p + 1, totalMentorPages))}
                       disabled={mentorPage === totalMentorPages}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:border-purple-300 hover:text-purple-700 disabled:opacity-40 disabled:pointer-events-none shadow-2xs transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-gray-700 border border-gray-200 hover:border-violet-200 hover:text-violet-700 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
                     >
                       <span>Next</span>
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -698,29 +658,29 @@ export default function LeaderboardPage() {
             </div>
           ) : (
             /* ── STUDENTS TABLE ── */
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    <tr className="bg-gray-50/70 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                       <th className="py-4 px-4 sm:px-6 w-16">Rank</th>
                       <th className="py-4 px-4 sm:px-6">Student & Campus</th>
                       <th className="py-4 px-4 sm:px-6">Learning Interests</th>
-                      <th className="py-4 px-4 sm:px-6 text-center">Sessions Completed</th>
+                      <th className="py-4 px-4 sm:px-6 text-center">Sessions</th>
                       <th className="py-4 px-4 sm:px-6 text-center">On-Chain Credentials</th>
-                      <th className="py-4 px-4 sm:px-6 text-right">Credential Proof</th>
+                      <th className="py-4 px-4 sm:px-6 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-gray-100">
                     {filteredStudents.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-500 text-sm">
+                        <td colSpan={6} className="py-12 text-center text-gray-400 text-sm">
                           No students match your filter criteria.
                         </td>
                       </tr>
                     ) : (
                       paginatedStudents.map((s) => (
-                        <tr key={s.id} className="hover:bg-indigo-50/30 transition-colors group">
+                        <tr key={s.id} className="hover:bg-violet-50/40 transition-colors group">
                           {/* Rank */}
                           <td className="py-4 px-4 sm:px-6">{getRankBadge(s.rank)}</td>
 
@@ -732,7 +692,7 @@ export default function LeaderboardPage() {
                                   <img
                                     src={s.avatarUrl}
                                     alt={s.name}
-                                    className="w-11 h-11 rounded-full object-cover border border-slate-200 ring-2 ring-transparent group-hover:ring-indigo-400 transition-all flex-shrink-0 cursor-pointer"
+                                    className="w-11 h-11 rounded-full object-cover border border-gray-200 ring-2 ring-transparent group-hover:ring-violet-300 transition-all flex-shrink-0 cursor-pointer"
                                   />
                                 </Link>
                               </div>
@@ -740,16 +700,16 @@ export default function LeaderboardPage() {
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <Link
                                     href={`/mentor/${encodeURIComponent(s.id)}`}
-                                    className="font-bold text-slate-900 hover:text-indigo-700 hover:underline transition-colors cursor-pointer"
+                                    className="font-bold text-gray-900 hover:text-violet-600 transition-colors cursor-pointer"
                                   >
                                     {s.name}
                                   </Link>
                                   {s.nickname && (
-                                    <span className="text-xs text-slate-500 font-medium">(@{s.nickname})</span>
+                                    <span className="text-xs text-gray-400 font-normal">(@{s.nickname})</span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-1 text-xs text-slate-500 font-medium mt-0.5">
-                                  <GraduationCap className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+                                <div className="flex items-center gap-1 text-xs text-gray-500 font-normal mt-0.5">
+                                  <GraduationCap className="w-3.5 h-3.5 text-violet-600 flex-shrink-0" />
                                   {s.university || "Web3 Academy"}
                                 </div>
                               </div>
@@ -758,24 +718,24 @@ export default function LeaderboardPage() {
 
                           {/* Interests */}
                           <td className="py-4 px-4 sm:px-6 max-w-xs">
-                            <p className="text-xs text-slate-700 font-medium line-clamp-2">
+                            <p className="text-xs text-gray-600 font-normal line-clamp-2">
                               {s.learningInterests}
                             </p>
                           </td>
 
                           {/* Sessions Completed */}
                           <td className="py-4 px-4 sm:px-6 text-center">
-                            <div className="font-bold text-slate-900">{s.sessionsCount} Sessions</div>
+                            <div className="font-bold text-gray-900 tabular-nums">{s.sessionsCount} Sessions</div>
                             <span className="text-[10px] text-emerald-600 font-semibold">100% Escrow Released</span>
                           </td>
 
                           {/* Certificates */}
                           <td className="py-4 px-4 sm:px-6 text-center">
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                              <Award className="w-3.5 h-3.5 text-amber-600" />
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100 tabular-nums">
+                              <Award className="w-3.5 h-3.5 text-violet-600" />
                               {s.certificatesCount} Credentials
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-1 font-medium">W3C JSON-LD / EIP-712</p>
+                            <p className="text-[10px] text-gray-400 mt-1 font-medium">W3C JSON-LD / EIP-712</p>
                           </td>
 
                           {/* Latest Certificate Action */}
@@ -783,13 +743,13 @@ export default function LeaderboardPage() {
                             {s.latestCertificate ? (
                               <Link
                                 href={`/certificate/${s.latestCertificate.attestationUid}`}
-                                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 whitespace-nowrap group cursor-pointer"
+                                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-gray-900 hover:bg-violet-600 text-white shadow-xs transition-all duration-200 whitespace-nowrap cursor-pointer"
                               >
                                 <span>Verify Proof</span>
-                                <ExternalLink className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+                                <ExternalLink className="w-3.5 h-3.5" />
                               </Link>
                             ) : (
-                              <span className="text-xs text-slate-400 font-medium italic whitespace-nowrap">Pending Attestation</span>
+                              <span className="text-xs text-gray-400 font-normal italic whitespace-nowrap">Pending Attestation</span>
                             )}
                           </td>
                         </tr>
@@ -799,15 +759,15 @@ export default function LeaderboardPage() {
                 </table>
               </div>
 
-              {/* ── Thematic Web3 Pagination for Students ── */}
+              {/* ── Pagination for Students ── */}
               {filteredStudents.length > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-slate-50/80 border-t border-slate-200">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse inline-block" />
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-gray-50/50 border-t border-gray-100">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-violet-600 inline-block" />
                     <span>
-                      Showing <strong className="text-slate-900 font-bold">{(studentPage - 1) * itemsPerPage + 1}</strong>–
-                      <strong className="text-slate-900 font-bold">{Math.min(studentPage * itemsPerPage, filteredStudents.length)}</strong> of{" "}
-                      <strong className="text-slate-900 font-bold">{filteredStudents.length}</strong> Certified Students
+                      Showing <strong className="text-gray-900 font-semibold">{(studentPage - 1) * itemsPerPage + 1}</strong>–
+                      <strong className="text-gray-900 font-semibold">{Math.min(studentPage * itemsPerPage, filteredStudents.length)}</strong> of{" "}
+                      <strong className="text-gray-900 font-semibold">{filteredStudents.length}</strong> Certified Students
                     </span>
                   </div>
 
@@ -815,7 +775,7 @@ export default function LeaderboardPage() {
                     <button
                       onClick={() => setStudentPage((p) => Math.max(p - 1, 1))}
                       disabled={studentPage === 1}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-indigo-700 disabled:opacity-40 disabled:pointer-events-none shadow-2xs transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-gray-700 border border-gray-200 hover:border-violet-200 hover:text-violet-700 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
                       <span>Prev</span>
@@ -826,10 +786,10 @@ export default function LeaderboardPage() {
                         <button
                           key={pageNum}
                           onClick={() => setStudentPage(pageNum)}
-                          className={`w-8 h-8 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                          className={`w-8 h-8 rounded-full text-xs font-bold transition-all cursor-pointer ${
                             studentPage === pageNum
-                              ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm shadow-indigo-500/30 ring-2 ring-indigo-300/40"
-                              : "bg-white text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200"
+                              ? "bg-violet-600 text-white shadow-xs"
+                              : "bg-white text-gray-600 border border-gray-200 hover:bg-violet-50 hover:text-violet-700 hover:border-violet-200"
                           }`}
                         >
                           {pageNum}
@@ -840,7 +800,7 @@ export default function LeaderboardPage() {
                     <button
                       onClick={() => setStudentPage((p) => Math.min(p + 1, totalStudentPages))}
                       disabled={studentPage === totalStudentPages}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-indigo-700 disabled:opacity-40 disabled:pointer-events-none shadow-2xs transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-white text-gray-700 border border-gray-200 hover:border-violet-200 hover:text-violet-700 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
                     >
                       <span>Next</span>
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -851,111 +811,106 @@ export default function LeaderboardPage() {
             </div>
           )}
 
-          {/* ── Redesigned Modern Web3 Dispute Governance Showcase (Replaced dark card) ── */}
-          <div className="mt-14 bg-gradient-to-b from-white via-purple-50/20 to-slate-50/80 rounded-3xl p-6 sm:p-10 border border-slate-200/90 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-purple-200/20 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl pointer-events-none" />
-
+          {/* ── Dispute Governance Showcase ── */}
+          <div className="mt-14 bg-white rounded-2xl p-6 sm:p-10 border border-gray-100 shadow-xs relative overflow-hidden">
             <div className="relative z-10">
-              {/* Header Badge & Title */}
               <div className="max-w-3xl">
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200/80 shadow-2xs mb-3">
-                  <Scale className="w-3.5 h-3.5 text-purple-600" />
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-100 mb-3">
+                  <Scale className="w-3.5 h-3.5 text-violet-600" />
                   Decentralized Dispute Governance
                 </span>
-                <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-950 mb-2">
+                <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 mb-2">
                   How Top Mentors Become Dispute Council Jurors
                 </h3>
-                <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-                  Unlike centralized platforms where disputes are decided by opaque corporate moderators, Trust Lesson selects dispute jurors transparently from the top-ranked mentors on this leaderboard.
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  Dispute jurors are selected transparently from verified top-ranked mentors on this leaderboard.
                 </p>
               </div>
 
               {/* 3 Step Interactive Workflow Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-8">
                 {/* Step 1 */}
-                <div className="bg-white rounded-2xl p-6 border border-emerald-200/80 shadow-xs hover:border-emerald-400 hover:shadow-md transition-all group relative overflow-hidden">
+                <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shadow-2xs border border-emerald-100 group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center font-bold">
                       <Coins className="w-5 h-5" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600">
                       Step 01
                     </span>
                   </div>
-                  <h4 className="text-slate-900 font-extrabold text-base mb-1.5">Stake ≥ 100 USDC</h4>
-                  <p className="text-slate-500 text-xs leading-relaxed">
-                    Lock security collateral into MentorStaking.sol to establish economic skin-in-the-game and prevent malicious rulings.
+                  <h4 className="text-gray-900 font-bold text-base mb-1.5">Stake ≥ 100 USDC</h4>
+                  <p className="text-gray-500 text-xs leading-relaxed">
+                    Lock collateral into MentorStaking.sol to establish economic skin-in-the-game.
                   </p>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400 font-medium">Smart Contract</span>
-                    <span className="text-emerald-700 font-bold font-mono">MentorStaking.sol</span>
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                    <span className="text-gray-400 font-medium">Smart Contract</span>
+                    <span className="text-violet-700 font-medium font-mono">MentorStaking.sol</span>
                   </div>
-                </div>
+                </Card>
 
                 {/* Step 2 */}
-                <div className="bg-white rounded-2xl p-6 border border-amber-200/80 shadow-xs hover:border-amber-400 hover:shadow-md transition-all group relative overflow-hidden">
+                <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shadow-2xs border border-amber-100 group-hover:scale-105 transition-transform">
-                      <Star className="w-5 h-5 fill-amber-500 text-amber-500" />
+                    <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center font-bold">
+                      <Star className="w-5 h-5" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600">
                       Step 02
                     </span>
                   </div>
-                  <h4 className="text-slate-900 font-extrabold text-base mb-1.5">5+ Sessions & Rating ≥ 4.8</h4>
-                  <p className="text-slate-500 text-xs leading-relaxed">
-                    Complete at least 5 verified mentorship sessions while maintaining a 4.8+ rating to earn Soulbound EAS credentials and juror eligibility.
+                  <h4 className="text-gray-900 font-bold text-base mb-1.5">5+ Sessions & Rating ≥ 4.8</h4>
+                  <p className="text-gray-500 text-xs leading-relaxed">
+                    Complete at least 5 verified sessions while maintaining a 4.8+ rating to earn juror eligibility.
                   </p>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400 font-medium">Attestation Proof</span>
-                    <span className="text-amber-700 font-bold font-mono">EAS Attestation</span>
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                    <span className="text-gray-400 font-medium">Attestation Proof</span>
+                    <span className="text-violet-700 font-medium font-mono">EAS Attestation</span>
                   </div>
-                </div>
+                </Card>
 
                 {/* Step 3 */}
-                <div className="bg-white rounded-2xl p-6 border border-purple-200/80 shadow-xs hover:border-purple-400 hover:shadow-md transition-all group relative overflow-hidden">
+                <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold shadow-2xs border border-purple-100 group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center font-bold">
                       <Scale className="w-5 h-5" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600">
                       Step 03
                     </span>
                   </div>
-                  <h4 className="text-slate-900 font-extrabold text-base mb-1.5">Earn Dispute Protocol Fees</h4>
-                  <p className="text-slate-500 text-xs leading-relaxed">
-                    Cast independent rulings on 3-of-5 quorum cases by inspecting IPFS evidence and earn $3–$5 USDC per vote.
+                  <h4 className="text-gray-900 font-bold text-base mb-1.5">Earn Dispute Protocol Fees</h4>
+                  <p className="text-gray-500 text-xs leading-relaxed">
+                    Cast independent rulings on 3-of-5 quorum cases by inspecting IPFS evidence and earn protocol fees.
                   </p>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400 font-medium">Consensus Quorum</span>
-                    <span className="text-purple-700 font-bold font-mono">3-of-5 Juror Multi-Sig</span>
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px]">
+                    <span className="text-gray-400 font-medium">Consensus Quorum</span>
+                    <span className="text-violet-700 font-medium font-mono">3-of-5 Juror Multi-Sig</span>
                   </div>
-                </div>
+                </Card>
               </div>
 
               {/* Bottom Callout Strip */}
-              <div className="mt-8 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="mt-8 p-4 sm:p-5 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
                     <ShieldCheck className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs sm:text-sm font-bold text-slate-900">
+                    <p className="text-xs sm:text-sm font-semibold text-gray-900">
                       Ready to qualify for the Protocol Dispute Council?
                     </p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-gray-400">
                       Stake collateral on Arbitrum Sepolia to enter the active juror candidate pool.
                     </p>
                   </div>
                 </div>
 
-                <Link
-                  href="/explore"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-slate-900 hover:bg-purple-600 transition-all shadow-xs whitespace-nowrap active:scale-95 cursor-pointer"
-                >
-                  <span>Explore Mentorship</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                <Link href="/explore">
+                  <PrimaryButton className="!min-h-[38px] !py-2 !px-4 text-xs">
+                    <span>Explore Mentorship</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </PrimaryButton>
                 </Link>
               </div>
             </div>

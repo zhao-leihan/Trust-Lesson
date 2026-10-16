@@ -20,6 +20,7 @@ import {
   Layers,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
+import { Card, PrimaryButton } from "@/src/components/ui/DesignTokens";
 
 export default function ScheduleSessionPage() {
   const params = useParams();
@@ -188,53 +189,53 @@ export default function ScheduleSessionPage() {
   ).slice(0, 14);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-purple-500 selection:text-white">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-between selection:bg-violet-500 selection:text-white">
       <main className="pt-28 pb-20 px-4 sm:px-6 flex-1">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Top Breadcrumb */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
             <Link
               href={`/dashboard/classes/${enrollmentId}`}
-              className="inline-flex items-center gap-2 text-slate-500 hover:text-purple-700 text-xs font-bold transition-colors group"
+              className="inline-flex items-center gap-2 text-gray-500 hover:text-violet-600 text-xs font-semibold transition-colors group"
             >
               <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
               <span>Back to Classroom</span>
             </Link>
 
-            <span className="text-xs font-bold text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
+            <span className="text-xs font-semibold text-violet-700 bg-violet-50 px-3 py-1 rounded-full border border-violet-100">
               {quota.remaining} Sessions Remaining
             </span>
           </div>
 
           {/* Form Header */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <Card className="p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div className="space-y-1">
-              <span className="text-xs font-bold text-purple-700 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                 Schedule Meeting Request
               </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
                 {gig?.title || "1:1 Live Mentorship Session"}
               </h1>
-              <p className="text-slate-500 text-xs sm:text-sm">
-                Pick a slot from mentor <strong className="text-slate-800">{mentor?.name}</strong>. Slots are automatically converted to your local time.
+              <p className="text-gray-500 text-xs sm:text-sm">
+                Pick a slot from mentor <strong className="text-gray-800">{mentor?.name}</strong>. Slots are automatically converted to your local time.
               </p>
             </div>
 
-            <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-2xl border border-purple-200/80 text-xs text-purple-900 shrink-0">
-              <Clock size={16} className="text-purple-600" />
+            <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-2xl border border-violet-100 text-xs text-violet-900 shrink-0">
+              <Clock size={16} className="text-violet-600" />
               <div>
-                <p className="font-extrabold">{enrollment.sessionDurationMin || 60} Minutes</p>
-                <p className="text-[11px] text-purple-700">1 Quota Unit Reserved</p>
+                <p className="font-bold">{enrollment.sessionDurationMin || 60} Minutes</p>
+                <p className="text-[11px] text-violet-700">1 Quota Unit Reserved</p>
               </div>
             </div>
-          </div>
+          </Card>
 
           {/* Success Banner */}
           {submitSuccess && (
-            <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-3xl flex items-center gap-3 text-emerald-800 animate-fadeIn">
+            <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-800 animate-fadeIn">
               <CheckCircle2 size={24} className="text-emerald-600 shrink-0" />
               <div>
-                <h4 className="font-extrabold text-sm">Meeting Request Sent!</h4>
+                <h4 className="font-bold text-sm">Meeting Request Sent</h4>
                 <p className="text-xs text-emerald-700 mt-0.5">
                   Your reservation is saved and the mentor has been notified. Redirecting to classroom...
                 </p>
@@ -244,7 +245,7 @@ export default function ScheduleSessionPage() {
 
           {/* Error Banner */}
           {submitError && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-xs">
+            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-800 text-xs">
               <AlertTriangle size={18} className="text-rose-600 shrink-0" />
               <span>{submitError}</span>
             </div>
@@ -253,29 +254,29 @@ export default function ScheduleSessionPage() {
           {/* Main Scheduling Form */}
           <form onSubmit={handleScheduleSubmit} className="space-y-8">
             {/* Step 1: Date Selector */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-4">
+            <Card className="p-6 sm:p-8 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                  <Calendar size={18} className="text-purple-600" />
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                  <Calendar size={18} className="text-violet-600" />
                   <span>1. Choose a Date</span>
                 </h3>
-                <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                <span className="text-[11px] text-gray-400 flex items-center gap-1 font-normal">
                   <Globe size={12} />
                   <span>Your Timezone: {userTimezone}</span>
                 </span>
               </div>
 
               {loadingSlots ? (
-                <div className="py-8 text-center text-slate-400 text-xs">
-                  <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <div className="py-8 text-center text-gray-400 text-xs">
+                  <div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                   Checking mentor availability...
                 </div>
               ) : availableDates.length === 0 ? (
-                <div className="p-6 bg-slate-50 rounded-2xl text-center text-slate-500 text-xs">
+                <div className="p-6 bg-gray-50 rounded-2xl text-center text-gray-400 text-xs">
                   No free slots found in the next 14 days. Please check back soon or message your mentor.
                 </div>
               ) : (
-                <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-thin">
+                <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none">
                   {availableDates.map((dateStr) => {
                     const d = new Date(dateStr + "T00:00:00");
                     const isSelected = selectedDate === dateStr;
@@ -290,17 +291,17 @@ export default function ScheduleSessionPage() {
                         }}
                         className={`flex flex-col items-center justify-center min-w-[76px] py-3 px-2 rounded-2xl border text-center transition-all cursor-pointer ${
                           isSelected
-                            ? "bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-500/25 scale-105"
-                            : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80"
+                            ? "bg-violet-600 text-white border-violet-600 shadow-sm"
+                            : "bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
                         }`}
                       >
-                        <span className="text-[10px] uppercase font-bold tracking-wider opacity-80">
+                        <span className="text-[10px] uppercase font-semibold tracking-wider opacity-80">
                           {d.toLocaleDateString("en-US", { weekday: "short" })}
                         </span>
-                        <span className="text-base font-extrabold my-0.5">
+                        <span className="text-base font-bold my-0.5">
                           {d.getDate()}
                         </span>
-                        <span className="text-[10px] font-semibold opacity-80">
+                        <span className="text-[10px] font-medium opacity-80">
                           {d.toLocaleDateString("en-US", { month: "short" })}
                         </span>
                       </button>
@@ -308,23 +309,23 @@ export default function ScheduleSessionPage() {
                   })}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* Step 2: Slot Selector */}
             {selectedDate && (
-              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-4">
+              <Card className="p-6 sm:p-8 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                    <Clock size={18} className="text-purple-600" />
+                  <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                    <Clock size={18} className="text-violet-600" />
                     <span>2. Select a Free Time Slot</span>
                   </h3>
-                  <span className="text-xs text-slate-500 font-medium">
+                  <span className="text-xs text-gray-400 font-normal">
                     {dateSlots.length} available slot(s)
                   </span>
                 </div>
 
                 {dateSlots.length === 0 ? (
-                  <div className="p-6 bg-slate-50 rounded-2xl text-center text-slate-500 text-xs">
+                  <div className="p-6 bg-gray-50 rounded-2xl text-center text-gray-400 text-xs">
                     No open slots on this specific day. Please pick another date.
                   </div>
                 ) : (
@@ -341,10 +342,10 @@ export default function ScheduleSessionPage() {
                           type="button"
                           key={sIdx}
                           onClick={() => setSelectedSlot(slot)}
-                          className={`py-3 px-3 rounded-2xl border text-center transition-all cursor-pointer font-bold text-xs flex flex-col items-center justify-center gap-1 ${
+                          className={`py-3 px-3 rounded-full border text-center transition-all cursor-pointer font-semibold text-xs flex flex-col items-center justify-center gap-0.5 ${
                             isSelected
-                              ? "bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-500/25"
-                              : "bg-slate-50 hover:bg-purple-50 text-slate-800 border-slate-200/80 hover:border-purple-300"
+                              ? "bg-violet-600 text-white border-violet-600 shadow-sm"
+                              : "bg-white hover:bg-violet-50 text-gray-800 border-gray-200 hover:border-violet-200"
                           }`}
                         >
                           <span>{startTime}</span>
@@ -356,13 +357,13 @@ export default function ScheduleSessionPage() {
                     })}
                   </div>
                 )}
-              </div>
+              </Card>
             )}
 
             {/* Step 3: Platform & Agenda */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
-              <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                <Video size={18} className="text-purple-600" />
+            <Card className="p-6 sm:p-8 space-y-6">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                <Video size={18} className="text-violet-600" />
                 <span>3. Meeting Platform & Agenda</span>
               </h3>
 
@@ -378,22 +379,22 @@ export default function ScheduleSessionPage() {
                     onClick={() => setPlatform(p.id)}
                     className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
                       platform === p.id
-                        ? "bg-purple-50 border-purple-600 text-purple-950 shadow-xs"
-                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                        ? "bg-violet-50 border-violet-600 text-violet-950 shadow-xs"
+                        : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
                     }`}
                   >
                     <div>
-                      <p className="font-bold text-xs">{p.label}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{p.desc}</p>
+                      <p className="font-semibold text-xs">{p.label}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{p.desc}</p>
                     </div>
-                    {platform === p.id && <CheckCircle2 size={16} className="text-purple-600" />}
+                    {platform === p.id && <CheckCircle2 size={16} className="text-violet-600" />}
                   </button>
                 ))}
               </div>
 
               {/* Agenda Note */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-800">
+                <label className="block text-xs font-semibold text-gray-700">
                   Agenda & Topics to Cover (Optional)
                 </label>
                 <textarea
@@ -401,21 +402,21 @@ export default function ScheduleSessionPage() {
                   value={agenda}
                   onChange={(e) => setAgenda(e.target.value)}
                   placeholder="E.g., Review smart contract security patterns, discuss architecture for capstone project..."
-                  className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-purple-600 transition-colors"
+                  className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-violet-600 focus:bg-white transition-colors"
                 />
               </div>
-            </div>
+            </Card>
 
             {/* Submit Action */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-white rounded-3xl border border-slate-200/80 shadow-xs">
-              <div className="text-xs text-slate-500">
-                <span className="font-bold text-slate-800">Anti-Overbooking Guarantee:</span> Time slot is reserved atomically with double-booking prevention.
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-white rounded-2xl border border-gray-100 shadow-xs">
+              <div className="text-xs text-gray-400">
+                <span className="font-semibold text-gray-700">Anti-Overbooking Guarantee:</span> Time slot is reserved atomically with double-booking prevention.
               </div>
 
-              <button
+              <PrimaryButton
                 type="submit"
                 disabled={isSubmitting || !selectedSlot}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs transition-all shadow-md shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto px-8 py-3 text-xs"
               >
                 {isSubmitting ? (
                   <>
@@ -428,7 +429,7 @@ export default function ScheduleSessionPage() {
                     <ChevronRight size={14} />
                   </>
                 )}
-              </button>
+              </PrimaryButton>
             </div>
           </form>
         </div>
