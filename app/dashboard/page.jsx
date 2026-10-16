@@ -74,6 +74,7 @@ import { useWalletBalances } from "../../src/hooks/useWalletBalances";
 import StudentSatisfactionView from "../../src/components/StudentSatisfactionView";
 import CertificateCard from "../../src/components/certificate/CertificateCard";
 import TransactionHistorySection from "../../src/components/TransactionHistorySection";
+import { StakingParticles, StakingOrbitalAura, StakingLoadingStep } from "../../src/components/StakingParticles";
 import Footer from "../../src/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../src/components/ui/Tabs";
 import {
@@ -1804,6 +1805,7 @@ function MentorDashboardView({ user }) {
   const [stakingStepMsg, setStakingStepMsg] = useState("");
   const [stakeSuccessMsg, setStakeSuccessMsg] = useState("");
   const [stakeErrorMsg, setStakeErrorMsg] = useState("");
+  const [showParticleBurst, setShowParticleBurst] = useState(false);
   const [mentorWalletUsdcBalance, setMentorWalletUsdcBalance] = useState(null);
 
   const fetchMentorWalletBalance = async () => {
@@ -1967,6 +1969,7 @@ function MentorDashboardView({ user }) {
       setStakeSuccessMsg(
         `Successfully deposited ${amountToStake} USDC on-chain! Your profile is now Verified.`
       );
+      setShowParticleBurst(true);
       setStats((prev) => ({
         ...prev,
         stakeAmount: data.stakeAmount,
@@ -1976,7 +1979,10 @@ function MentorDashboardView({ user }) {
       }));
       fetchMentorWalletBalance();
       fetchMentorStats();
-      setTimeout(() => setShowStakeModal(false), 2500);
+      setTimeout(() => {
+        setShowParticleBurst(false);
+        setShowStakeModal(false);
+      }, 3000);
     } catch (err) {
       console.error("[Staking Error]:", err);
       let cleanMsg = err.message || "Failed to complete staking.";
@@ -3852,10 +3858,12 @@ function MentorDashboardView({ user }) {
               <button
                 type="button"
                 onClick={() => setShowStakeModal(true)}
-                className="px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="relative overflow-hidden px-6 py-2.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/30 hover:shadow-purple-600/50 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer group"
               >
-                <ShieldCheck size={14} />
+                <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer-sweep" />
+                <ShieldCheck size={14} className="group-hover:rotate-12 transition-transform text-emerald-300" />
                 <span>{stats.isVerified || stats.stakeAmount >= 100 ? "Add More Stake / Upgrade" : "Stake 100 USDC to Become Verified"}</span>
+                <Sparkles size={12} className="text-amber-300 animate-pulse" />
               </button>
             </div>
           </div>
@@ -4965,10 +4973,17 @@ function MentorDashboardView({ user }) {
       {/* MENTOR COLLATERAL STAKING & VERIFICATION MODAL                    */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       <Dialog open={showStakeModal} onOpenChange={setShowStakeModal}>
-        <DialogContent className="max-w-2xl sm:max-w-3xl p-6 sm:p-9 rounded-3xl space-y-6 max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-4 border-b border-slate-100">
+        <DialogContent className="max-w-2xl sm:max-w-3xl p-6 sm:p-9 rounded-3xl space-y-6 max-h-[90vh] overflow-y-auto relative">
+          {/* Ambient Staking Orbital Aura when processing or successful */}
+          <StakingOrbitalAura active={isStakingLoading || showParticleBurst} />
+          {/* Particle Explosion on Staking Success */}
+          <StakingParticles active={showParticleBurst} count={36} />
+
+          <DialogHeader className="pb-4 border-b border-slate-100 relative z-10">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20 transition-all ${
+                isStakingLoading ? "animate-pulse scale-105" : ""
+              }`}>
                 <ShieldCheck size={26} />
               </div>
               <div>
@@ -4990,6 +5005,13 @@ function MentorDashboardView({ user }) {
               </div>
             </div>
           </DialogHeader>
+
+          {/* Staking Processing Step Banner */}
+          {isStakingLoading && (
+            <div className="relative z-10">
+              <StakingLoadingStep stepMessage={stakingStepMsg || "Processing On-Chain Staking..."} />
+            </div>
+          )}
 
           {/* 3-Box Live Metrics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -5246,17 +5268,28 @@ function MentorDashboardView({ user }) {
                   type="button"
                   disabled={isStakingLoading || stakeAmountChoice <= 0}
                   onClick={() => handleStakeCollateral(stakeAmountChoice)}
-                  className="px-7 py-3 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 border-b-4 border-purple-900 active:border-b-0 active:translate-y-1 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className={`relative overflow-hidden px-8 py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-xl shadow-purple-600/30 border-b-4 border-purple-950 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
+                    isStakingLoading ? "animate-pulse ring-4 ring-purple-400/30" : "hover:shadow-purple-600/50 hover:scale-[1.02]"
+                  }`}
                 >
+                  {/* Subtle moving light sheen inside button */}
+                  <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer-sweep" />
+
                   {isStakingLoading ? (
                     <>
-                      <RefreshCw size={14} className="animate-spin" />
-                      <span>{stakingStepMsg || "Processing On-Chain Deposit..."}</span>
+                      <div className="relative w-4 h-4 flex items-center justify-center">
+                        <RefreshCw size={15} className="animate-spin text-purple-200" />
+                        <span className="absolute inset-0 rounded-full border border-purple-200 animate-ping opacity-40" />
+                      </div>
+                      <span className="tracking-wide">
+                        {stakingStepMsg || "Processing On-Chain Deposit..."}
+                      </span>
                     </>
                   ) : (
                     <>
-                      <ShieldCheck size={14} />
+                      <ShieldCheck size={16} className="text-emerald-300 drop-shadow-xs" />
                       <span>Deposit {stakeAmountChoice} USDC Stake</span>
+                      <Sparkles size={14} className="text-amber-300 animate-wiggle" />
                     </>
                   )}
                 </button>
