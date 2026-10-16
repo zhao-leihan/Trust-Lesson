@@ -37,12 +37,14 @@ import {
   MessageSquare,
   Paperclip,
   Upload,
-  Check,
   File,
   Trophy,
+  Share2,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 import ClassroomLeaderboard from "@/src/components/ClassroomLeaderboard";
+import TransactionStatusTimeline from "@/src/components/TransactionStatusTimeline";
+import CourseCompletionFeedbackModal from "@/src/components/CourseCompletionFeedbackModal";
 
 function StatusBadge({ status }) {
   const map = {
@@ -109,6 +111,7 @@ export default function ClassroomDetailPage() {
   const [completingEscrow, setCompletingEscrow] = useState(false);
   const [certificateData, setCertificateData] = useState(null);
   const [showCertModal, setShowCertModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   // Persistent Roadmap Module Completion (localStorage)
   useEffect(() => {
@@ -290,18 +293,20 @@ export default function ClassroomDetailPage() {
           const { ethers } = await import("ethers");
           const provider = new ethers.BrowserProvider(window.ethereum);
           const signer = await provider.getSigner();
-          const routerAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT || "0xF3Ca9731772781e19852E9cE3b1ec7A68Eb3edcA";
-          const routerAbi = [
-            "function releaseEscrow(uint256 sessionId) external",
-            "function confirmMilestone(uint256 sessionId, uint256 milestoneIndex) external",
-            "function getSession(uint256 sessionId) external view returns (address learner, address mentor, uint256 totalAmount, uint256 platformFeeAmount, uint8 status, uint256 createdAt, uint256 milestoneCount)",
-          ];
-          const routerContract = new ethers.Contract(routerAddress, routerAbi, signer);
-          const sess = await routerContract.getSession(enrollment.onchainSessionId).catch(() => null);
-          if (sess && Number(sess[4]) < 3) {
-            const tx = await routerContract.releaseEscrow(enrollment.onchainSessionId, { gasLimit: 350000 });
-            const receipt = await tx.wait(1);
-            clientTxHash = receipt.hash;
+          const routerAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT;
+          if (routerAddress) {
+            const routerAbi = [
+              "function releaseEscrow(uint256 sessionId) external",
+              "function confirmMilestone(uint256 sessionId, uint256 milestoneIndex) external",
+              "function getSession(uint256 sessionId) external view returns (address learner, address mentor, uint256 totalAmount, uint256 platformFeeAmount, uint8 status, uint256 createdAt, uint256 milestoneCount)",
+            ];
+            const routerContract = new ethers.Contract(routerAddress, routerAbi, signer);
+            const sess = await routerContract.getSession(enrollment.onchainSessionId).catch(() => null);
+            if (sess && Number(sess[4]) < 3) {
+              const tx = await routerContract.releaseEscrow(enrollment.onchainSessionId, { gasLimit: 350000 });
+              const receipt = await tx.wait(1);
+              clientTxHash = receipt.hash;
+            }
           }
         } catch (onChainErr) {
           console.warn("[On-Chain Client Release Notice]:", onChainErr.message);
@@ -317,6 +322,7 @@ export default function ClassroomDetailPage() {
         setShowCertModal(true);
       }
       setShowReleaseModal(false);
+      setTimeout(() => setShowFeedbackModal(true), 800);
       await reloadClassroom();
     } catch (err) {
       alert("Failed to release escrow: " + err.message);
@@ -499,20 +505,39 @@ export default function ClassroomDetailPage() {
                   <span>End Mentorship & Release Escrow</span>
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    fetchCertificate();
-                    setShowCertModal(true);
-                  }}
-                  className="px-3.5 py-1.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105"
-                >
-                  <Award size={13} />
-                  <span>View On-Chain Certificate</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchCertificate();
+                      setShowCertModal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105"
+                  >
+                    <Award size={13} />
+                    <span>View On-Chain Certificate</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowFeedbackModal(true)}
+                    className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105"
+                  >
+                    <Share2 size={13} />
+                    <span>Feedback & Share</span>
+                  </button>
+                </div>
               )}
             </div>
           </div>
+
+          {/* Visual On-Chain Transaction Progress Tracker */}
+          <TransactionStatusTimeline
+            status={effectiveStatus}
+            txHashCreate={enrollment.txHash}
+            txHashRelease={certificateData?.txHash || enrollment.txHashRelease}
+            onchainSessionId={enrollment.onchainSessionId}
+            amount={enrollment.packagePrice || 50}
+          />
 
           {/* Hero Banner with Gig Info & Quota Meter */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1903,6 +1928,17 @@ export default function ClassroomDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Course Completion Feedback & Multi-Platform Share Modal */}
+        <CourseCompletionFeedbackModal
+          open={showFeedbackModal}
+          onClose={() => setShowFeedbackModal(false)}
+          role={isMentor ? "mentor" : "learner"}
+          courseTitle={gig?.title || "Web3 Mentorship"}
+          counterpartyName={isMentor ? (enrollment?.learner?.name || "Student") : (mentor?.name || "Mentor")}
+          enrollmentId={enrollmentId}
+          certificateId={certificateData?.id}
+        />
       </main>
       <Footer />
     </div>

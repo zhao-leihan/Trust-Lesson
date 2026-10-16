@@ -34,6 +34,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "./ui/Dialog";
+import TransactionStatusTimeline from "./TransactionStatusTimeline";
 
 export default function TransactionHistorySection({
   role = "admin", // "admin" | "mentor" | "learner"
@@ -527,7 +528,7 @@ export default function TransactionHistorySection({
       {/* ── 5. Detailed Transaction Recap Modal ── */}
       <Dialog open={Boolean(selectedTx)} onOpenChange={(open) => !open && setSelectedTx(null)}>
         {selectedTx && (
-          <DialogContent className="max-w-lg p-6 sm:p-7 rounded-3xl space-y-5">
+          <DialogContent className="max-w-xl sm:max-w-2xl p-6 sm:p-7 rounded-3xl space-y-5 max-h-[90vh] overflow-y-auto">
             <DialogHeader className="pb-3 border-b border-purple-100">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
@@ -557,6 +558,15 @@ export default function TransactionHistorySection({
             </DialogHeader>
 
             <div className="space-y-4 text-xs">
+              {/* Visual On-Chain Transaction Progress Tracker */}
+              <TransactionStatusTimeline
+                status={selectedTx.isDisbursed ? "COMPLETED" : "IN_SESSION"}
+                txHashCreate={selectedTx.txHash}
+                txHashRelease={selectedTx.isDisbursed ? selectedTx.txHash : null}
+                onchainSessionId={selectedTx.onchainSessionId}
+                amount={selectedTx.grossAmount}
+                compact={true}
+              />
               {/* Financial Calculation Breakdown Box */}
               <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-100 space-y-2.5">
                 <div className="flex justify-between items-center text-slate-700">

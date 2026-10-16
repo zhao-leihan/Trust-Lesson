@@ -74,6 +74,7 @@ import { useWalletBalances } from "../../src/hooks/useWalletBalances";
 import StudentSatisfactionView from "../../src/components/StudentSatisfactionView";
 import CertificateCard from "../../src/components/certificate/CertificateCard";
 import TransactionHistorySection from "../../src/components/TransactionHistorySection";
+import MentorAnalyticsCard from "../../src/components/MentorAnalyticsCard";
 import { StakingParticles, StakingOrbitalAura, StakingLoadingStep } from "../../src/components/StakingParticles";
 import Footer from "../../src/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../src/components/ui/Tabs";
@@ -1713,7 +1714,7 @@ function MentorDashboardView({ user }) {
       const tabParam = params.get("tab");
       if (tabParam === "profile") {
         setActiveTab("portfolio");
-      } else if (tabParam && ["overview", "courses", "wallet", "leveling", "portfolio", "juror"].includes(tabParam)) {
+      } else if (tabParam && ["overview", "courses", "wallet", "leveling", "portfolio", "juror", "analytics"].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     }
@@ -2799,6 +2800,10 @@ function MentorDashboardView({ user }) {
             <Briefcase size={14} />
             <span>Portfolio & Bio</span>
           </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-2 flex-1 sm:flex-none text-xs">
+            <BarChart3 size={14} />
+            <span>Analytics</span>
+          </TabsTrigger>
           {isJurorMentor && (
             <TabsTrigger
               value="juror"
@@ -2863,6 +2868,13 @@ function MentorDashboardView({ user }) {
               <p className="text-slate-500 text-[11px] mt-1">Multi-currency supported</p>
             </div>
           </div>
+
+          {/* Mentor Performance Analytics (Earnings 7d/30d/90d, Completion Rate, Rating Trend, Response Time) */}
+          <MentorAnalyticsCard
+            stats={stats}
+            user={user}
+            hourlyRate={user?.hourlyRate || stats.hourlyRate || 35}
+          />
 
           {/* Wallet Security Notice & Quick Action Banner */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -5046,6 +5058,15 @@ function MentorDashboardView({ user }) {
             </div>
           </TabsContent>
         )}
+
+        {/* TAB: ANALYTICS (Earnings 7d/30d/90d, Completion Rate, Rating Trend, Response Time) */}
+        <TabsContent value="analytics" className="space-y-6 pt-2">
+          <MentorAnalyticsCard
+            stats={stats}
+            user={user}
+            hourlyRate={user?.hourlyRate || stats.hourlyRate || 35}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* DIALOG ADD LINKEDIN EXPERIENCE */}
