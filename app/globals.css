@@ -156,19 +156,18 @@
   animation: pulse-soft 2.5s ease-in-out infinite;
 }
 
-@keyframes rotate3dCoin {
-  0% {
-    transform: perspective(400px) rotateY(0deg);
+@keyframes badgeGlow {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.4));
   }
   50% {
-    transform: perspective(400px) rotateY(180deg);
-  }
-  100% {
-    transform: perspective(400px) rotateY(360deg);
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.8));
   }
 }
-.animate-rotate-3d {
-  animation: rotate3dCoin 6s ease-in-out infinite;
+.animate-badge-glow {
+  animation: badgeGlow 2.5s ease-in-out infinite;
 }
 
 @keyframes float3d {
@@ -213,10 +212,10 @@
 
 @keyframes glowPulse {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(139, 92, 246, 0.4), inset 0 0 15px rgba(139, 92, 246, 0.2);
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.4), inset 0 0 15px rgba(6, 182, 212, 0.2);
   }
   50% {
-    box-shadow: 0 0 30px rgba(139, 92, 246, 0.8), inset 0 0 25px rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.8), inset 0 0 25px rgba(59, 130, 246, 0.5);
   }
 }
 .animate-glow-pulse {

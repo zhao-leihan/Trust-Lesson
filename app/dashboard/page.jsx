@@ -1704,7 +1704,7 @@ function AdminDashboardView({ user }) {
 // MENTOR DASHBOARD VIEW (Live Database Connection - Zero Mockup)
 // =============================================================
 function MentorDashboardView({ user }) {
-  const { portfolios, addPortfolioItem, deletePortfolioItem, connectWallet, updateUserProfile, switchRole } = useAuth();
+  const { portfolios, addPortfolioItem, deletePortfolioItem, connectWallet, updateUserProfile, switchRole, getWalletProvider } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
@@ -1808,11 +1808,37 @@ function MentorDashboardView({ user }) {
   const [showParticleBurst, setShowParticleBurst] = useState(false);
   const [mentorWalletUsdcBalance, setMentorWalletUsdcBalance] = useState(null);
 
+  const getEvmProvider = () => {
+    if (typeof window === "undefined") return null;
+    // 1. EIP-6963 Discovery via AuthContext
+    if (typeof getWalletProvider === "function") {
+      const mmProvider = getWalletProvider("metamask");
+      if (mmProvider) return mmProvider;
+    }
+    // 2. If multiple extension providers exist in window.ethereum, pick genuine MetaMask
+    if (window.ethereum?.providers?.length) {
+      const mm = window.ethereum.providers.find(
+        (p) => p.isMetaMask && !p.isPhantom && !p.isCoinbaseWallet && !p.isRabby && !p.isRainbow
+      );
+      if (mm) return mm;
+    }
+    // 3. Provider map
+    if (window.ethereum?.providerMap?.get?.("MetaMask")) {
+      return window.ethereum.providerMap.get("MetaMask");
+    }
+    // 4. Fallback only if genuinely MetaMask and not Phantom
+    if (window.ethereum?.isMetaMask && !window.ethereum?.isPhantom) {
+      return window.ethereum;
+    }
+    return window.ethereum || null;
+  };
+
   const fetchMentorWalletBalance = async () => {
-    if (typeof window !== "undefined" && window.ethereum) {
+    const activeProvider = getEvmProvider();
+    if (activeProvider) {
       try {
         const { ethers } = await import("ethers");
-        const provider = new ethers.BrowserProvider(window.ethereum);
+        const provider = new ethers.BrowserProvider(activeProvider);
         const accounts = await provider.listAccounts();
         if (accounts && accounts.length > 0) {
           const userAddress = await accounts[0].getAddress();
@@ -1841,27 +1867,37 @@ function MentorDashboardView({ user }) {
     setIsStakingLoading(true);
     setStakeErrorMsg("");
     setStakeSuccessMsg("");
-    setStakingStepMsg("Connecting to Web3 wallet...");
+    setStakingStepMsg("Connecting MetaMask wallet...");
+    // Close modal immediately so the user sees live on-chain status and animations directly on the dashboard
+    setShowStakeModal(false);
+
     try {
-      if (typeof window === "undefined" || !window.ethereum) {
+      const activeProvider = getEvmProvider();
+      if (!activeProvider) {
         throw new Error("No Web3 wallet detected. Please connect MetaMask to complete on-chain staking.");
       }
 
-      const { ethers } = await import("ethers");
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      // 1. Explicitly request accounts to force MetaMask popup (bypassing evmAsk multi-wallet conflict)
+      setStakingStepMsg("Opening MetaMask wallet connection...");
+      const accounts = await activeProvider.request({ method: "eth_requestAccounts" });
+      if (!accounts || accounts.length === 0) {
+        throw new Error("Please connect and unlock your MetaMask wallet.");
+      }
+      const userAddress = accounts[0];
 
-      // 1. Verify network: Arbitrum Sepolia (421614 / 0x66eee)
-      setStakingStepMsg("Verifying Arbitrum Sepolia network...");
-      const network = await provider.getNetwork();
-      if (Number(network.chainId) !== 421614) {
+      // 2. Verify network: Arbitrum Sepolia (421614 / 0x66eee)
+      const chainIdHex = await activeProvider.request({ method: "eth_chainId" });
+      const currentChainId = parseInt(chainIdHex, 16);
+      if (currentChainId !== 421614) {
+        setStakingStepMsg("Please approve switching network to Arbitrum Sepolia in MetaMask...");
         try {
-          await window.ethereum.request({
+          await activeProvider.request({
             method: "wallet_switchEthereumChain",
             params: [{ chainId: "0x66eee" }],
           });
         } catch (switchErr) {
-          if (switchErr.code === 4902) {
-            await window.ethereum.request({
+          if (switchErr.code === 4902 || switchErr.code === -32603) {
+            await activeProvider.request({
               method: "wallet_addEthereumChain",
               params: [{
                 chainId: "0x66eee",
@@ -1872,13 +1908,14 @@ function MentorDashboardView({ user }) {
               }],
             });
           } else {
-            throw new Error("Please switch your wallet network to Arbitrum Sepolia.");
+            throw new Error("Please switch your wallet network to Arbitrum Sepolia in MetaMask.");
           }
         }
       }
 
+      const { ethers } = await import("ethers");
+      const provider = new ethers.BrowserProvider(activeProvider);
       const signer = await provider.getSigner();
-      const userAddress = await signer.getAddress();
       const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS || "0x65BfF36b3FD34c58F6543537871D9066CEbA6A44";
       const stakingAddress = process.env.NEXT_PUBLIC_STAKING_CONTRACT || "0xE98fdb7cdecBD9D06E473ba68671C299DE6deB1f";
 
@@ -1894,22 +1931,23 @@ function MentorDashboardView({ user }) {
 
       const parsedAmount = ethers.parseUnits(amountToStake.toString(), 6);
 
-      // 2. Query mentor's USDC wallet balance
+      // 3. Query mentor's USDC wallet balance
       setStakingStepMsg("Checking wallet USDC balance...");
       const userBalance = await usdc.balanceOf(userAddress);
-      setMentorWalletUsdcBalance(ethers.formatUnits(userBalance, 6));
+      const formattedBalance = Number(ethers.formatUnits(userBalance, 6));
+      setMentorWalletUsdcBalance(formattedBalance.toString());
 
       if (userBalance < parsedAmount) {
         throw new Error(
-          `Insufficient Mock USDC in your wallet. Your balance is ${ethers.formatUnits(userBalance, 6)} USDC, but you need ${amountToStake} USDC. Please claim free test tokens from the Faucet first.`
+          `Insufficient USDC balance in wallet (${formattedBalance} USDC available, ${amountToStake} USDC requested). Claim free Mock USDC from the Faucet or stake a lower amount.`
         );
       }
 
-      // 2.5 Just-In-Time (JIT) Gas Subsidy from Sponsor Wallet at transaction time
+      // 4. Just-In-Time (JIT) Gas Subsidy from Platform Sponsor Wallet
       const requiredStakeGasWei = ethers.parseEther("0.000045");
       const mentorEthWei = await provider.getBalance(userAddress);
       if (mentorEthWei < requiredStakeGasWei) {
-        setStakingStepMsg("Applying Gas Fee Subsidy from Platform Sponsor Wallet for this transaction...");
+        setStakingStepMsg("Applying Gas Fee Subsidy from Platform Sponsor Wallet...");
         try {
           const sponsorRes = await fetch("/api/blockchain/sponsor-gas", {
             method: "POST",
@@ -1932,17 +1970,18 @@ function MentorDashboardView({ user }) {
         }
       }
 
-      // 3. Check allowance and approve if required
+      // 5. Check allowance and approve if required
+      setStakingStepMsg("Checking USDC allowance...");
       const currentAllowance = await usdc.allowance(userAddress, stakingAddress);
       if (currentAllowance < parsedAmount) {
-        setStakingStepMsg("Approving USDC transfer in MetaMask...");
+        setStakingStepMsg("Please confirm USDC Allowance Approval in MetaMask popup...");
         const approveTx = await usdc.approve(stakingAddress, parsedAmount);
         setStakingStepMsg("Waiting for USDC approval confirmation on Arbitrum...");
         await approveTx.wait(1);
       }
 
-      // 4. Call MentorStaking.stake(amount) directly on-chain
-      setStakingStepMsg("Confirming Stake deposit in MetaMask...");
+      // 6. Call MentorStaking.stake(amount) directly on-chain
+      setStakingStepMsg("Please confirm Staking Deposit in MetaMask popup...");
       const stakingContract = new ethers.Contract(
         stakingAddress,
         [
@@ -1952,11 +1991,11 @@ function MentorDashboardView({ user }) {
         signer
       );
       const stakeTx = await stakingContract.stake(parsedAmount);
-      setStakingStepMsg("Waiting for on-chain block confirmation...");
+      setStakingStepMsg("Waiting for on-chain block confirmation on Arbitrum Sepolia...");
       const receipt = await stakeTx.wait(1);
       const txHash = receipt.hash;
 
-      // 5. Synchronize database record
+      // 7. Synchronize database record
       setStakingStepMsg("Syncing verified status to dashboard...");
       const res = await fetch("/api/mentor/stake", {
         method: "POST",
@@ -1967,7 +2006,7 @@ function MentorDashboardView({ user }) {
       if (!res.ok) throw new Error(data.error || "Failed to sync stake record");
 
       setStakeSuccessMsg(
-        `Successfully deposited ${amountToStake} USDC on-chain! Your profile is now Verified.`
+        `Successfully deposited ${amountToStake} USDC on-chain! Your profile is now Verified. Tx: ${txHash.slice(0, 10)}...`
       );
       setShowParticleBurst(true);
       setStats((prev) => ({
@@ -1981,13 +2020,14 @@ function MentorDashboardView({ user }) {
       fetchMentorStats();
       setTimeout(() => {
         setShowParticleBurst(false);
-        setShowStakeModal(false);
-      }, 3000);
+      }, 5000);
     } catch (err) {
       console.error("[Staking Error]:", err);
       let cleanMsg = err.message || "Failed to complete staking.";
       if (cleanMsg.includes("user rejected") || cleanMsg.includes("ACTION_REJECTED")) {
         cleanMsg = "Transaction was cancelled in MetaMask.";
+      } else if (cleanMsg.includes("origin") || cleanMsg.includes("evmAsk")) {
+        cleanMsg = "Wallet extension conflict detected. Please refresh this tab (F5) or use MetaMask directly.";
       }
       setStakeErrorMsg(cleanMsg);
     } finally {
@@ -2002,10 +2042,11 @@ function MentorDashboardView({ user }) {
     setStakeSuccessMsg("");
     try {
       let txHash = null;
-      if (typeof window !== "undefined" && window.ethereum) {
+      const activeProvider = getEvmProvider();
+      if (activeProvider) {
         try {
           const { ethers } = await import("ethers");
-          const provider = new ethers.BrowserProvider(window.ethereum);
+          const provider = new ethers.BrowserProvider(activeProvider);
           const signer = await provider.getSigner();
           const stakingAddress = process.env.NEXT_PUBLIC_STAKING_CONTRACT || "0xE98fdb7cdecBD9D06E473ba68671C299DE6deB1f";
           const stakingContract = new ethers.Contract(
@@ -2643,20 +2684,38 @@ function MentorDashboardView({ user }) {
               <span>{user.domain || "Smart Contract & Web3 Architecture"}</span>
               <span>•</span>
               {stats.isVerified || stats.stakeAmount >= 100 ? (
-                <span className="inline-flex items-center gap-2 text-purple-900 bg-purple-50/90 px-3.5 py-1 rounded-full border-2 border-purple-200 font-extrabold text-xs shadow-xs">
-                  <div className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-xs animate-rotate-3d shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStakeActionTab("deposit");
+                    setShowStakeModal(true);
+                    fetchMentorWalletBalance().catch(() => {});
+                  }}
+                  className="inline-flex items-center gap-2 text-purple-900 bg-purple-50/90 hover:bg-purple-100 px-3.5 py-1 rounded-full border-2 border-purple-200 font-extrabold text-xs shadow-xs transition-all cursor-pointer group"
+                  title="Click to view and manage Collateral Vault"
+                >
+                  <div className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-xs animate-badge-glow shrink-0">
                     <Coins size={10} />
                   </div>
                   <ShieldCheck size={14} className="text-purple-700" />
                   <span className="font-bold">
                     Verified Mentor (${stats.stakeAmount} USDC Staked)
                   </span>
-                </span>
+                </button>
               ) : (
-                <span className="inline-flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 font-bold text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStakeActionTab("deposit");
+                    setShowStakeModal(true);
+                    fetchMentorWalletBalance().catch(() => {});
+                  }}
+                  className="inline-flex items-center gap-1.5 text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200 font-bold text-xs transition-all cursor-pointer group"
+                  title="Click to stake 100 USDC and become verified"
+                >
                   <AlertCircle size={13} className="text-amber-600" />
                   <span>Unverified (${stats.stakeAmount || 0}/100 USDC Staked)</span>
-                </span>
+                </button>
               )}
             </div>
           </div>
@@ -2673,18 +2732,18 @@ function MentorDashboardView({ user }) {
             <span>Create New Gig</span>
           </Link>
 
-          {/* Staking Action Button — Far Right with 3D Depth and 3D Rotating Animation */}
+          {/* Staking Action Button — Far Right */}
           {!(stats.isVerified || stats.stakeAmount >= 100) ? (
             <button
               type="button"
               onClick={() => {
                 setStakeActionTab("deposit");
                 setShowStakeModal(true);
-                fetchMentorWalletBalance();
+                fetchMentorWalletBalance().catch(() => {});
               }}
               className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 border-b-4 border-purple-900 active:border-b-0 active:translate-y-1 transition-all flex items-center gap-2 cursor-pointer group"
             >
-              <div className="w-5 h-5 rounded-full bg-white/20 text-white flex items-center justify-center animate-rotate-3d shrink-0">
+              <div className="w-5 h-5 rounded-full bg-white/20 text-white flex items-center justify-center shrink-0">
                 <ShieldCheck size={12} />
               </div>
               <span>Stake 100 USDC to Verify</span>
@@ -2695,12 +2754,11 @@ function MentorDashboardView({ user }) {
               onClick={() => {
                 setStakeActionTab("deposit");
                 setShowStakeModal(true);
-                fetchMentorWalletBalance();
+                fetchMentorWalletBalance().catch(() => {});
               }}
               className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 hover:from-purple-800 hover:to-indigo-800 text-white font-extrabold text-xs shadow-lg shadow-purple-700/35 border-b-4 border-purple-950 active:border-b-0 active:translate-y-1 transition-all flex items-center gap-2.5 cursor-pointer animate-float-3d group"
             >
-              {/* 3D Rotating Gold Coin */}
-              <div className="w-5 h-5 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-md animate-rotate-3d shrink-0">
+              <div className="w-5 h-5 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-md animate-badge-glow shrink-0">
                 <Coins size={12} />
               </div>
               <span className="font-black tracking-tight">
@@ -3790,8 +3848,45 @@ function MentorDashboardView({ user }) {
           </div>
 
           {/* Collateral Staking Vault & Verification Banner */}
-          <div className="rounded-3xl p-6 sm:p-7 border-2 border-purple-200 bg-white shadow-md shadow-purple-500/5 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="rounded-3xl p-6 sm:p-7 border-2 border-slate-200 bg-white shadow-md shadow-slate-200/50 space-y-5 relative overflow-hidden">
+            {/* Ambient Staking Orbital Aura when processing or successful */}
+            <StakingOrbitalAura active={isStakingLoading || showParticleBurst} />
+            {/* Particle Explosion on Staking Success */}
+            <StakingParticles active={showParticleBurst} count={36} />
+
+            {/* LIVE ON-DASHBOARD STAKING STEP PROGRESS */}
+            {isStakingLoading && (
+              <div className="relative z-10 animate-fadeInUp">
+                <StakingLoadingStep stepMessage={stakingStepMsg || "Processing On-Chain Staking..."} />
+              </div>
+            )}
+
+            {stakeSuccessMsg && (
+              <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-300 text-emerald-900 text-xs font-bold flex items-center justify-between gap-2 animate-fadeIn relative z-10">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span>{stakeSuccessMsg}</span>
+                </div>
+              </div>
+            )}
+
+            {stakeErrorMsg && (
+              <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn relative z-10">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-rose-600 shrink-0" />
+                  <span>{stakeErrorMsg}</span>
+                </div>
+                <Link
+                  href="/faucet"
+                  target="_blank"
+                  className="px-4 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shrink-0 cursor-pointer text-center"
+                >
+                  Claim 100 USDC Faucet
+                </Link>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
               <div>
                 <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
                   <ShieldCheck size={18} className="text-purple-600" />
@@ -3803,32 +3898,120 @@ function MentorDashboardView({ user }) {
               </div>
 
               {stats.isVerified || stats.stakeAmount >= 100 ? (
-                <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-50 text-purple-900 border-2 border-purple-200 font-extrabold text-xs shadow-xs">
-                  <div className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-xs animate-rotate-3d shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStakeActionTab("deposit");
+                    setShowStakeModal(true);
+                    fetchMentorWalletBalance().catch(() => {});
+                  }}
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-900 border-2 border-purple-200 font-extrabold text-xs shadow-xs transition-all cursor-pointer group"
+                  title="Click to manage collateral staking vault"
+                >
+                  <div className="w-4 h-4 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-xs animate-badge-glow shrink-0">
                     <Coins size={10} />
                   </div>
                   <ShieldCheck size={14} className="text-purple-700" />
                   <span>Verified Mentor (${stats.stakeAmount} USDC Live)</span>
-                </span>
+                </button>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStakeActionTab("deposit");
+                    setShowStakeModal(true);
+                    fetchMentorWalletBalance().catch(() => {});
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs transition-all cursor-pointer group"
+                  title="Click to stake 100 USDC and become verified"
+                >
                   <AlertCircle size={13} className="text-amber-600" />
                   <span>Unverified (100 USDC Required)</span>
-                </span>
+                </button>
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">
-              <div className="bg-purple-50/60 p-4 rounded-2xl border border-purple-100">
-                <span className="text-slate-500 text-[11px] font-semibold block">Currently Staked</span>
+            {/* DIRECT ON-DASHBOARD STAKING CONTROLS */}
+            <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Wallet size={14} className="text-purple-600" />
+                  <span className="text-xs font-bold text-slate-800">Connected Wallet Balance:</span>
+                  <span className="text-xs font-mono font-extrabold text-purple-700">
+                    {mentorWalletUsdcBalance !== null ? `${mentorWalletUsdcBalance} USDC` : "Checking..."}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Select collateral deposit tier or stake available balance directly on Arbitrum Sepolia.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {mentorWalletUsdcBalance && Number(mentorWalletUsdcBalance) > 0 && Number(mentorWalletUsdcBalance) < 100 && (
+                  <button
+                    type="button"
+                    onClick={() => handleStakeCollateral(Number(mentorWalletUsdcBalance))}
+                    disabled={isStakingLoading}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                  >
+                    <Coins size={12} />
+                    <span>Stake All ({mentorWalletUsdcBalance} USDC)</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleStakeCollateral(100)}
+                  disabled={isStakingLoading}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shadow-sm hover:shadow-purple-600/30 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                >
+                  <ShieldCheck size={13} />
+                  <span>Stake 100 USDC (Verified)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStakeActionTab("deposit");
+                    setShowStakeModal(true);
+                    fetchMentorWalletBalance().catch(() => {});
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs transition-all cursor-pointer"
+                >
+                  Custom Amount...
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 relative z-10">
+              <div
+                onClick={() => {
+                  setStakeActionTab("deposit");
+                  setShowStakeModal(true);
+                  fetchMentorWalletBalance().catch(() => {});
+                }}
+                className="bg-purple-50/60 hover:bg-purple-100/60 p-4 rounded-2xl border border-purple-100 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 text-[11px] font-semibold block">Currently Staked</span>
+                  <ExternalLink size={12} className="text-purple-400 group-hover:text-purple-700 transition-colors" />
+                </div>
                 <span className="text-slate-950 font-black text-2xl block mt-0.5">
                   ${stats.stakeAmount || 0} USDC
                 </span>
                 <span className="text-purple-700 text-[10px] mt-1 block">Locked in non-custodial vault</span>
               </div>
 
-              <div className="bg-purple-50/60 p-4 rounded-2xl border border-purple-100">
-                <span className="text-slate-500 text-[11px] font-semibold block">Verification Status</span>
+              <div
+                onClick={() => {
+                  setStakeActionTab("deposit");
+                  setShowStakeModal(true);
+                  fetchMentorWalletBalance().catch(() => {});
+                }}
+                className="bg-purple-50/60 hover:bg-purple-100/60 p-4 rounded-2xl border border-purple-100 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 text-[11px] font-semibold block">Verification Status</span>
+                  <ExternalLink size={12} className="text-purple-400 group-hover:text-purple-700 transition-colors" />
+                </div>
                 <span className={`font-black text-lg block mt-0.5 ${stats.isVerified || stats.stakeAmount >= 100 ? "text-emerald-600" : "text-amber-600"}`}>
                   {stats.isVerified || stats.stakeAmount >= 100 ? "Active & Verified" : "Pending Collateral"}
                 </span>
@@ -3837,8 +4020,18 @@ function MentorDashboardView({ user }) {
                 </span>
               </div>
 
-              <div className="bg-purple-50/60 p-4 rounded-2xl border border-purple-100">
-                <span className="text-slate-500 text-[11px] font-semibold block">Council Juror Eligibility</span>
+              <div
+                onClick={() => {
+                  setStakeActionTab("deposit");
+                  setShowStakeModal(true);
+                  fetchMentorWalletBalance().catch(() => {});
+                }}
+                className="bg-purple-50/60 hover:bg-purple-100/60 p-4 rounded-2xl border border-purple-100 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 text-[11px] font-semibold block">Council Juror Eligibility</span>
+                  <ExternalLink size={12} className="text-purple-400 group-hover:text-purple-700 transition-colors" />
+                </div>
                 <span className="text-slate-950 font-black text-lg block mt-0.5">
                   {stats.stakeAmount >= 100 ? "Eligible for Sortition" : "Stake >= 100 USDC Needed"}
                 </span>
@@ -3846,7 +4039,7 @@ function MentorDashboardView({ user }) {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-purple-50">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-purple-50 relative z-10">
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <Droplets size={14} className="text-purple-600" />
                 <span>Need testnet USDC for collateral?</span>
@@ -3857,12 +4050,13 @@ function MentorDashboardView({ user }) {
 
               <button
                 type="button"
-                onClick={() => setShowStakeModal(true)}
-                className="relative overflow-hidden px-6 py-2.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/30 hover:shadow-purple-600/50 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer group"
+                onClick={() => handleStakeCollateral(100)}
+                disabled={isStakingLoading}
+                className="relative overflow-hidden px-6 py-2.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-md shadow-purple-600/30 hover:shadow-purple-600/50 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer group disabled:opacity-50"
               >
                 <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer-sweep" />
                 <ShieldCheck size={14} className="group-hover:rotate-12 transition-transform text-emerald-300" />
-                <span>{stats.isVerified || stats.stakeAmount >= 100 ? "Add More Stake / Upgrade" : "Stake 100 USDC to Become Verified"}</span>
+                <span>{stats.isVerified || stats.stakeAmount >= 100 ? "Add More Stake via MetaMask" : "Stake 100 USDC via MetaMask"}</span>
                 <Sparkles size={12} className="text-amber-300 animate-pulse" />
               </button>
             </div>
@@ -4981,7 +5175,7 @@ function MentorDashboardView({ user }) {
 
           <DialogHeader className="pb-4 border-b border-slate-100 relative z-10">
             <div className="flex items-center gap-3.5">
-              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20 transition-all ${
+              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20 transition-all ${
                 isStakingLoading ? "animate-pulse scale-105" : ""
               }`}>
                 <ShieldCheck size={26} />
@@ -5015,12 +5209,12 @@ function MentorDashboardView({ user }) {
 
           {/* 3-Box Live Metrics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50/80 to-indigo-50/50 border border-purple-100 space-y-1">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-50/80 to-blue-50/50 border border-cyan-100 space-y-1">
               <span className="text-[11px] font-semibold text-slate-500 block uppercase tracking-wider">Current Collateral</span>
               <span className="text-2xl font-black text-slate-900 block font-mono">
                 ${stats.stakeAmount || 0} USDC
               </span>
-              <span className="text-[11px] text-purple-700 font-medium block">
+              <span className="text-[11px] text-cyan-800 font-medium block">
                 {stats.stakeAmount >= 300 ? "Master Tier" : stats.stakeAmount >= 100 ? "Pro Tier" : "Unranked"}
               </span>
             </div>
@@ -5268,8 +5462,8 @@ function MentorDashboardView({ user }) {
                   type="button"
                   disabled={isStakingLoading || stakeAmountChoice <= 0}
                   onClick={() => handleStakeCollateral(stakeAmountChoice)}
-                  className={`relative overflow-hidden px-8 py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-xl shadow-purple-600/30 border-b-4 border-purple-950 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
-                    isStakingLoading ? "animate-pulse ring-4 ring-purple-400/30" : "hover:shadow-purple-600/50 hover:scale-[1.02]"
+                  className={`relative overflow-hidden px-8 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-700 hover:from-blue-700 hover:to-cyan-700 text-white font-extrabold text-xs shadow-xl shadow-blue-600/30 border-b-4 border-blue-950 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 ${
+                    isStakingLoading ? "animate-pulse ring-4 ring-cyan-400/30" : "hover:shadow-blue-600/50 hover:scale-[1.02]"
                   }`}
                 >
                   {/* Subtle moving light sheen inside button */}
@@ -5278,8 +5472,8 @@ function MentorDashboardView({ user }) {
                   {isStakingLoading ? (
                     <>
                       <div className="relative w-4 h-4 flex items-center justify-center">
-                        <RefreshCw size={15} className="animate-spin text-purple-200" />
-                        <span className="absolute inset-0 rounded-full border border-purple-200 animate-ping opacity-40" />
+                        <RefreshCw size={15} className="animate-spin text-cyan-200" />
+                        <span className="absolute inset-0 rounded-full border border-cyan-200 animate-ping opacity-40" />
                       </div>
                       <span className="tracking-wide">
                         {stakingStepMsg || "Processing On-Chain Deposit..."}

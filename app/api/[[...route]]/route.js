@@ -390,11 +390,13 @@ app.post("/auth/login", async (c) => {
       maxAge: isRemember ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60,
     });
 
-    let userNickname = null;
-    try {
-      const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = ? LIMIT 1`, user.id);
-      if (rows && rows[0]) userNickname = rows[0].nickname;
-    } catch {}
+    let userNickname = user.nickname || null;
+    if (!userNickname) {
+      try {
+        const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = $1 LIMIT 1`, user.id);
+        if (rows && rows[0]) userNickname = rows[0].nickname;
+      } catch {}
+    }
 
     return c.json({
       token: accessToken,
@@ -621,11 +623,13 @@ app.post("/auth/google", async (c) => {
       maxAge: 30 * 24 * 60 * 60,
     });
 
-    let userNickname = null;
-    try {
-      const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = ? LIMIT 1`, user.id);
-      if (rows && rows[0]) userNickname = rows[0].nickname;
-    } catch {}
+    let userNickname = user.nickname || null;
+    if (!userNickname) {
+      try {
+        const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = $1 LIMIT 1`, user.id);
+        if (rows && rows[0]) userNickname = rows[0].nickname;
+      } catch {}
+    }
 
     return c.json({
       token,
@@ -666,11 +670,13 @@ app.get("/auth/me", authMiddleware, async (c) => {
     });
     if (!user) return c.json({ error: "User not found" }, 404);
 
-    let userNickname = null;
-    try {
-      const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = ? LIMIT 1`, user.id);
-      if (rows && rows[0]) userNickname = rows[0].nickname;
-    } catch {}
+    let userNickname = user.nickname || null;
+    if (!userNickname) {
+      try {
+        const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = $1 LIMIT 1`, user.id);
+        if (rows && rows[0]) userNickname = rows[0].nickname;
+      } catch {}
+    }
 
     return c.json({
       user: {
@@ -801,31 +807,22 @@ app.post("/auth/register", async (c) => {
       role: newUser.role,
     }).catch((err) => console.warn("[Resend Register Email Warning]:", err.message));
 
-    // Save extended SQLite columns
+    // Save extended user profile columns
     try {
-      await db.$executeRawUnsafe(
-        `UPDATE "User" SET 
-          "birthDate" = ?, 
-          "domicileCountry" = ?, 
-          "educationHistory" = ?, 
-          "learningInterests" = ?, 
-          "skills" = ?, 
-          "languages" = ?, 
-          "videoIntroUrl" = ?, 
-          "verificationType" = ?, 
-          "availability" = ? 
-        WHERE id = ?`,
-        birthDate || null,
-        domicileCountry || null,
-        educationHistory ? JSON.stringify(educationHistory) : null,
-        learningInterests ? JSON.stringify(learningInterests) : null,
-        skills ? JSON.stringify(skills) : null,
-        languages ? JSON.stringify(languages) : null,
-        videoIntroUrl || null,
-        verificationType || null,
-        availability ? JSON.stringify(availability) : null,
-        newUser.id
-      );
+      await db.user.update({
+        where: { id: newUser.id },
+        data: {
+          birthDate: birthDate || null,
+          domicileCountry: domicileCountry || null,
+          educationHistory: educationHistory ? JSON.stringify(educationHistory) : null,
+          learningInterests: learningInterests ? JSON.stringify(learningInterests) : null,
+          skills: skills ? JSON.stringify(skills) : null,
+          languages: languages ? JSON.stringify(languages) : null,
+          videoIntroUrl: videoIntroUrl || null,
+          verificationType: verificationType || null,
+          availability: availability ? JSON.stringify(availability) : null,
+        },
+      });
     } catch (colErr) {
       console.warn("[Register Warning] Extended column update:", colErr.message);
     }
@@ -962,11 +959,13 @@ app.post("/auth/google", async (c) => {
       maxAge: 30 * 24 * 60 * 60,
     });
 
-    let userNickname = null;
-    try {
-      const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = ? LIMIT 1`, user.id);
-      if (rows && rows[0]) userNickname = rows[0].nickname;
-    } catch {}
+    let userNickname = user.nickname || null;
+    if (!userNickname) {
+      try {
+        const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = $1 LIMIT 1`, user.id);
+        if (rows && rows[0]) userNickname = rows[0].nickname;
+      } catch {}
+    }
 
     return c.json({
       token,
@@ -5587,11 +5586,13 @@ app.get("/mentor/profile", async (c) => {
 
     if (!user) return c.json({ error: "Mentor not found" }, 404);
 
-    let nickname = null;
-    try {
-      const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = ? LIMIT 1`, user.id);
-      if (rows && rows[0]) nickname = rows[0].nickname;
-    } catch {}
+    let nickname = user.nickname || null;
+    if (!nickname) {
+      try {
+        const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = $1 LIMIT 1`, user.id);
+        if (rows && rows[0]) nickname = rows[0].nickname;
+      } catch {}
+    }
 
     return c.json({
       user: {
@@ -5663,24 +5664,34 @@ app.post("/mentor/profile", async (c) => {
       data: updates,
     });
 
-    // Update nickname safely via raw SQL so it works whether or not Prisma client has re-generated
+    // Update nickname safely
     let savedNickname = null;
     if (nickname !== undefined) {
       savedNickname = nickname.trim().replace(/^@/, "");
       try {
-        await db.$executeRawUnsafe(
-          `UPDATE "User" SET "nickname" = ? WHERE "id" = ?`,
-          savedNickname,
-          user.id
-        );
-      } catch (err) {
-        console.warn("[Database] Could not update nickname column:", err.message);
+        await db.user.update({
+          where: { id: user.id },
+          data: { nickname: savedNickname },
+        });
+      } catch (prismaErr) {
+        try {
+          await db.$executeRawUnsafe(
+            `UPDATE "User" SET "nickname" = $1 WHERE "id" = $2`,
+            savedNickname,
+            user.id
+          );
+        } catch (err) {
+          console.warn("[Database] Could not update nickname column:", err.message);
+        }
       }
     } else {
-      try {
-        const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = ? LIMIT 1`, user.id);
-        if (rows && rows[0]) savedNickname = rows[0].nickname;
-      } catch {}
+      savedNickname = updatedUser.nickname || user.nickname || null;
+      if (!savedNickname) {
+        try {
+          const rows = await db.$queryRawUnsafe(`SELECT nickname FROM "User" WHERE id = $1 LIMIT 1`, user.id);
+          if (rows && rows[0]) savedNickname = rows[0].nickname;
+        } catch {}
+      }
     }
 
     return c.json({

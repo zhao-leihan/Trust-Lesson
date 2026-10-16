@@ -295,7 +295,7 @@ export function AuthProvider({ children }) {
       // 2. window.ethereum.providers array
       if (window.ethereum?.providers?.length) {
         const mm = window.ethereum.providers.find(
-          (p) => p.isMetaMask && !p.isCoinbaseWallet && !p.isRabby && !p.isRainbow && !p.isBraveWallet
+          (p) => p.isMetaMask && !p.isPhantom && !p.isCoinbaseWallet && !p.isRabby && !p.isRainbow && !p.isBraveWallet
         );
         if (mm) return mm;
       }
@@ -308,6 +308,7 @@ export function AuthProvider({ children }) {
       // 4. Standalone window.ethereum ONLY if it's genuinely MetaMask and NOT others
       if (
         window.ethereum?.isMetaMask &&
+        !window.ethereum?.isPhantom &&
         !window.ethereum?.isCoinbaseWallet &&
         !window.ethereum?.isRabby &&
         !window.ethereum?.isRainbow
@@ -799,6 +800,7 @@ export function AuthProvider({ children }) {
         portfolios,
         addPortfolioItem,
         deletePortfolioItem,
+        getWalletProvider,
         // Expose API utility for child components
         apiFetch: USE_API ? apiFetch : null,
         isApiEnabled: USE_API,
