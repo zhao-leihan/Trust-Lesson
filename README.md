@@ -115,22 +115,43 @@ All contracts deployed on **Arbitrum Sepolia** (`Chain ID: 421614`), compiled wi
 
 | Feature | Description |
 | :--- | :--- |
-| **Dashboard** | Monthly earnings, active escrow pool, reputation score, hourly rate analytics |
-| **Curriculum Upload** | Native Cloudflare Stream (video) + R2 (documents) with signed URLs |
+| **Real Database Analytics** | Live 30-day earnings, active escrow volume, on-chain reputation score, and hourly rate metrics |
+| **Curriculum Upload** | Native Cloudflare Stream (video) + R2 (documents) with signed HLS tokens |
 | **Zero-Budget Hosting** | Unlisted YouTube / restricted Google Drive fallback with setup guides |
 | **Student View Simulator** | Preview curriculum from unpaid (locked) and paid (unlocked) perspectives before publishing |
-| **Escrow Wallet** | Track pending deposits, milestone status, withdraw settled earnings |
-| **Portfolio** | Live demo URLs, GitHub repos, tech stack tags |
+| **Payout Wallet Lock Guard** | Enforce recipient address locking on Arbitrum before gig creation |
+| **Portfolio & Bio** | Live demo URLs, GitHub repos, tech stack tags, and leveling badges |
 
 ### For Learners
 
 | Feature | Description |
 | :--- | :--- |
-| **Live Balance Check** | Arbitrum Sepolia USDC + ETH balance in checkout card |
-| **Insufficient Balance Guard** | Pre-flight warnings + direct faucet links |
-| **Milestone Tracker** | Escrow Deposited → In Session → Confirmed & Released |
-| **Dispute Resolution** | 48-hour window, evidence hashed to IPFS |
-| **Soulbound Credentials** | Non-transferable completion certificates linked to Arbiscan |
+| **Live Balance Check** | Arbitrum Sepolia USDC + ETH balance check in checkout card |
+| **Insufficient Balance Guard** | Pre-flight balance validation + direct testnet faucet integrations |
+| **Transaction Status Timeline** | Visual on-chain milestone progress: Created → Funded → In Session → Completed → Attestation |
+| **Post-Course Social Sharing** | Instant 1-click sharing to X, LinkedIn, and Instagram with pre-composed hashtags |
+| **Multi-Layer Idempotency** | Complete protection against double payments, duplicate session entries, and booking race conditions |
+| **Soulbound Credentials** | Dual-party non-transferable completion certificates (W3C JSON-LD + EIP-712) linked to Arbiscan |
+
+---
+
+## Design System & Architecture Updates
+
+### 1. "Calm Learning Platform" Design System
+Internal platform routes (`/dashboard`, `/dashboard/requests`, `/leaderboard`, `/dashboard/availability`, `/dashboard/chat`, `/dashboard/classes`, `/dashboard/gigs`) adhere to the Calm Learning design tokens:
+- **Palette**: `violet-600` for primary actions, `violet-50` for active pill selections and icon containers, and neutral `gray-100/400/500/900`.
+- **Reusable Primitives** (`src/components/ui/DesignTokens.jsx`): `PrimaryButton`, `SecondaryButton`, `GhostButton`, `Card`, `StatCard`, `StatusPill`, and `EmptyState`.
+- **Zero Horizontal Scroll**: 100% mobile-responsive down to 375px with touch-friendly 44px targets.
+
+### 2. Multi-Layer Idempotency & Concurrency Guards
+- **Web3 Layer**: Client-side `isProcessing` mutex locks plus automated `findRecentSessionReceipt` log query to recover already-broadcasted transactions.
+- **API Gateway Layer**: `alreadyEnrolled` active enrollment checks and `onchainSessionId` uniqueness filters.
+- **Database Layer**: PostgreSQL transaction-level advisory locks (`pg_advisory_xact_lock`) serializing calendar slot reservations per mentor.
+- **Smart Contract Layer**: `require(!milestone.released)` and OpenZeppelin `ReentrancyGuard` preventing duplicate milestone claims.
+
+Detailed technical specs can be found in [docs/system-updates-and-changelog.md](./docs/system-updates-and-changelog.md).
+
+---
 
 ### Economic Model
 
@@ -150,7 +171,7 @@ Fee parameter: `PLATFORM_FEE_BPS = 1000` (10%, adjustable by governance).
 
 | Layer | Technology |
 | :--- | :--- |
-| **Frontend** | Next.js 15 App Router, React 19, Tailwind CSS v4, Radix UI |
+| **Frontend** | Next.js 15 App Router, React 19, Tailwind CSS v4, Calm Learning Design Tokens |
 | **Backend** | Hono Edge Router, Prisma ORM, PostgreSQL / SQLite |
 | **Smart Contracts** | Solidity 0.8.24, Hardhat, OpenZeppelin 5.x |
 | **Web3** | Ethers.js v6, Viem, MetaMask / Rabby / Coinbase Wallet |
@@ -236,6 +257,7 @@ Trust-Lesson/
 │   ├── MentorStaking.sol         # Stake pool + slashing
 │   └── VideoAccess.sol           # Content access gating
 ├── docs/                         # Engineering specs
+│   ├── system-updates-and-changelog.md # Detailed design system & idempotency specs
 │   ├── code architecture.md      # Full-stack blueprint
 │   ├── classroom-webrtc-architecture.md
 │   ├── report.md                 # Technical audit manual

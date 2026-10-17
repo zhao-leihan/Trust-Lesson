@@ -49,9 +49,6 @@ cache_hardhat/
 *.sln
 *.sw?
 
-# Exclude docs as requested
-docs/
-
 # Exclude tests as requested
 test/
 
