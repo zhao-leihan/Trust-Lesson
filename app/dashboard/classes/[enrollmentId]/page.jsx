@@ -89,7 +89,12 @@ export default function ClassroomDetailPage() {
     instructions: "",
     dueAt: "",
     passingScore: 70,
+    fileUrl: "",
+    fileName: "",
+    fileSize: null,
+    externalLink: "",
   });
+  const [uploadingBrief, setUploadingBrief] = useState(false);
   const [submittingAssignmentId, setSubmittingAssignmentId] = useState(null);
   const [submissionForm, setSubmissionForm] = useState({ content: "", fileRefs: "" });
   const [gradingAssignmentId, setGradingAssignmentId] = useState(null);
@@ -326,6 +331,64 @@ export default function ClassroomDetailPage() {
       alert("Failed to release escrow: " + err.message);
     } finally {
       setCompletingEscrow(false);
+    }
+  };
+
+  // Mentor uploads coursework brief (PDF or Docs)
+  const handleUploadBrief = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingBrief(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const token = typeof window !== "undefined" ? (localStorage.getItem("tl_jwt") || localStorage.getItem("tl_token")) : null;
+      const res = await fetch("/api/tasks/upload", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || "Failed to upload file");
+      setNewAssignment((prev) => ({
+        ...prev,
+        fileUrl: result.url,
+        fileName: result.fileName || file.name,
+        fileSize: result.fileSize || file.size,
+      }));
+    } catch (err) {
+      alert("Brief upload error: " + err.message);
+    } finally {
+      setUploadingBrief(false);
+    }
+  };
+
+  // Mentor creates assignment
+  const handleCreateAssignment = async (e) => {
+    e.preventDefault();
+    if (!newAssignment.title.trim() || !newAssignment.instructions.trim()) return;
+    setActionLoading(true);
+    try {
+      await apiFetch(`/enrollments/${enrollmentId}/assignments`, {
+        method: "POST",
+        body: JSON.stringify(newAssignment),
+      });
+      setIsCreatingAssignment(false);
+      setNewAssignment({
+        title: "",
+        instructions: "",
+        dueAt: "",
+        passingScore: 70,
+        fileUrl: "",
+        fileName: "",
+        fileSize: null,
+        externalLink: "",
+      });
+      await reloadClassroom();
+    } catch (err) {
+      alert(err.message || "Failed to create assignment");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -1206,6 +1269,80 @@ export default function ClassroomDetailPage() {
                       />
                     </div>
 
+                    {/* PDF Brief Upload & External Resource Link */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200/80">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <FileText size={13} className="text-purple-600" />
+                            <span>Attach Brief / PDF (Optional)</span>
+                          </span>
+                        </label>
+
+                        {newAssignment.fileUrl ? (
+                          <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-purple-200 shadow-2xs">
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <File className="text-purple-600 shrink-0" size={16} />
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-900 truncate">
+                                  {newAssignment.fileName}
+                                </p>
+                                {newAssignment.fileSize && (
+                                  <p className="text-[10px] text-slate-400">
+                                    {(newAssignment.fileSize / 1024).toFixed(1)} KB
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewAssignment((prev) => ({
+                                  ...prev,
+                                  fileUrl: "",
+                                  fileName: "",
+                                  fileSize: null,
+                                }))
+                              }
+                              className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex items-center justify-center gap-2 p-3 bg-white hover:bg-purple-50/30 rounded-xl border border-dashed border-slate-300 hover:border-purple-300 cursor-pointer transition text-xs font-semibold text-slate-600 hover:text-purple-700">
+                            <Upload size={14} className="text-purple-600" />
+                            <span>{uploadingBrief ? "Uploading Brief..." : "Upload PDF or File Brief"}</span>
+                            <input
+                              type="file"
+                              accept=".pdf,.doc,.docx,.zip,.txt"
+                              onChange={handleUploadBrief}
+                              disabled={uploadingBrief}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                        <p className="text-[10px] text-slate-400">PDF, Word, or Zip document (max 20MB)</p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <ExternalLink size={13} className="text-purple-600" />
+                          <span>External Resource Link (Optional)</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={newAssignment.externalLink}
+                          onChange={(e) =>
+                            setNewAssignment({ ...newAssignment, externalLink: e.target.value })
+                          }
+                          placeholder="https://github.com/... or Google Drive"
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:outline-purple-600"
+                        />
+                        <p className="text-[10px] text-slate-400">Google Drive, GitHub repo, Figma, or Docs</p>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-xs font-bold text-slate-700">Minimum Passing Score (0-100)</label>
@@ -1317,6 +1454,49 @@ export default function ClassroomDetailPage() {
                             {def.instructions}
                           </p>
                         </div>
+
+                        {/* Task Brief / Attachments / External Link */}
+                        {def.attachments && (() => {
+                          let att = null;
+                          try {
+                            att = JSON.parse(def.attachments);
+                          } catch (e) {}
+                          if (!att || (!att.fileUrl && !att.externalLink)) return null;
+
+                          return (
+                            <div className="p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-2">
+                              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                                Coursework Resources & Reference
+                              </span>
+                              <div className="flex flex-wrap items-center gap-3">
+                                {att.fileUrl && (
+                                  <a
+                                    href={att.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download
+                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:text-purple-700 transition shadow-2xs"
+                                  >
+                                    <FileText size={14} className="text-purple-600" />
+                                    <span className="truncate max-w-[220px]">{att.fileName || "Coursework Brief"}</span>
+                                    <Download size={12} className="text-slate-400" />
+                                  </a>
+                                )}
+                                {att.externalLink && (
+                                  <a
+                                    href={att.externalLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-purple-700 hover:text-purple-800 transition shadow-2xs"
+                                  >
+                                    <ExternalLink size={13} className="text-purple-600" />
+                                    <span className="truncate max-w-[260px]">{att.externalLink}</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Submissions & Review Block */}
                         {latestSubmission && (

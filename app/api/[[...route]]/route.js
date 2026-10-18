@@ -3167,10 +3167,22 @@ app.post("/enrollments/:id/assignments", authMiddleware, async (c) => {
   const jwtUser = c.get("user");
   const db = await getPrisma();
   const body = await c.req.json();
-  const { title, instructions, dueAt, passingScore = 70 } = body;
+  const { title, instructions, dueAt, passingScore = 70, attachments, externalLink, fileUrl, fileName, fileSize } = body;
 
   if (!title || !instructions) {
     return c.json({ error: "Task title and instructions are required" }, 400);
+  }
+
+  let serializedAttachments = null;
+  if (attachments) {
+    serializedAttachments = typeof attachments === "string" ? attachments : JSON.stringify(attachments);
+  } else if (fileUrl || externalLink) {
+    serializedAttachments = JSON.stringify({
+      fileUrl: fileUrl || null,
+      fileName: fileName || "Assignment_Brief.pdf",
+      fileSize: fileSize || null,
+      externalLink: externalLink ? externalLink.trim() : null,
+    });
   }
 
   try {
@@ -3183,9 +3195,10 @@ app.post("/enrollments/:id/assignments", authMiddleware, async (c) => {
       data: {
         gigId: enrollment.gigId,
         phase: "DURING",
-        type: "LINK_REPO",
+        type: fileUrl ? "FILE_UPLOAD" : (externalLink ? "LINK_REPO" : "TEXT_REFLECTION"),
         title: title.trim(),
         instructions: instructions.trim(),
+        attachments: serializedAttachments,
         passingScore: Number(passingScore) || 70,
       },
     });
@@ -4049,10 +4062,22 @@ app.post("/gigs/:id/assignments", authMiddleware, async (c) => {
   const gigId = c.req.param("id");
   const db = await getPrisma();
   const body = await c.req.json();
-  const { title, instructions, dueAt, passingScore = 70, targetLearnerId } = body;
+  const { title, instructions, dueAt, passingScore = 70, targetLearnerId, attachments, externalLink, fileUrl, fileName, fileSize } = body;
 
   if (!title || !instructions) {
     return c.json({ error: "Title and instructions are required" }, 400);
+  }
+
+  let serializedAttachments = null;
+  if (attachments) {
+    serializedAttachments = typeof attachments === "string" ? attachments : JSON.stringify(attachments);
+  } else if (fileUrl || externalLink) {
+    serializedAttachments = JSON.stringify({
+      fileUrl: fileUrl || null,
+      fileName: fileName || "Assignment_Brief.pdf",
+      fileSize: fileSize || null,
+      externalLink: externalLink ? externalLink.trim() : null,
+    });
   }
 
   try {
@@ -4065,9 +4090,10 @@ app.post("/gigs/:id/assignments", authMiddleware, async (c) => {
       data: {
         gigId,
         phase: "DURING",
-        type: "LINK_REPO",
+        type: fileUrl ? "FILE_UPLOAD" : (externalLink ? "LINK_REPO" : "TEXT_REFLECTION"),
         title: title.trim(),
         instructions: instructions.trim(),
+        attachments: serializedAttachments,
         passingScore: Number(passingScore) || 70,
       },
     });
