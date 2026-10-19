@@ -271,6 +271,154 @@ app.get("/auth/google/callback", async (c) => {
   return c.json({ error: "Failed to obtain refresh token", detail: data }, 400);
 });
 
+/** GET /api/auth/linkedin — 1-Click Official LinkedIn OAuth 2.0 Login / Connect */
+app.get("/auth/linkedin", (c) => {
+  const clientId = process.env.LINKEDIN_CLIENT_ID || process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID;
+  const origin = new URL(c.req.url).origin;
+  const redirectUri = `${origin}/api/auth/linkedin/callback`;
+  const userId = c.req.query("userId") || "";
+  const state = Buffer.from(JSON.stringify({ userId, origin })).toString("base64");
+
+  if (!clientId) {
+    return c.html(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>LinkedIn OAuth Setup</title></head>
+        <body style="font-family:system-ui,-apple-system,sans-serif;padding:40px;text-align:center;color:#1e293b;background:#f8fafc;">
+          <div style="max-width:440px;margin:0 auto;background:#fff;padding:32px;border-radius:20px;border:1px solid #e2e8f0;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+            <div style="width:48px;height:48px;background:#0077b5;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:#fff;font-weight:900;font-size:24px;">in</div>
+            <h3 style="margin:0 0 8px;font-size:18px;">LinkedIn OAuth App Not Configured</h3>
+            <p style="color:#64748b;font-size:13px;line-height:1.5;margin-bottom:24px;">To connect automatically via OAuth, set <code>LINKEDIN_CLIENT_ID</code> and <code>LINKEDIN_CLIENT_SECRET</code> in your <code>.env</code> file. Alternatively, you can paste your profile link directly in the dashboard.</p>
+            <button onclick="window.close()" style="background:#0077b5;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;">Close Window</button>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+
+  const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent("openid profile email")}&state=${encodeURIComponent(state)}`;
+  return c.redirect(url);
+});
+
+/** GET /api/auth/linkedin/callback — Handle Official LinkedIn OAuth callback */
+app.get("/auth/linkedin/callback", async (c) => {
+  const code = c.req.query("code");
+  const stateRaw = c.req.query("state");
+  const error = c.req.query("error");
+  const errorDescription = c.req.query("error_description");
+
+  if (error || !code) {
+    return c.html(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>LinkedIn Authorization</title></head>
+        <body style="font-family:system-ui,sans-serif;padding:40px;text-align:center;background:#f8fafc;">
+          <div style="max-width:420px;margin:0 auto;background:#fff;padding:30px;border-radius:20px;border:1px solid #e2e8f0;">
+            <h3 style="color:#e11d48;margin-top:0;">Authorization Cancelled</h3>
+            <p style="color:#64748b;font-size:13px;">${errorDescription || error || "No authorization code returned."}</p>
+            <button onclick="window.close()" style="background:#64748b;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-weight:bold;cursor:pointer;">Close</button>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+
+  let stateObj = {};
+  try {
+    if (stateRaw) {
+      stateObj = JSON.parse(Buffer.from(stateRaw, "base64").toString("utf8"));
+    }
+  } catch (e) {}
+
+  const clientId = process.env.LINKEDIN_CLIENT_ID || process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID;
+  const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
+  const origin = stateObj.origin || new URL(c.req.url).origin;
+  const redirectUri = `${origin}/api/auth/linkedin/callback`;
+
+  try {
+    const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) {
+      throw new Error(tokenData.error_description || tokenData.error || "Failed to retrieve access token");
+    }
+
+    const userInfoRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const profile = await userInfoRes.json();
+
+    const vanity = profile.sub || profile.email?.split("@")[0] || "member";
+    const profileUrl = `https://www.linkedin.com/in/${vanity}`;
+
+    if (stateObj.userId) {
+      const db = await getPrisma();
+      const updateData = {
+        linkedin: profileUrl,
+      };
+      if (profile.name) {
+        updateData.name = profile.name;
+      }
+      if (profile.picture) {
+        updateData.avatarUrl = profile.picture;
+      }
+      await db.user.update({
+        where: { id: stateObj.userId },
+        data: updateData,
+      });
+    }
+
+    return c.html(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>LinkedIn Connected</title></head>
+        <body style="font-family:system-ui,sans-serif;padding:40px;text-align:center;background:#f8fafc;">
+          <div style="max-width:420px;margin:0 auto;background:#fff;padding:30px;border-radius:20px;border:1px solid #e2e8f0;">
+            <h3 style="color:#059669;margin-top:0;">LinkedIn Connected!</h3>
+            <p style="color:#475569;font-size:13px;">Verified as ${profile.name || "LinkedIn User"}</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({
+                  type: "LINKEDIN_CONNECTED",
+                  url: "${profileUrl}",
+                  name: "${profile.name || ""}",
+                  picture: "${profile.picture || ""}"
+                }, "*");
+                setTimeout(() => window.close(), 600);
+              } else {
+                window.location.href = "${origin}/dashboard?tab=portfolio";
+              }
+            </script>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    return c.html(`
+      <!DOCTYPE html>
+      <html>
+        <body style="font-family:system-ui,sans-serif;padding:40px;text-align:center;background:#f8fafc;">
+          <div style="max-width:420px;margin:0 auto;background:#fff;padding:30px;border-radius:20px;border:1px solid #e2e8f0;">
+            <h3 style="color:#e11d48;margin-top:0;">LinkedIn Connect Error</h3>
+            <p style="color:#64748b;font-size:13px;">${err.message}</p>
+            <button onclick="window.close()" style="background:#64748b;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-weight:bold;cursor:pointer;">Close</button>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+});
+
 /** POST /api/auth/login — Email + Password Login with Turnstile & Dual Tokens */
 app.post("/auth/login", async (c) => {
   const clientIp = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || c.req.header("x-real-ip") || "127.0.0.1";

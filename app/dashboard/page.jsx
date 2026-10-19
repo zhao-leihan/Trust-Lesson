@@ -6134,6 +6134,40 @@ function StudentProfileEditor({ user, sessions }) {
     return clean;
   };
 
+  // Listen for OAuth completion from popup
+  useEffect(() => {
+    const handleOAuthMessage = (event) => {
+      if (event.data?.type === "LINKEDIN_CONNECTED" && event.data?.url) {
+        setFormLinkedin(event.data.url);
+        setLinkedinInput(event.data.url);
+        if (event.data.name) setFormName(event.data.name);
+        if (event.data.picture) setFormAvatarUrl(event.data.picture);
+        updateUserProfile({
+          linkedin: event.data.url,
+          ...(event.data.name ? { name: event.data.name } : {}),
+          ...(event.data.picture ? { avatarUrl: event.data.picture } : {}),
+        });
+        setIsEditingLinkedin(false);
+        setLinkedinMsg(`Connected via LinkedIn as ${event.data.name || "Member"}!`);
+        setTimeout(() => setLinkedinMsg(""), 4000);
+      }
+    };
+    window.addEventListener("message", handleOAuthMessage);
+    return () => window.removeEventListener("message", handleOAuthMessage);
+  }, []);
+
+  const handleOpenLinkedInOAuth = () => {
+    const w = 600;
+    const h = 720;
+    const left = window.screen.width / 2 - w / 2;
+    const top = window.screen.height / 2 - h / 2;
+    window.open(
+      `/api/auth/linkedin?userId=${encodeURIComponent(user?.id || "")}`,
+      "LinkedInOAuthPopup",
+      `width=${w},height=${h},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
+    );
+  };
+
   const handleConnectLinkedin = async (customUrl) => {
     const raw = customUrl !== undefined ? customUrl : linkedinInput;
     const targetUrl = normalizeLinkedinUrl(raw);
@@ -6434,23 +6468,32 @@ function StudentProfileEditor({ user, sessions }) {
           </div>
 
           <div>
-            <label className="block text-slate-700 font-bold text-xs mb-1">LinkedIn Profile URL</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#0077B5]">
-                <LinkedinIcon className="w-4 h-4 fill-current" />
+            <label className="block text-slate-700 font-bold text-xs mb-1">LinkedIn Account</label>
+            {formLinkedin ? (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50/60 border border-blue-200">
+                <div className="flex items-center gap-2">
+                  <LinkedinIcon className="w-4 h-4 text-[#0077B5] fill-current" />
+                  <span className="text-xs font-semibold text-slate-700 truncate max-w-xs">{formLinkedin}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDisconnectLinkedin}
+                  className="text-[11px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+                >
+                  Disconnect
+                </button>
               </div>
-              <input
-                type="text"
-                value={formLinkedin}
-                onChange={(e) => {
-                  setFormLinkedin(e.target.value);
-                  setLinkedinInput(e.target.value);
-                }}
-                placeholder="https://www.linkedin.com/in/your-username or username"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-shadow"
-              />
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1">Enter your actual profile URL or username so your student credentials can be verified.</p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenLinkedInOAuth}
+                className="px-4 py-2.5 rounded-xl bg-[#0077B5] hover:bg-[#006097] text-white font-bold text-xs flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+              >
+                <LinkedinIcon className="w-4 h-4 fill-current" />
+                <span>Connect with LinkedIn (1-Click OAuth)</span>
+              </button>
+            )}
+            <p className="text-[11px] text-slate-400 mt-1">Authenticate directly via official LinkedIn 1-Click OAuth.</p>
           </div>
 
           <button
@@ -6532,7 +6575,7 @@ function StudentProfileEditor({ user, sessions }) {
             </div>
           </div>
 
-          {(formLinkedin || user.linkedin) && !isEditingLinkedin && (
+          {(formLinkedin || user.linkedin) && (
             <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
               <a
                 href={formLinkedin || user.linkedin}
@@ -6545,16 +6588,6 @@ function StudentProfileEditor({ user, sessions }) {
               </a>
               <button
                 type="button"
-                onClick={() => {
-                  setLinkedinInput(formLinkedin || user.linkedin || "");
-                  setIsEditingLinkedin(true);
-                }}
-                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs transition-colors shadow-xs cursor-pointer"
-              >
-                Change URL
-              </button>
-              <button
-                type="button"
                 onClick={handleDisconnectLinkedin}
                 className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 font-bold text-xs transition-colors cursor-pointer"
                 title="Disconnect LinkedIn"
@@ -6565,50 +6598,18 @@ function StudentProfileEditor({ user, sessions }) {
           )}
         </div>
 
-        {/* Real LinkedIn Input Box: displayed when not linked or when user clicks Change URL */}
-        {(!formLinkedin && !user.linkedin) || isEditingLinkedin ? (
-          <div className="pt-3 border-t border-blue-100/80 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#0077B5]">
-                <LinkedinIcon className="w-4 h-4 fill-current" />
-              </div>
-              <input
-                type="text"
-                value={linkedinInput}
-                onChange={(e) => setLinkedinInput(e.target.value)}
-                placeholder="https://www.linkedin.com/in/your-username or username"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-blue-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-              />
-            </div>
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              <button
-                type="button"
-                onClick={() => handleConnectLinkedin()}
-                disabled={isSyncingLinkedin || !linkedinInput.trim()}
-                className="px-5 py-2.5 rounded-xl bg-[#0077B5] hover:bg-[#006097] text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
-              >
-                <span>{isSyncingLinkedin ? "Connecting..." : "Verify & Connect"}</span>
-              </button>
-              {isEditingLinkedin && (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingLinkedin(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-              )}
-              <a
-                href="https://www.linkedin.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-[#0077B5] border border-blue-200 text-xs font-bold flex items-center gap-1 transition-colors"
-                title="Open LinkedIn in new tab to copy your profile link"
-              >
-                <span>LinkedIn.com</span>
-                <ExternalLink size={11} />
-              </a>
-            </div>
+        {/* Connect options: Official 1-Click OAuth */}
+        {!formLinkedin && !user.linkedin ? (
+          <div className="pt-3 border-t border-blue-100/80">
+            <button
+              type="button"
+              onClick={handleOpenLinkedInOAuth}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#0077B5] hover:bg-[#006097] text-white font-bold text-xs flex items-center justify-center gap-2.5 transition-all shadow-md shadow-blue-600/20 active:scale-95 cursor-pointer"
+              title="Launch official LinkedIn authorization popup"
+            >
+              <LinkedinIcon className="w-4 h-4 fill-current" />
+              <span>Connect with LinkedIn (1-Click OAuth)</span>
+            </button>
           </div>
         ) : null}
       </div>
