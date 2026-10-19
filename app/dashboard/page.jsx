@@ -6115,11 +6115,75 @@ function StudentProfileEditor({ user, sessions }) {
   const [formBio, setFormBio] = useState(user.bio || "");
   const [formDomain, setFormDomain] = useState(user.domain || "");
   const [formLinkedin, setFormLinkedin] = useState(user.linkedin || "");
+  const [linkedinInput, setLinkedinInput] = useState(user.linkedin || "");
+  const [isEditingLinkedin, setIsEditingLinkedin] = useState(false);
   const [formUniversity, setFormUniversity] = useState(user.university || "");
   const [formAvatarUrl, setFormAvatarUrl] = useState(user.avatarUrl || "");
   const [saved, setSaved] = useState(false);
   const [isSyncingLinkedin, setIsSyncingLinkedin] = useState(false);
   const [linkedinMsg, setLinkedinMsg] = useState("");
+
+  const normalizeLinkedinUrl = (raw) => {
+    let clean = (raw || "").trim();
+    if (!clean) return "";
+    // If user enters just username or in/username without protocol
+    if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+      clean = clean.replace(/^in\//i, "").replace(/^\/+|\/+$/g, "");
+      return `https://www.linkedin.com/in/${clean}`;
+    }
+    return clean;
+  };
+
+  const handleConnectLinkedin = async (customUrl) => {
+    const raw = customUrl !== undefined ? customUrl : linkedinInput;
+    const targetUrl = normalizeLinkedinUrl(raw);
+
+    if (!targetUrl || targetUrl === "https://www.linkedin.com/in/") {
+      alert("Please enter your actual LinkedIn profile URL (e.g. https://www.linkedin.com/in/your-username) or username.");
+      return;
+    }
+
+    setIsSyncingLinkedin(true);
+    try {
+      await fetch("/api/mentor/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id,
+          email: user?.email,
+          linkedin: targetUrl,
+        }),
+      });
+      setFormLinkedin(targetUrl);
+      setLinkedinInput(targetUrl);
+      updateUserProfile({ linkedin: targetUrl });
+      setIsEditingLinkedin(false);
+      setLinkedinMsg("LinkedIn connected successfully!");
+      setTimeout(() => setLinkedinMsg(""), 3500);
+    } catch (err) {
+      alert("Failed to connect LinkedIn: " + err.message);
+    } finally {
+      setIsSyncingLinkedin(false);
+    }
+  };
+
+  const handleDisconnectLinkedin = async () => {
+    setFormLinkedin("");
+    setLinkedinInput("");
+    setIsEditingLinkedin(false);
+    updateUserProfile({ linkedin: "" });
+    try {
+      await fetch("/api/mentor/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user?.id, email: user?.email, linkedin: "" }),
+      });
+      setLinkedinMsg("LinkedIn disconnected");
+      setTimeout(() => setLinkedinMsg(""), 3000);
+    } catch (err) {
+      console.warn("Disconnect error:", err);
+    }
+  };
 
   const [learnerCerts, setLearnerCerts] = useState([]);
   const [loadingCerts, setLoadingCerts] = useState(true);
@@ -6176,36 +6240,6 @@ function StudentProfileEditor({ user, sessions }) {
         }
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  const handleConnectLinkedin = async () => {
-    // Generate clean LinkedIn profile identifier based on user name or email
-    const fallbackHandle = (user.name || user.email?.split("@")[0] || "student")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "-")
-      .replace(/^-+|-+$/g, "");
-    const targetUrl = user.linkedin || formLinkedin || `https://www.linkedin.com/in/${fallbackHandle}`;
-
-    setIsSyncingLinkedin(true);
-    try {
-      await fetch("/api/mentor/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user?.id,
-          email: user?.email,
-          linkedin: targetUrl,
-        }),
-      });
-      setFormLinkedin(targetUrl);
-      updateUserProfile({ linkedin: targetUrl });
-      setLinkedinMsg("LinkedIn connected successfully!");
-      setTimeout(() => setLinkedinMsg(""), 3500);
-    } catch (err) {
-      alert("Failed to connect LinkedIn: " + err.message);
-    } finally {
-      setIsSyncingLinkedin(false);
     }
   };
 
@@ -6399,6 +6433,26 @@ function StudentProfileEditor({ user, sessions }) {
             </select>
           </div>
 
+          <div>
+            <label className="block text-slate-700 font-bold text-xs mb-1">LinkedIn Profile URL</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#0077B5]">
+                <LinkedinIcon className="w-4 h-4 fill-current" />
+              </div>
+              <input
+                type="text"
+                value={formLinkedin}
+                onChange={(e) => {
+                  setFormLinkedin(e.target.value);
+                  setLinkedinInput(e.target.value);
+                }}
+                placeholder="https://www.linkedin.com/in/your-username or username"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-shadow"
+              />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Enter your actual profile URL or username so your student credentials can be verified.</p>
+          </div>
+
           <button
             onClick={handleSave}
             className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-purple-600/20 shadow-sm"
@@ -6447,39 +6501,39 @@ function StudentProfileEditor({ user, sessions }) {
         </div>
       )}
 
-      {/* ── CARD BOTTOM: 1-CLICK AUTOMATIC LINKEDIN CONNECT ── */}
-      <div className="p-6 bg-gradient-to-r from-blue-50/60 via-indigo-50/40 to-white rounded-3xl border-2 border-blue-100/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fadeInUp">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#0077B5] text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
-            <LinkedinIcon className="w-6 h-6 fill-current" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="font-extrabold text-slate-900 text-base">
-                LinkedIn Profile Integration
-              </h4>
-              {formLinkedin || user.linkedin ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold flex items-center gap-1">
-                  <CheckCircle2 size={12} className="text-emerald-600" />
-                  <span>Connected</span>
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-bold">
-                  Not Linked
-                </span>
-              )}
+      {/* ── CARD BOTTOM: REAL LINKEDIN PROFILE INTEGRATION ── */}
+      <div className="p-6 bg-gradient-to-r from-blue-50/60 via-indigo-50/40 to-white rounded-3xl border-2 border-blue-100/90 shadow-sm space-y-4 animate-fadeInUp">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#0077B5] text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+              <LinkedinIcon className="w-6 h-6 fill-current" />
             </div>
-            <p className="text-slate-500 text-xs mt-0.5 max-w-md">
-              {formLinkedin || user.linkedin
-                ? `Linked: ${formLinkedin || user.linkedin}`
-                : "Connect your official LinkedIn profile automatically with 1-click to show verified student credentials."}
-            </p>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-extrabold text-slate-900 text-base">
+                  LinkedIn Profile Integration
+                </h4>
+                {formLinkedin || user.linkedin ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold flex items-center gap-1">
+                    <CheckCircle2 size={12} className="text-emerald-600" />
+                    <span>Connected</span>
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-bold">
+                    Not Linked
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-500 text-xs mt-0.5 max-w-lg">
+                {formLinkedin || user.linkedin
+                  ? `Linked: ${formLinkedin || user.linkedin}`
+                  : "Link your verified LinkedIn profile URL to showcase authenticated student credentials and achievements."}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-          {formLinkedin || user.linkedin ? (
-            <div className="flex items-center gap-2">
+          {(formLinkedin || user.linkedin) && !isEditingLinkedin && (
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
               <a
                 href={formLinkedin || user.linkedin}
                 target="_blank"
@@ -6491,35 +6545,72 @@ function StudentProfileEditor({ user, sessions }) {
               </a>
               <button
                 type="button"
-                onClick={async () => {
-                  setFormLinkedin("");
-                  updateUserProfile({ linkedin: "" });
-                  await fetch("/api/mentor/profile", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ userId: user?.id, email: user?.email, linkedin: "" }),
-                  });
-                  setLinkedinMsg("LinkedIn disconnected");
-                  setTimeout(() => setLinkedinMsg(""), 3000);
+                onClick={() => {
+                  setLinkedinInput(formLinkedin || user.linkedin || "");
+                  setIsEditingLinkedin(true);
                 }}
-                className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 font-bold text-xs transition-colors"
-                title="Disconnect"
+                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs transition-colors shadow-xs cursor-pointer"
+              >
+                Change URL
+              </button>
+              <button
+                type="button"
+                onClick={handleDisconnectLinkedin}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 font-bold text-xs transition-colors cursor-pointer"
+                title="Disconnect LinkedIn"
               >
                 Disconnect
               </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleConnectLinkedin}
-              disabled={isSyncingLinkedin}
-              className="px-5 py-2.5 rounded-xl bg-[#0077B5] hover:bg-[#006097] text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-600/20 active:scale-95 disabled:opacity-50"
-            >
-              <LinkedinIcon className="w-4 h-4 fill-current" />
-              <span>{isSyncingLinkedin ? "Connecting..." : "Connect LinkedIn Automatically"}</span>
-            </button>
           )}
         </div>
+
+        {/* Real LinkedIn Input Box: displayed when not linked or when user clicks Change URL */}
+        {(!formLinkedin && !user.linkedin) || isEditingLinkedin ? (
+          <div className="pt-3 border-t border-blue-100/80 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#0077B5]">
+                <LinkedinIcon className="w-4 h-4 fill-current" />
+              </div>
+              <input
+                type="text"
+                value={linkedinInput}
+                onChange={(e) => setLinkedinInput(e.target.value)}
+                placeholder="https://www.linkedin.com/in/your-username or username"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-blue-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              />
+            </div>
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handleConnectLinkedin()}
+                disabled={isSyncingLinkedin || !linkedinInput.trim()}
+                className="px-5 py-2.5 rounded-xl bg-[#0077B5] hover:bg-[#006097] text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <span>{isSyncingLinkedin ? "Connecting..." : "Verify & Connect"}</span>
+              </button>
+              {isEditingLinkedin && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingLinkedin(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              )}
+              <a
+                href="https://www.linkedin.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-[#0077B5] border border-blue-200 text-xs font-bold flex items-center gap-1 transition-colors"
+                title="Open LinkedIn in new tab to copy your profile link"
+              >
+                <span>LinkedIn.com</span>
+                <ExternalLink size={11} />
+              </a>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* SECTION: VERIFIABLE CERTIFICATES & CREDENTIALS */}
