@@ -103,15 +103,9 @@ export default function TransactionStatusTimeline({
             <Activity size={16} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h4 className="font-extrabold text-sm text-slate-900 tracking-tight">
-                Transaction Status Timeline
-              </h4>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200/70 text-[10px] font-bold uppercase tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-violet-600 animate-ping" />
-                Live Indexer
-              </span>
-            </div>
+            <h4 className="font-extrabold text-sm text-slate-900 tracking-tight">
+              Transaction Status Timeline
+            </h4>
             <p className="text-[11px] text-slate-500">
               Real-time on-chain verification powered by Arbitrum Sepolia indexer.
             </p>
