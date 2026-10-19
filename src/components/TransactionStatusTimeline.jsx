@@ -2,22 +2,20 @@
 
 import React, { useState } from "react";
 import {
-  CheckCircle2,
+  Check,
   Clock,
   ExternalLink,
   ShieldCheck,
   RefreshCw,
-  AlertCircle,
   Copy,
-  Check,
   Activity,
   Layers,
-  ArrowRight,
 } from "lucide-react";
 
 /**
  * Transaction Status Timeline
- * Visual on-chain progress tracker with real-time indexer sync, Arbiscan links, and estimated stage times.
+ * Visual on-chain milestone progress tracker with purple glow effects, stepped points,
+ * and real-time indexer sync.
  * Stages: [Deposited] -> [Locked] -> [In Session] -> [Completed / Released]
  */
 export default function TransactionStatusTimeline({
@@ -48,11 +46,11 @@ export default function TransactionStatusTimeline({
   else if (status === "DISPUTED") activeIndex = 2;
 
   const isDisputed = status === "DISPUTED";
-  const isCancelled = status === "CANCELLED";
 
   const stages = [
     {
       id: "deposited",
+      stepNum: "01",
       title: "Deposited",
       desc: "USDC escrow deposit confirmed on-chain",
       estTime: "~2-5s (Arbitrum L2)",
@@ -61,6 +59,7 @@ export default function TransactionStatusTimeline({
     },
     {
       id: "locked",
+      stepNum: "02",
       title: "Locked",
       desc: "Collateral secured in EscrowRouter vault",
       estTime: "Instant on-chain",
@@ -69,6 +68,7 @@ export default function TransactionStatusTimeline({
     },
     {
       id: "in_session",
+      stepNum: "03",
       title: "In Session",
       desc: "Live classes and task submissions active",
       estTime: "Course duration",
@@ -77,6 +77,7 @@ export default function TransactionStatusTimeline({
     },
     {
       id: "completed",
+      stepNum: "04",
       title: "Completed",
       desc: "Funds settled & SBT certificate issued",
       estTime: "~2-5s confirmation",
@@ -85,12 +86,20 @@ export default function TransactionStatusTimeline({
     },
   ];
 
+  // Percentage for progress line fill
+  const progressPercent =
+    activeIndex === 0 ? 12 : activeIndex === 1 ? 38 : activeIndex === 2 ? 70 : 100;
+
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-white ${compact ? "p-4 space-y-3" : "p-5 sm:p-6 space-y-5"} shadow-xs`}>
+    <div
+      className={`rounded-2xl border border-slate-200/90 bg-white ${
+        compact ? "p-4 space-y-4" : "p-5 sm:p-6 space-y-6"
+      } shadow-xs`}
+    >
       {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-700 flex items-center justify-center shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3.5 border-b border-slate-100">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center shrink-0 shadow-2xs">
             <Activity size={16} />
           </div>
           <div>
@@ -98,8 +107,8 @@ export default function TransactionStatusTimeline({
               <h4 className="font-extrabold text-sm text-slate-900 tracking-tight">
                 Transaction Status Timeline
               </h4>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200/70 text-[10px] font-bold uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-violet-600 animate-ping" />
                 Live Indexer
               </span>
             </div>
@@ -110,134 +119,218 @@ export default function TransactionStatusTimeline({
         </div>
 
         {onchainSessionId !== null && onchainSessionId !== undefined && (
-          <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 self-start sm:self-auto">
-            <Layers size={13} className="text-cyan-600" />
+          <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-violet-900 bg-violet-50/70 px-3 py-1.5 rounded-xl border border-violet-200/60 self-start sm:self-auto">
+            <Layers size={13} className="text-violet-600" />
             <span>Session #{onchainSessionId}</span>
           </div>
         )}
       </div>
 
-      {/* Visual Progress Steps Tracker */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 relative">
-        {stages.map((stage, idx) => {
-          const isDone = idx < activeIndex || (idx === 3 && activeIndex === 3);
-          const isCurrent = idx === activeIndex && activeIndex !== 3;
-          const isPending = idx > activeIndex;
+      {/* Desktop Stepped Timeline with Purple Glow & Connected Points */}
+      <div className="hidden md:block relative pt-4 pb-2">
+        {/* Continuous Progress Track */}
+        <div className="absolute top-[34px] left-[6%] right-[6%] h-1 bg-slate-100 rounded-full z-0 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 rounded-full transition-all duration-700 ease-out shadow-sm shadow-violet-500/40"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
 
-          return (
-            <div
-              key={stage.id}
-              className={`relative p-3.5 rounded-2xl border transition-all ${
-                isDone
-                  ? "bg-emerald-50/50 border-emerald-200 text-slate-900 shadow-xs"
-                  : isCurrent
-                  ? isDisputed
-                    ? "bg-amber-50/60 border-amber-300 ring-2 ring-amber-100"
-                    : "bg-cyan-50/60 border-cyan-300 ring-2 ring-cyan-100"
-                  : "bg-slate-50/60 border-slate-200 text-slate-400"
-              }`}
-            >
-              {/* Connector line indicator (desktop only) */}
-              {idx < stages.length - 1 && (
-                <div className="hidden md:block absolute -right-2 top-1/2 -translate-y-1/2 z-10 text-slate-300">
-                  <ArrowRight size={14} />
+        {/* 4 Stepped Milestone Points */}
+        <div className="grid grid-cols-4 gap-4 relative z-10">
+          {stages.map((stage, idx) => {
+            const isDone = idx < activeIndex || (idx === 3 && activeIndex === 3);
+            const isCurrent = idx === activeIndex && activeIndex !== 3;
+            const isPending = idx > activeIndex;
+
+            return (
+              <div key={stage.id} className="flex flex-col items-center text-center group">
+                {/* Milestone Point Dot with Purple Glow */}
+                <div className="h-12 flex items-center justify-center relative">
+                  {isDone ? (
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-violet-600 to-purple-600 text-white shadow-md shadow-violet-500/30 flex items-center justify-center ring-4 ring-violet-50 transition-transform duration-200 group-hover:scale-105">
+                      <Check size={16} strokeWidth={2.8} />
+                    </div>
+                  ) : isCurrent ? (
+                    <div className="relative flex items-center justify-center">
+                      {/* Ambient Purple Pulsing Glow */}
+                      <span className="absolute -inset-2.5 rounded-full bg-violet-500/20 blur-sm pointer-events-none" />
+                      <span className="absolute -inset-1.5 rounded-full bg-violet-400/40 animate-ping pointer-events-none" />
+                      <div className="w-10 h-10 rounded-full bg-white border-2 border-violet-600 text-violet-600 shadow-xl shadow-violet-500/40 flex items-center justify-center ring-4 ring-violet-200/90 relative z-10 transition-transform duration-200 group-hover:scale-105">
+                        {isDisputed ? (
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                        ) : (
+                          <RefreshCw size={15} className="animate-spin text-violet-600" />
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center ring-4 ring-slate-50 text-[11px] font-mono font-bold transition-transform duration-200 group-hover:scale-105">
+                      {stage.stepNum}
+                    </div>
+                  )}
                 </div>
-              )}
 
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-xs font-black ${
+                {/* Point Status Pill */}
+                <div className="mt-2">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${
                       isDone
-                        ? "bg-emerald-600 text-white shadow-xs"
+                        ? "bg-violet-50 text-violet-700 border border-violet-100"
                         : isCurrent
                         ? isDisputed
-                          ? "bg-amber-500 text-white animate-pulse"
-                          : "bg-cyan-600 text-white animate-pulse"
-                        : "bg-slate-200 text-slate-500"
+                          ? "bg-amber-100 text-amber-800 border border-amber-200 font-extrabold"
+                          : "bg-gradient-to-r from-violet-600 to-purple-600 text-white font-extrabold shadow-xs shadow-violet-500/30 animate-pulse"
+                        : "bg-slate-100 text-slate-400 border border-transparent"
                     }`}
                   >
-                    {isDone ? (
-                      <CheckCircle2 size={14} />
-                    ) : isCurrent ? (
-                      <RefreshCw size={12} className="animate-spin" />
-                    ) : (
-                      <Clock size={12} />
-                    )}
-                  </div>
-                  <span className="font-extrabold text-xs text-slate-900">
-                    {stage.title}
+                    {isDone ? "Done" : isCurrent ? (isDisputed ? "Disputed" : "In Progress") : "Queued"}
                   </span>
                 </div>
 
-                <span
-                  className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider ${
-                    isDone
-                      ? "bg-emerald-100 text-emerald-800"
-                      : isCurrent
-                      ? isDisputed
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-cyan-100 text-cyan-800"
-                      : "bg-slate-200/70 text-slate-600"
-                  }`}
-                >
-                  {isDone ? "Done" : isCurrent ? (isDisputed ? "Disputed" : "Active") : "Queued"}
-                </span>
+                {/* Point Title & Description */}
+                <h5 className="font-extrabold text-xs sm:text-sm text-slate-900 mt-2">
+                  {stage.title}
+                </h5>
+                <p className="text-[11px] text-slate-500 mt-1 leading-snug px-2 max-w-[210px]">
+                  {stage.desc}
+                </p>
+
+                {/* Stage Meta Box */}
+                <div className="w-full mt-3.5 p-2.5 rounded-xl bg-slate-50/70 border border-slate-100 text-[10px] space-y-1.5 transition-colors group-hover:bg-violet-50/40 group-hover:border-violet-100">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="font-medium text-slate-400">Est. Time:</span>
+                    <span className="font-mono font-semibold text-slate-700">{stage.estTime}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">
+                    <span className="font-medium text-slate-400">Explorer:</span>
+                    {stage.link ? (
+                      <div className="flex items-center gap-1.5">
+                        {stage.txHash && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(stage.txHash, stage.id)}
+                            className="text-violet-600 hover:text-violet-800 font-bold p-0.5 transition cursor-pointer"
+                            title="Copy Transaction Hash"
+                          >
+                            {copiedHash === stage.id ? (
+                              <Check size={10} className="text-emerald-600" />
+                            ) : (
+                              <Copy size={10} />
+                            )}
+                          </button>
+                        )}
+                        <a
+                          href={stage.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-violet-600 hover:text-violet-800 font-extrabold hover:underline inline-flex items-center gap-0.5"
+                        >
+                          <span>Arbiscan</span>
+                          <ExternalLink size={9} />
+                        </a>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 font-medium">State Monitored</span>
+                    )}
+                  </div>
+                </div>
               </div>
+            );
+          })}
+        </div>
+      </div>
 
-              <p className="text-[11px] text-slate-600 leading-tight mb-2">
-                {stage.desc}
-              </p>
+      {/* Mobile Stepper Layout with Vertical Purple Line (block md:hidden) */}
+      <div className="block md:hidden space-y-4">
+        <div className="relative pl-7 space-y-6 before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-violet-600 before:via-purple-500 before:to-slate-200">
+          {stages.map((stage, idx) => {
+            const isDone = idx < activeIndex || (idx === 3 && activeIndex === 3);
+            const isCurrent = idx === activeIndex && activeIndex !== 3;
+            const isPending = idx > activeIndex;
 
-              <div className="pt-2 border-t border-slate-200/60 flex flex-col gap-1 text-[10px]">
-                <div className="flex items-center justify-between text-slate-500">
-                  <span className="font-medium">Estimated Time:</span>
-                  <span className="font-mono font-bold text-slate-700">{stage.estTime}</span>
+            return (
+              <div key={stage.id} className="relative">
+                {/* Node Dot on Vertical Line */}
+                <div className="absolute -left-7 top-0.5 flex items-center justify-center">
+                  {isDone ? (
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-violet-600 to-purple-600 text-white shadow-xs shadow-violet-500/25 flex items-center justify-center ring-3 ring-violet-50">
+                      <Check size={12} strokeWidth={2.8} />
+                    </div>
+                  ) : isCurrent ? (
+                    <div className="relative flex items-center justify-center">
+                      <span className="absolute -inset-1 rounded-full bg-violet-400/30 animate-ping pointer-events-none" />
+                      <div className="w-7 h-7 rounded-full bg-white border-2 border-violet-600 text-violet-600 shadow-md shadow-violet-500/30 flex items-center justify-center ring-3 ring-violet-200/90 relative z-10">
+                        <RefreshCw size={11} className="animate-spin text-violet-600" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center ring-3 ring-slate-50 text-[10px] font-mono font-bold">
+                      {stage.stepNum}
+                    </div>
+                  )}
                 </div>
 
-                {stage.link ? (
-                  <div className="flex items-center justify-between pt-0.5">
-                    <span className="font-medium text-slate-500">Explorer:</span>
-                    <div className="flex items-center gap-1.5">
-                      {stage.txHash && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(stage.txHash, stage.id)}
-                          className="text-cyan-700 hover:text-cyan-800 font-bold flex items-center gap-0.5 cursor-pointer"
-                          title="Copy Hash"
-                        >
-                          {copiedHash === stage.id ? <Check size={10} /> : <Copy size={10} />}
-                        </button>
-                      )}
+                {/* Content Box */}
+                <div
+                  className={`p-3 rounded-xl border transition-all ${
+                    isCurrent
+                      ? "bg-violet-50/60 border-violet-200/80 shadow-xs ring-1 ring-violet-100"
+                      : isDone
+                      ? "bg-slate-50/60 border-slate-200/80"
+                      : "bg-white border-slate-200/70"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h5 className="font-extrabold text-xs text-slate-900">{stage.title}</h5>
+                    <span
+                      className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                        isDone
+                          ? "bg-violet-100/70 text-violet-700"
+                          : isCurrent
+                          ? "bg-violet-600 text-white shadow-2xs animate-pulse"
+                          : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      {isDone ? "Done" : isCurrent ? "In Progress" : "Queued"}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 mt-1 leading-snug">{stage.desc}</p>
+
+                  <div className="mt-2 pt-2 border-t border-slate-200/50 flex flex-wrap items-center justify-between gap-1 text-[10px]">
+                    <span className="text-slate-400">
+                      Est: <strong className="text-slate-600">{stage.estTime}</strong>
+                    </span>
+                    {stage.link ? (
                       <a
                         href={stage.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-cyan-700 hover:text-cyan-900 font-extrabold underline flex items-center gap-0.5"
+                        className="text-violet-600 hover:text-violet-800 font-extrabold hover:underline inline-flex items-center gap-0.5"
                       >
                         <span>Arbiscan</span>
-                        <ExternalLink size={10} />
+                        <ExternalLink size={9} />
                       </a>
-                    </div>
+                    ) : (
+                      <span className="text-slate-400">State Monitored</span>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between pt-0.5 text-slate-400">
-                    <span>Explorer:</span>
-                    <span>State Monitored</span>
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Footer Info Notice */}
-      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+      <div className="p-3 sm:px-4 bg-violet-50/50 rounded-xl border border-violet-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2 text-slate-600">
-          <ShieldCheck size={16} className="text-cyan-600 shrink-0" />
+          <ShieldCheck size={16} className="text-violet-600 shrink-0" />
           <span>
-            {amount ? `${amount} USDC escrowed.` : ""} Funds are non-custodial and released strictly upon milestone verification.
+            {amount ? `${amount} USDC escrowed. ` : ""}Funds are non-custodial and released strictly
+            upon milestone verification.
           </span>
         </div>
         {contractAddress && (
@@ -245,7 +338,7 @@ export default function TransactionStatusTimeline({
             href={`https://sepolia.arbiscan.io/address/${contractAddress}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-cyan-700 hover:text-cyan-900 font-extrabold flex items-center gap-1 shrink-0 text-[11px]"
+            className="text-violet-600 hover:text-violet-800 font-extrabold flex items-center gap-1 shrink-0 text-[11px] hover:underline"
           >
             <span>View Escrow Contract</span>
             <ExternalLink size={11} />
