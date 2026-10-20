@@ -40,6 +40,7 @@ import {
   sendCertificateEmail,
   sendFeedbackThankYouEmail,
   sendDeadlineWarningEmail,
+  sendCompletionRequestEmail,
   generateCertificatePdf,
 } from "@/lib/mail";
 import { generatePdfCertificate } from "@/lib/certificates/generatePdfCertificate";
@@ -3183,6 +3184,48 @@ app.get("/enrollments", authMiddleware, async (c) => {
   }
 });
 
+/** GET /api/enrollments/:id/completion-status — Check completion status & mentor agreement */
+app.get("/enrollments/:id/completion-status", authMiddleware, async (c) => {
+  const enrollmentId = c.req.param("id");
+  const db = await getPrisma();
+
+  try {
+    const enrollment = await db.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { gig: true },
+    });
+
+    if (!enrollment) return c.json({ error: "Enrollment not found" }, 404);
+
+    const agreedNotif = await db.notification.findFirst({
+      where: {
+        userId: enrollment.learnerId,
+        type: "COMPLETION_AGREED",
+        payload: { contains: enrollmentId },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const requestedNotif = await db.notification.findFirst({
+      where: {
+        userId: enrollment.mentorId,
+        type: "COMPLETION_REQUESTED",
+        payload: { contains: enrollmentId },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return c.json({
+      mentorAgreed: Boolean(agreedNotif),
+      agreedAt: agreedNotif ? agreedNotif.createdAt : null,
+      completionRequested: Boolean(requestedNotif),
+      requestedAt: requestedNotif ? requestedNotif.createdAt : null,
+    });
+  } catch (err) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 /** GET /api/enrollments/:id — Detail of enrollment with gated materials and quota */
 app.get("/enrollments/:id", authMiddleware, async (c) => {
   const enrollmentId = c.req.param("id");
@@ -3507,6 +3550,154 @@ app.post("/tasks/upload", authMiddleware, async (c) => {
   }
 });
 
+/** POST /api/enrollments/:id/request-completion — Learner requests course completion */
+app.post("/enrollments/:id/request-completion", authMiddleware, async (c) => {
+  const enrollmentId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const db = await getPrisma();
+
+  try {
+    const enrollment = await db.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { gig: true, learner: true, mentor: true },
+    });
+
+    if (!enrollment) return c.json({ error: "Enrollment not found" }, 404);
+
+    if (enrollment.learnerId !== jwtUser.sub && jwtUser.role !== "ADMIN") {
+      return c.json({ error: "Only the enrolled learner can request completion" }, 403);
+    }
+
+    // 1. Verify all modules completed
+    let modules = [];
+    try {
+      if (typeof enrollment.gig?.modules === "string") {
+        modules = JSON.parse(enrollment.gig.modules);
+      } else if (Array.isArray(enrollment.gig?.modules)) {
+        modules = enrollment.gig.modules;
+      }
+    } catch {}
+
+    const body = await c.req.json().catch(() => ({}));
+    const completedModules = body.completedModules || {};
+    if (modules.length > 0) {
+      const allModulesDone = modules.every((_, idx) => Boolean(completedModules[idx]));
+      if (!allModulesDone) {
+        return c.json({
+          error: "All curriculum modules must be viewed/completed before requesting course completion.",
+          status: "MODULES_INCOMPLETE"
+        }, 400);
+      }
+    }
+
+    // 2. Verify all tasks completed and approved
+    const taskAssignments = await db.taskAssignment.findMany({
+      where: { enrollmentId },
+      include: { submissions: { orderBy: { version: "desc" }, take: 1 } },
+    });
+
+    if (taskAssignments.length > 0) {
+      const incomplete = taskAssignments.filter(
+        (t) => t.status !== "APPROVED" && (!t.submissions || t.submissions.length === 0)
+      );
+      if (incomplete.length > 0) {
+        return c.json({
+          error: "You have " + incomplete.length + " unsubmitted assignment(s). All tasks must be completed.",
+          status: "TASKS_INCOMPLETE"
+        }, 400);
+      }
+
+      const unapproved = taskAssignments.filter((t) => t.status !== "APPROVED");
+      if (unapproved.length > 0) {
+        return c.json({
+          error: "You have " + unapproved.length + " assignment(s) waiting for mentor review and approval.",
+          status: "TASKS_UNAPPROVED"
+        }, 400);
+      }
+    }
+
+    // Create Notification for Mentor
+    await db.notification.create({
+      data: {
+        userId: enrollment.mentorId,
+        type: "COMPLETION_REQUESTED",
+        dedupeKey: "completion_req:" + enrollmentId + ":" + Date.now(),
+        payload: JSON.stringify({
+          enrollmentId,
+          learnerId: enrollment.learnerId,
+          learnerName: enrollment.learner?.name || "Student",
+          gigTitle: enrollment.gig?.title || "Mentorship Gig",
+          requestedAt: new Date().toISOString(),
+        }),
+      },
+    });
+
+    // Send email to mentor
+    if (enrollment.mentor?.email) {
+      sendCompletionRequestEmail({
+        mentorEmail: enrollment.mentor.email,
+        mentorName: enrollment.mentor.name || "Mentor",
+        learnerName: enrollment.learner?.name || "Student",
+        gigTitle: enrollment.gig?.title || "Mentorship Gig",
+        classroomUrl: (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000") + "/dashboard/classes/" + enrollmentId,
+      }).catch((err) => console.warn("[Completion Request Email Warning]:", err.message));
+    }
+
+    return c.json({
+      success: true,
+      message: "Completion request sent to mentor. Awaiting mentor agreement.",
+      requestedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[Request Completion Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** POST /api/enrollments/:id/agree-completion — Mentor agrees to course completion */
+app.post("/enrollments/:id/agree-completion", authMiddleware, async (c) => {
+  const enrollmentId = c.req.param("id");
+  const jwtUser = c.get("user");
+  const db = await getPrisma();
+
+  try {
+    const enrollment = await db.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { gig: true, learner: true, mentor: true },
+    });
+
+    if (!enrollment) return c.json({ error: "Enrollment not found" }, 404);
+
+    if (enrollment.mentorId !== jwtUser.sub && jwtUser.role !== "ADMIN") {
+      return c.json({ error: "Only the assigned mentor can approve completion" }, 403);
+    }
+
+    // Record agreement in notification for learner
+    await db.notification.create({
+      data: {
+        userId: enrollment.learnerId,
+        type: "COMPLETION_AGREED",
+        dedupeKey: "completion_agreed:" + enrollmentId + ":" + Date.now(),
+        payload: JSON.stringify({
+          enrollmentId,
+          mentorName: enrollment.mentor?.name || "Mentor",
+          gigTitle: enrollment.gig?.title || "Mentorship Gig",
+          agreedAt: new Date().toISOString(),
+        }),
+      },
+    });
+
+    return c.json({
+      success: true,
+      message: "Mentor agreed to completion. Learner can now finalize escrow release.",
+      agreedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[Agree Completion Error]:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 /** POST /api/enrollments/:id/complete-and-release — Complete mentorship, release escrow, and generate on-chain certificate */
 app.post("/enrollments/:id/complete-and-release", authMiddleware, async (c) => {
   const enrollmentId = c.req.param("id");
@@ -3525,6 +3716,24 @@ app.post("/enrollments/:id/complete-and-release", authMiddleware, async (c) => {
     if (!enrollment) {
       return c.json({ error: "Enrollment not found" }, 404);
     }
+
+    // Verification Guard: Check if mentor agreed to completion
+    const agreedNotif = await db.notification.findFirst({
+      where: {
+        userId: enrollment.learnerId,
+        type: "COMPLETION_AGREED",
+        payload: { contains: enrollmentId },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!agreedNotif && jwtUser.role !== "ADMIN") {
+      return c.json({
+        error: "Mentor agreement required: Please request course completion and await mentor agreement before ending mentorship and releasing escrow.",
+        status: "MENTOR_AGREEMENT_REQUIRED",
+      }, 400);
+    }
+
 
     // Pass / Fail Evaluation Guard
     const taskAssignments = await db.taskAssignment.findMany({

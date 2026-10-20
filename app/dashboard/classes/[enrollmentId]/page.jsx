@@ -40,6 +40,8 @@ import {
   File,
   Trophy,
   Share2,
+  Bell,
+  XCircle,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 import ClassroomLeaderboard from "@/src/components/ClassroomLeaderboard";
@@ -111,6 +113,14 @@ export default function ClassroomDetailPage() {
 
   // Escrow Completion and Certificate States
   const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [completionStatus, setCompletionStatus] = useState({
+    mentorAgreed: false,
+    completionRequested: false,
+    loading: false,
+  });
+  const [requestingCompletion, setRequestingCompletion] = useState(false);
+  const [agreeingCompletion, setAgreeingCompletion] = useState(false);
+  const [completionNotice, setCompletionNotice] = useState(null);
   const [completingEscrow, setCompletingEscrow] = useState(false);
   const [certificateData, setCertificateData] = useState(null);
   const [showCertModal, setShowCertModal] = useState(false);
@@ -217,6 +227,28 @@ export default function ClassroomDetailPage() {
     }
   }, [data, enrollmentId]);
 
+  // Fetch Completion & Agreement Status
+  const fetchCompletionStatus = async () => {
+    if (!enrollmentId) return;
+    try {
+      const res = await apiFetch(`/enrollments/${enrollmentId}/completion-status`);
+      if (res) {
+        setCompletionStatus({
+          mentorAgreed: Boolean(res.mentorAgreed),
+          completionRequested: Boolean(res.completionRequested),
+          loading: false,
+        });
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (enrollmentId) {
+      fetchCompletionStatus();
+    }
+  }, [enrollmentId]);
+
+
   // Derive whether current user is mentor
   const isMentor =
     user &&
@@ -283,6 +315,62 @@ export default function ClassroomDetailPage() {
       alert("File upload error: " + err.message);
     } finally {
       setUploadingFile(false);
+    }
+  };
+
+  // Request Mentorship Completion (Learner)
+  const handleRequestCompletion = async () => {
+    // 1. Verify modules completed
+    const gigModules = data?.enrollment?.gig?.parsedModules || [];
+    if (gigModules.length > 0) {
+      const uncompletedCount = gigModules.filter((_, idx) => !completedModules[idx]).length;
+      if (uncompletedCount > 0) {
+        alert("Action Locked: You must complete all " + gigModules.length + " curriculum modules before ending the mentorship. Please review and mark remaining modules as completed.");
+        return;
+      }
+    }
+
+    // 2. Verify all tasks completed and approved
+    const tasks = data?.assignments || [];
+    if (tasks.length > 0) {
+      const unapprovedCount = tasks.filter((t) => t.status !== "APPROVED").length;
+      if (unapprovedCount > 0) {
+        alert("Action Locked: All assigned tasks (" + tasks.length + ") must be submitted and approved by your mentor before ending the mentorship.");
+        return;
+      }
+    }
+
+    setRequestingCompletion(true);
+    try {
+      const res = await apiFetch(`/enrollments/${enrollmentId}/request-completion`, {
+        method: "POST",
+        body: JSON.stringify({ completedModules }),
+      });
+      setCompletionNotice("Completion request sent to mentor. Awaiting mentor agreement.");
+      await fetchCompletionStatus();
+      setShowReleaseModal(false);
+      alert(res.message || "Notification sent to mentor! Once your mentor agrees, you can release the escrow.");
+    } catch (err) {
+      alert(err.message || "Failed to send completion request");
+    } finally {
+      setRequestingCompletion(false);
+    }
+  };
+
+  // Mentor Agrees to Completion
+  const handleAgreeCompletion = async () => {
+    setAgreeingCompletion(true);
+    try {
+      const res = await apiFetch(`/enrollments/${enrollmentId}/agree-completion`, {
+        method: "POST",
+      });
+      await fetchCompletionStatus();
+      await reloadClassroom();
+      alert("You have agreed to mentorship completion! The learner can now release the escrow payout.");
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setAgreeingCompletion(false);
     }
   };
 
@@ -557,13 +645,61 @@ export default function ClassroomDetailPage() {
                 </span>
               )}
               {!isCompleted ? (
-                <PrimaryButton
-                  onClick={() => setShowReleaseModal(true)}
-                  className="!min-h-[38px] !py-1.5 !px-4"
-                >
-                  <CheckCircle2 size={14} />
-                  <span>End Mentorship & Release Escrow</span>
-                </PrimaryButton>
+                <div className="flex items-center gap-2">
+                  {isMentor ? (
+                    completionStatus.completionRequested && !completionStatus.mentorAgreed ? (
+                      <PrimaryButton
+                        onClick={handleAgreeCompletion}
+                        disabled={agreeingCompletion}
+                        className="!min-h-[38px] !py-1.5 !px-4 !bg-emerald-600 hover:!bg-emerald-700 !text-white"
+                      >
+                        <CheckCircle2 size={14} />
+                        <span>{agreeingCompletion ? "Approving..." : "Agree to Complete Mentorship"}</span>
+                      </PrimaryButton>
+                    ) : completionStatus.mentorAgreed ? (
+                      <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
+                        <CheckCircle2 size={13} className="text-emerald-600" />
+                        <span>Completion Agreed (Awaiting Escrow Release)</span>
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold">
+                        Awaiting Student Completion Request
+                      </span>
+                    )
+                  ) : (
+                    // Learner View
+                    completionStatus.mentorAgreed ? (
+                      <PrimaryButton
+                        onClick={() => setShowReleaseModal(true)}
+                        className="!min-h-[38px] !py-1.5 !px-4 !bg-emerald-600 hover:!bg-emerald-700 !text-white"
+                      >
+                        <CheckCircle2 size={14} />
+                        <span>End Mentorship & Release Escrow</span>
+                      </PrimaryButton>
+                    ) : completionStatus.completionRequested ? (
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold flex items-center gap-1.5">
+                          <Clock size={13} className="text-amber-600 animate-spin" />
+                          <span>Waiting for Mentor Agreement</span>
+                        </span>
+                        <SecondaryButton
+                          onClick={() => setShowReleaseModal(true)}
+                          className="!min-h-[38px] !py-1.5 !px-3 text-xs"
+                        >
+                          <span>Review Requirements</span>
+                        </SecondaryButton>
+                      </div>
+                    ) : (
+                      <PrimaryButton
+                        onClick={() => setShowReleaseModal(true)}
+                        className="!min-h-[38px] !py-1.5 !px-4"
+                      >
+                        <CheckCircle2 size={14} />
+                        <span>Request Course Completion</span>
+                      </PrimaryButton>
+                    )
+                  )}
+                </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <PrimaryButton
@@ -1930,74 +2066,146 @@ export default function ClassroomDetailPage() {
         </div>
 
         {/* Release Escrow Confirmation Modal */}
-        {showReleaseModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
-                <CheckCircle2 size={32} />
-              </div>
+        {showReleaseModal && (() => {
+          const gigModules = modules || [];
+          const uncompletedModulesCount = gigModules.filter((_, idx) => !completedModules[idx]).length;
+          const allModulesFinished = gigModules.length === 0 || uncompletedModulesCount === 0;
 
-              <div className="text-center space-y-2">
-                <h3 className="text-lg font-extrabold text-slate-900">
-                  Complete Mentorship & Release Escrow?
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  This will release the escrow funds ({enrollment.packagePrice || 50} USDC) to your mentor ({mentor?.name}) and issue your official on-chain completion certificate on Arbitrum Sepolia.
-                </p>
-              </div>
+          const taskList = assignments || [];
+          const unsubmittedTasks = taskList.filter((t) => t.status !== "APPROVED" && (!t.submissions || t.submissions.length === 0));
+          const unapprovedTasks = taskList.filter((t) => t.status !== "APPROVED");
+          const allTasksFinished = taskList.length === 0 || unapprovedTasks.length === 0;
 
-              {/* Pass / Fail Guard Notice */}
-              <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200 text-amber-900 text-xs space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-[11px] uppercase tracking-wide text-amber-800">
-                  <Shield size={13} />
-                  <span>Academic Evaluation Guard</span>
-                </div>
-                <p className="text-[11px] leading-relaxed text-amber-700">
-                  Passing criteria requires completion of all deliverables with an average score of at least 70%. If any required task is missing or average score is under 70%, the issuance will fail.
-                </p>
-              </div>
+          const isEligibleToRequest = allModulesFinished && unsubmittedTasks.length === 0 && unapprovedTasks.length === 0;
+          const canFinalizeRelease = completionStatus.mentorAgreed;
 
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5 text-slate-600">
-                <div className="flex justify-between">
-                  <span className="font-semibold">Course Gig:</span>
-                  <span className="font-bold text-slate-900">{gig?.title}</span>
+          return (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+                  <CheckCircle2 size={32} />
                 </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Mentor:</span>
-                  <span className="font-bold text-slate-900">{mentor?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Network:</span>
-                  <span className="font-bold text-purple-700">Arbitrum Sepolia</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Gas Fee:</span>
-                  <span className="font-bold text-emerald-700">Sponsored by Platform ($0.00)</span>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowReleaseModal(false)}
-                  disabled={completingEscrow}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCompleteAndRelease}
-                  disabled={completingEscrow}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
-                >
-                  <CheckCircle2 size={14} />
-                  <span>{completingEscrow ? "Releasing Escrow..." : "Confirm & Release"}</span>
-                </button>
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-extrabold text-slate-900">
+                    {canFinalizeRelease ? "Mentor Agreed! Complete & Release Escrow" : "Course Completion & Escrow Release"}
+                  </h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {canFinalizeRelease
+                      ? `Your mentor has agreed to completion. Confirm below to release ${enrollment.packagePrice || 50} USDC from Arbitrum Sepolia escrow directly to ${mentor?.name}.`
+                      : "Before ending the mentorship, all curriculum modules must be read and all practical tasks must be reviewed and approved by your mentor."}
+                  </p>
+                </div>
+
+                {/* Pre-flight Checklist Requirements */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                    <Shield size={14} className="text-purple-600" />
+                    <span>Completion Checklist</span>
+                  </h4>
+
+                  <div className="space-y-2 text-xs">
+                    {/* Item 1: Curriculum Modules */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200">
+                      <div className="flex items-center gap-2">
+                        {allModulesFinished ? (
+                          <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                        ) : (
+                          <XCircle size={15} className="text-rose-500 shrink-0" />
+                        )}
+                        <span className="font-semibold text-slate-800">
+                          Curriculum Modules ({completedCount}/{totalCount})
+                        </span>
+                      </div>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${allModulesFinished ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                        {allModulesFinished ? "Completed" : `${uncompletedModulesCount} Remaining`}
+                      </span>
+                    </div>
+
+                    {/* Item 2: Assignments & Tasks */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200">
+                      <div className="flex items-center gap-2">
+                        {allTasksFinished ? (
+                          <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                        ) : (
+                          <XCircle size={15} className="text-rose-500 shrink-0" />
+                        )}
+                        <span className="font-semibold text-slate-800">
+                          Tasks Submitted & Approved
+                        </span>
+                      </div>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${allTasksFinished ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                        {allTasksFinished ? "Passed" : unsubmittedTasks.length > 0 ? `${unsubmittedTasks.length} Not Submitted` : `${unapprovedTasks.length} Pending Review`}
+                      </span>
+                    </div>
+
+                    {/* Item 3: Mentor Agreement */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200">
+                      <div className="flex items-center gap-2">
+                        {completionStatus.mentorAgreed ? (
+                          <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                        ) : (
+                          <Clock size={15} className="text-amber-500 shrink-0" />
+                        )}
+                        <span className="font-semibold text-slate-800">
+                          Mentor Completion Agreement
+                        </span>
+                      </div>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${completionStatus.mentorAgreed ? "bg-emerald-50 text-emerald-700" : completionStatus.completionRequested ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
+                        {completionStatus.mentorAgreed ? "Agreed" : completionStatus.completionRequested ? "Requested" : "Not Requested"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Notice */}
+                {!canFinalizeRelease && (
+                  <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-200 text-blue-900 text-xs space-y-1">
+                    <p className="font-bold text-[11px] uppercase tracking-wide text-blue-800">
+                      Verification Notice
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-blue-700">
+                      When you click &quot;Send Completion Request to Mentor&quot;, an automated notification and email are dispatched to your mentor. Once they review and agree, this button will unlock for immediate escrow release.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowReleaseModal(false)}
+                    disabled={completingEscrow || requestingCompletion}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+
+                  {canFinalizeRelease ? (
+                    <button
+                      type="button"
+                      onClick={handleCompleteAndRelease}
+                      disabled={completingEscrow}
+                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
+                    >
+                      <CheckCircle2 size={14} />
+                      <span>{completingEscrow ? "Releasing Escrow..." : "Confirm & Release Escrow"}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRequestCompletion}
+                      disabled={requestingCompletion || !isEligibleToRequest}
+                      className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/20 disabled:opacity-50 cursor-pointer"
+                    >
+                      <Bell size={14} />
+                      <span>{requestingCompletion ? "Sending Notification..." : completionStatus.completionRequested ? "Re-send Notification to Mentor" : "Send Completion Request to Mentor"}</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Certificate Modal */}
         {showCertModal && certificateData && (
