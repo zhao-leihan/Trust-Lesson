@@ -5640,6 +5640,26 @@ function StudentDashboardView({ user }) {
     }
   }, []);
 
+  const [enrollmentsList, setEnrollmentsList] = useState([]);
+
+  useEffect(() => {
+    async function loadActiveEnrollments() {
+      try {
+        const token = localStorage.getItem("tl_jwt") || localStorage.getItem("tl_token");
+        const res = await fetch("/api/enrollments?role=learner", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setEnrollmentsList(data.enrollments || []);
+        }
+      } catch (err) {
+        console.warn("Failed to load active enrollments:", err);
+      }
+    }
+    loadActiveEnrollments();
+  }, [user]);
+
   const [selectedCert, setSelectedCert] = useState(null);
   const [loadingCert, setLoadingCert] = useState(false);
   const [showCertModal, setShowCertModal] = useState(false);
@@ -5837,7 +5857,7 @@ function StudentDashboardView({ user }) {
               </div>
               <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Active Enrollments</p>
               <p className="text-slate-950 font-black text-2xl mt-1 tracking-tight">
-                {sessions.filter((s) => s.status !== "released").length} Gigs
+                {Math.max(enrollmentsList.filter((e) => ["FUNDED", "IN_SESSION"].includes(e.escrowStatus)).length, sessions.filter((s) => s.status !== "released").length) || enrollmentsList.length || sessions.length} Gigs
               </p>
               <p className="text-purple-700 text-[11px] mt-1.5 font-semibold">Protected in smart contract escrow</p>
             </div>

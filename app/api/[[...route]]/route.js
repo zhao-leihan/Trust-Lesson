@@ -3528,21 +3528,39 @@ app.post("/tasks/upload", authMiddleware, async (c) => {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const targetDir = path.default.join(process.cwd(), "public", "uploads", "tasks");
-    await fs.mkdir(targetDir, { recursive: true });
-    const targetPath = path.default.join(targetDir, safeName);
-    await fs.writeFile(targetPath, buffer);
+    const mimeType = file.type || "application/pdf";
+    const base64Data = buffer.toString("base64");
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const fileUrl = `/uploads/tasks/${safeName}`;
+    // Also persist into database IpfsObject for tamper-proof decentralized reference
+    let ipfsHash = null;
+    try {
+      const db = await getPrisma();
+      const crypto = await import("crypto");
+      const sha256 = crypto.default.createHash("sha256").update(buffer).digest("hex");
+      ipfsHash = `0x${sha256}`;
+
+      await db.ipfsObject.upsert({
+        where: { hash: ipfsHash },
+        update: { size: file.size, mimeType },
+        create: {
+          hash: ipfsHash,
+          mimeType,
+          size: file.size,
+          data: buffer,
+        },
+      });
+    } catch (dbErr) {
+      console.warn("[IpfsObject DB Save Warning]:", dbErr.message);
+    }
+
     return c.json({
       success: true,
-      url: fileUrl,
+      url: dataUrl,
       fileName: file.name,
       fileSize: file.size,
-      fileType: file.type,
+      fileType: mimeType,
+      ipfsHash,
     });
   } catch (err) {
     console.error("[Task Upload Error]:", err);

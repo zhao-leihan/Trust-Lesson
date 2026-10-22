@@ -730,7 +730,7 @@ export default function ClassroomDetailPage() {
             txHashCreate={enrollment.txHash}
             txHashRelease={certificateData?.txHash || enrollment.txHashRelease}
             onchainSessionId={enrollment.onchainSessionId}
-            amount={enrollment.packagePrice || 50}
+            amount={gig?.price || enrollment.packagePrice || 0}
           />
 
           {/* Hero Banner with Gig Info & Quota Meter */}
@@ -2092,7 +2092,7 @@ export default function ClassroomDetailPage() {
                   </h3>
                   <p className="text-xs text-slate-600 leading-relaxed">
                     {canFinalizeRelease
-                      ? `Your mentor has agreed to completion. Confirm below to release ${enrollment.packagePrice || 50} USDC from Arbitrum Sepolia escrow directly to ${mentor?.name}.`
+                      ? `Your mentor has agreed to completion. Confirm below to release ${gig?.price || enrollment.packagePrice || 0} USDC from Arbitrum Sepolia escrow directly to ${mentor?.name}.`
                       : "Before ending the mentorship, all curriculum modules must be read and all practical tasks must be reviewed and approved by your mentor."}
                   </p>
                 </div>
