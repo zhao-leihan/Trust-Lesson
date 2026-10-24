@@ -94,10 +94,11 @@ export function usePusherChat({ roomId, currentUser, peerUser }) {
       setConnectionState("connected");
     }
 
-    // 3. Fallback / Sync polling every 3.5s to ensure zero message loss
+    // 3. Fallback / Sync polling (relaxed interval to prevent DB connection pool exhaustion)
     const pollInterval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
       fetchMessages();
-    }, 3500);
+    }, pusherKey ? 25000 : 10000);
 
     return () => {
       clearInterval(pollInterval);

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
-import { LogOut, ArrowRight, Menu, X, LayoutDashboard, MessageSquare } from "lucide-react";
+import { LogOut, ArrowRight, Menu, X, LayoutDashboard, MessageSquare, Bell } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/Avatar";
 
 const DEFAULT_NAV_LINKS = [
@@ -99,10 +99,11 @@ export default function Navbar() {
   const [chatToast, setChatToast] = useState(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || pathname === "/dashboard/chat") return;
     let isSubscribed = true;
 
     const checkUnread = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
         const token = localStorage.getItem("tl_jwt") || localStorage.getItem("tl_token");
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -127,12 +128,43 @@ export default function Navbar() {
     };
 
     checkUnread();
-    const interval = setInterval(checkUnread, 6000);
+    const interval = setInterval(checkUnread, 25000);
     return () => {
       isSubscribed = false;
       clearInterval(interval);
     };
   }, [user, pathname, lastSeenMsgId]);
+
+  // Notifications unread count
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    let isSubscribed = true;
+
+    const checkNotifs = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      try {
+        const token = localStorage.getItem("tl_jwt") || localStorage.getItem("tl_token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch("/api/notifications", { headers });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (isSubscribed) {
+          setUnreadNotifCount(data.unreadCount || 0);
+        }
+      } catch (err) {
+        // silent fail
+      }
+    };
+
+    checkNotifs();
+    const interval = setInterval(checkNotifs, 15000);
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
+  }, [user, pathname]);
 
   // Close mobile drawer on route transition
   useEffect(() => {
@@ -294,6 +326,25 @@ export default function Navbar() {
                   </button>
                 </div>
               )}
+
+              {/* Notification Bell Button */}
+              <Link
+                href="/dashboard/notifications"
+                title="Notifications"
+                aria-label="Notifications"
+                className={`relative p-2 rounded-full transition-colors cursor-pointer ${
+                  isWhiteTheme
+                    ? "text-white/80 hover:text-white hover:bg-white/10"
+                    : "text-slate-600 hover:text-purple-700 hover:bg-purple-50"
+                }`}
+              >
+                <Bell size={18} />
+                {unreadNotifCount > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black leading-none flex items-center justify-center shadow-xs">
+                    {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                  </span>
+                )}
+              </Link>
 
               {/* User Profile Avatar with Live Photo Sync */}
               <Link
@@ -617,20 +668,41 @@ export default function Navbar() {
             }`}
           >
             {user ? (
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLogout();
-                }}
-                className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer ${
-                  isWhiteTheme
-                    ? "bg-white/5 hover:bg-rose-500/10 text-rose-300 border border-rose-500/20"
-                    : "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200"
-                }`}
-              >
-                <LogOut size={15} />
-                <span>Sign Out ({user.name})</span>
-              </button>
+              <>
+                <Link
+                  href="/dashboard/notifications"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                    isWhiteTheme
+                      ? "bg-white/5 hover:bg-white/10 text-white border border-white/10"
+                      : "bg-purple-50 text-purple-700 border border-purple-200"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Bell size={15} />
+                    <span>Notifications</span>
+                    {unreadNotifCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black leading-none">
+                        {unreadNotifCount}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+                    isWhiteTheme
+                      ? "bg-white/5 hover:bg-rose-500/10 text-rose-300 border border-rose-500/20"
+                      : "bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200"
+                  }`}
+                >
+                  <LogOut size={15} />
+                  <span>Sign Out ({user.name})</span>
+                </button>
+              </>
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 <Link

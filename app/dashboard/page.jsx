@@ -1705,7 +1705,7 @@ function AdminDashboardView({ user }) {
 // MENTOR DASHBOARD VIEW (Live Database Connection - Zero Mockup)
 // =============================================================
 function MentorDashboardView({ user }) {
-  const { portfolios, addPortfolioItem, deletePortfolioItem, connectWallet, updateUserProfile, switchRole, getWalletProvider } = useAuth();
+  const { portfolios, addPortfolioItem, deletePortfolioItem, connectWallet, disconnectWallet, walletAddress, updateUserProfile, switchRole, getWalletProvider } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
@@ -2808,6 +2808,8 @@ function MentorDashboardView({ user }) {
         {/* TAB 1: OVERVIEW (REAL FINANCIAL DATA - ZERO MOCKUP)    */}
         {/* ══════════════════════════════════════════════════════ */}
         <TabsContent value="overview" className="space-y-8 pt-4">
+          <WalletConnectCard />
+
           {/* Real Metrics Cards directly in section container with no redundant wrapper */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
             {/* Card 1: 30-Day Earnings (Hero Highlight with Purple Accent Icon) */}
@@ -2898,26 +2900,26 @@ function MentorDashboardView({ user }) {
             <div className="p-6 rounded-2xl bg-white border border-gray-200 flex flex-col justify-between space-y-4 shadow-2xs">
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
-                  {isWalletLocked ? (
-                    <Lock size={14} className="text-emerald-600" />
+                  {walletAddress ? (
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   ) : (
-                    <Unlock size={14} className="text-amber-500" />
+                    <span className="w-2 h-2 rounded-full bg-slate-300" />
                   )}
                   <h4 className="font-bold text-slate-900 text-sm">
-                    {isWalletLocked ? "Escrow Payout Wallet Locked" : "Payout Wallet Configuration"}
+                    {walletAddress ? "Escrow Payout Wallet Connected" : "Escrow Payout Wallet"}
                   </h4>
                 </div>
                 <p className="text-gray-500 text-xs leading-relaxed">
-                  {isWalletLocked ? (
+                  {walletAddress ? (
                     <>
-                      Your payout address is locked:{" "}
+                      Connected address:{" "}
                       <code className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded font-mono text-[11px] font-semibold">
-                        {stats.walletAddress?.slice(0, 8)}...{stats.walletAddress?.slice(-6)}
+                        {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
                       </code>
-                      . Escrow payouts are safely routed to this verified address.
+                      . Escrow payouts and milestone earnings settle automatically to this address.
                     </>
                   ) : (
-                    "You have not locked your payout wallet address yet. Enter your Arbitrum wallet to guarantee automated milestone disbursement."
+                    "No Web3 wallet is currently connected. Connect MetaMask, Coinbase, Rabby, Rainbow, or WalletConnect to receive escrow disbursements."
                   )}
                 </p>
               </div>
@@ -2926,7 +2928,7 @@ function MentorDashboardView({ user }) {
                 className="self-start px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 font-semibold text-xs hover:bg-gray-50 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
               >
                 <Wallet size={14} className="text-gray-400" />
-                <span>Configure Wallet</span>
+                <span>{walletAddress ? "Manage Wallet" : "Connect Wallet"}</span>
               </button>
             </div>
           </div>
@@ -3141,105 +3143,14 @@ function MentorDashboardView({ user }) {
           <div className="pb-3 border-b border-purple-100">
             <h2 className="text-slate-950 font-black text-lg">Escrow Payout Wallet Configuration</h2>
             <p className="text-slate-500 text-xs mt-0.5">
-              Input your Arbitrum address manually or connect via Web3. Once locked, payments will safely settle here without risk of tampering.
+              Connect your Web3 wallet for non-custodial milestone disbursements and automated escrow payouts.
             </p>
           </div>
 
-          {walletLockSuccess && (
-            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
-              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-              <span>
-                Payout wallet address has been locked and synchronized with the database! All future escrow payouts will settle to this address.
-              </span>
-            </div>
-          )}
+          <WalletConnectCard />
 
-          {walletLockError && (
-            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
-              <AlertTriangle size={16} className="text-rose-600 shrink-0" />
-              <span>{walletLockError}</span>
-            </div>
-          )}
-
-          {/* Wallet Configuration Card */}
-          <div className="bg-white border-2 border-purple-100 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
-                  <Wallet size={18} className="text-purple-600" />
-                  <span>Arbitrum One Payout Address</span>
-                </h3>
-                <p className="text-slate-500 text-xs mt-0.5">
-                  The destination where 90% of milestone funds are transferred automatically when students release escrow (10% platform protocol cut).
-                </p>
-              </div>
-
-              {isWalletLocked && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs shadow-2xs">
-                  <Lock size={12} className="text-emerald-600" />
-                  <span>Wallet Locked & Verified</span>
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row gap-2.5">
-                <input
-                  type="text"
-                  disabled={isWalletLocked}
-                  value={walletInput}
-                  onChange={(e) => setWalletInput(e.target.value)}
-                  placeholder="0x..."
-                  className={`flex-1 px-4 py-3 rounded-2xl border font-mono text-xs transition-all ${
-                    isWalletLocked
-                      ? "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed"
-                      : "bg-purple-50/40 border-purple-200 text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/30"
-                  }`}
-                />
-
-                {!isWalletLocked && (
-                  <button
-                    type="button"
-                    onClick={handleConnectAndAutofill}
-                    className="px-5 py-3 rounded-2xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
-                  >
-                    <Wallet size={14} />
-                    <span>Connect MetaMask / Coinbase</span>
-                  </button>
-                )}
-              </div>
-
-              {!isWalletLocked ? (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                  <p className="text-[11px] text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 flex items-center gap-1.5">
-                    <AlertTriangle size={13} className="shrink-0 text-amber-600" />
-                    <span>Once locked, the wallet cannot be altered without platform dispute authorization.</span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleLockWallet}
-                    disabled={isSavingWallet}
-                    className="px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-                  >
-                    <Lock size={14} />
-                    <span>{isSavingWallet ? "Locking Wallet..." : "Lock Payout Wallet"}</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-emerald-900 text-xs space-y-1">
-                  <p className="font-bold flex items-center gap-1.5">
-                    <CheckCircle2 size={14} className="text-emerald-600" />
-                    <span>Payout address securely locked</span>
-                  </p>
-                  <p className="text-slate-600 text-[11px] leading-relaxed">
-                    To modify your locked payout destination address, contact Trust Lesson administration through support or raise a security request.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Escrow Balance & Protocol Settlement Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-4 border-t border-purple-100 text-xs">
+          {/* Escrow Balance & Protocol Settlement Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-4 border-t border-purple-100 text-xs">
               <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
                 <span className="text-slate-500 text-[11px] block font-medium">Available for Payout</span>
                 <span className="text-slate-900 font-black text-xl block mt-0.5">
@@ -3260,7 +3171,6 @@ function MentorDashboardView({ user }) {
                 <span className="text-slate-500 text-[10px] mt-1 block">Zero gas subsidies enabled</span>
               </div>
             </div>
-          </div>
 
           {/* ══════════════════════════════════════════════════════════════════ */}
           {/* WEB3 PAYOUT WALLET BRANCHING MODAL (METAMASK VS COINBASE)         */}

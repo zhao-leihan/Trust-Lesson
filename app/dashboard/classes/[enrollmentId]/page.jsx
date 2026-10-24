@@ -249,7 +249,7 @@ export default function ClassroomDetailPage() {
   }, [enrollmentId]);
 
 
-  // Derive whether current user is mentor
+  // Derive whether current user is mentor or admin
   const isMentor =
     user &&
     data?.enrollment &&
@@ -258,6 +258,7 @@ export default function ClassroomDetailPage() {
       (user.walletAddress &&
         data.enrollment.mentor?.walletAddress &&
         user.walletAddress.toLowerCase() === data.enrollment.mentor.walletAddress.toLowerCase()));
+  const canMentorAgree = isMentor || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
   // WebRTC P2P Direct Chat (Zero DB overhead)
   const peerUser = isMentor
@@ -383,9 +384,11 @@ export default function ClassroomDetailPage() {
         try {
           const { ethers } = await import("ethers");
           const provider = new ethers.BrowserProvider(window.ethereum);
-          const signer = await provider.getSigner();
+          const signer = await provider.getSigner().catch(() => null);
+          const signerAddress = signer ? await signer.getAddress().catch(() => null) : null;
           const routerAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT;
-          if (routerAddress) {
+
+          if (signer && routerAddress && signerAddress) {
             const routerAbi = [
               "function releaseEscrow(uint256 sessionId) external",
               "function confirmMilestone(uint256 sessionId, uint256 milestoneIndex) external",
@@ -393,14 +396,19 @@ export default function ClassroomDetailPage() {
             ];
             const routerContract = new ethers.Contract(routerAddress, routerAbi, signer);
             const sess = await routerContract.getSession(enrollment.onchainSessionId).catch(() => null);
-            if (sess && Number(sess[4]) < 3) {
+            const isAuthorized = sess && (
+              signerAddress.toLowerCase() === sess[0]?.toLowerCase() ||
+              signerAddress.toLowerCase() === sess[1]?.toLowerCase()
+            );
+
+            if (isAuthorized && sess && Number(sess[4]) < 3) {
               const tx = await routerContract.releaseEscrow(enrollment.onchainSessionId, { gasLimit: 350000 });
               const receipt = await tx.wait(1);
               clientTxHash = receipt.hash;
             }
           }
         } catch (onChainErr) {
-          console.warn("[On-Chain Client Release Notice]:", onChainErr.message);
+          console.warn("[On-Chain Client Release Notice]: Handled via sponsored settlement -", onChainErr.message);
         }
       }
 
@@ -646,7 +654,7 @@ export default function ClassroomDetailPage() {
               )}
               {!isCompleted ? (
                 <div className="flex items-center gap-2">
-                  {isMentor ? (
+                  {canMentorAgree ? (
                     completionStatus.completionRequested && !completionStatus.mentorAgreed ? (
                       <PrimaryButton
                         onClick={handleAgreeCompletion}
@@ -723,6 +731,66 @@ export default function ClassroomDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Completion Agreement Status Banner */}
+          {completionStatus.completionRequested && !completionStatus.mentorAgreed && (
+            <div className="p-5 rounded-3xl bg-amber-50 border border-amber-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-200">
+                  <Clock size={20} className="animate-spin text-amber-700" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-amber-950">
+                    Mentorship Completion Requested
+                  </h3>
+                  <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                    {canMentorAgree
+                      ? "The student has completed all curriculum modules and tasks. Review and agree below to allow escrow payout release."
+                      : "You have requested mentorship completion. Waiting for mentor review and agreement before releasing escrow."}
+                  </p>
+                </div>
+              </div>
+
+              {canMentorAgree && (
+                <PrimaryButton
+                  onClick={handleAgreeCompletion}
+                  disabled={agreeingCompletion}
+                  className="!min-h-[40px] !py-2 !px-5 !bg-emerald-600 hover:!bg-emerald-700 !text-white whitespace-nowrap self-start sm:self-center shadow-xs"
+                >
+                  <CheckCircle2 size={16} />
+                  <span>{agreeingCompletion ? "Approving..." : "Agree to Complete Mentorship"}</span>
+                </PrimaryButton>
+              )}
+            </div>
+          )}
+
+          {completionStatus.mentorAgreed && !isCompleted && (
+            <div className="p-5 rounded-3xl bg-emerald-50 border border-emerald-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 border border-emerald-200">
+                  <CheckCircle2 size={20} className="text-emerald-700" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-emerald-950">
+                    Mentor Agreed! Ready for Escrow Release
+                  </h3>
+                  <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
+                    {canMentorAgree && !isMentor
+                      ? "Mentorship completion agreed. Waiting for student to finalize and release escrow."
+                      : "Your mentor has agreed to completion. Click below to release the escrow payout and claim your certificate."}
+                  </p>
+                </div>
+              </div>
+
+              <PrimaryButton
+                onClick={() => setShowReleaseModal(true)}
+                className="!min-h-[40px] !py-2 !px-5 !bg-emerald-600 hover:!bg-emerald-700 !text-white whitespace-nowrap self-start sm:self-center shadow-xs"
+              >
+                <CheckCircle2 size={16} />
+                <span>End Mentorship & Release Escrow</span>
+              </PrimaryButton>
+            </div>
+          )}
 
           {/* Visual On-Chain Transaction Progress Tracker */}
           <TransactionStatusTimeline

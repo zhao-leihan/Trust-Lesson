@@ -273,8 +273,67 @@ export function AuthProvider({ children }) {
     window.addEventListener("eip6963:announceProvider", onAnnounceProvider);
     window.dispatchEvent(new Event("eip6963:requestProvider"));
 
+    // Check if wallet is still authorized in provider or was disconnected
+    const syncActiveAccount = async () => {
+      try {
+        const provider = window.ethereum || window.coinbaseWalletExtension || window.rabby;
+        if (provider?.request) {
+          const accounts = await provider.request({ method: "eth_accounts" });
+          if (!accounts || accounts.length === 0) {
+            setWalletAddress(null);
+            localStorage.removeItem("trust_lesson_wallet");
+          } else {
+            const current = accounts[0].toLowerCase();
+            setWalletAddress(current);
+            localStorage.setItem("trust_lesson_wallet", current);
+          }
+        }
+      } catch (err) {
+        console.warn("[AuthContext] eth_accounts check:", err);
+      }
+    };
+
+    syncActiveAccount();
+    window.addEventListener("focus", syncActiveAccount);
+
+    // Listen to accountsChanged across all detected Web3 providers
+    const handleAccountsChanged = (accounts) => {
+      if (!accounts || accounts.length === 0) {
+        setWalletAddress(null);
+        localStorage.removeItem("trust_lesson_wallet");
+        localStorage.removeItem("tl_jwt");
+        setUser((prev) => (prev ? { ...prev, walletAddress: null } : prev));
+      } else {
+        const next = accounts[0].toLowerCase();
+        setWalletAddress(next);
+        localStorage.setItem("trust_lesson_wallet", next);
+        setUser((prev) => (prev ? { ...prev, walletAddress: next } : prev));
+      }
+    };
+
+    const providers = [];
+    if (window.ethereum?.providers?.length) {
+      providers.push(...window.ethereum.providers);
+    } else if (window.ethereum) {
+      providers.push(window.ethereum);
+    }
+    if (window.coinbaseWalletExtension) providers.push(window.coinbaseWalletExtension);
+    if (window.rabby) providers.push(window.rabby);
+
+    providers.forEach((p) => {
+      if (p.on) {
+        p.on("accountsChanged", handleAccountsChanged);
+      }
+    });
+
     return () => {
       window.removeEventListener("eip6963:announceProvider", onAnnounceProvider);
+      window.removeEventListener("focus", syncActiveAccount);
+      providers.forEach((p) => {
+        if (p.removeListener) {
+          p.removeListener("accountsChanged", handleAccountsChanged);
+        }
+      });
     };
   }, []);
 
@@ -457,6 +516,7 @@ export function AuthProvider({ children }) {
     const cleanAddress = address.trim().toLowerCase();
     setWalletAddress(cleanAddress);
     localStorage.setItem("trust_lesson_wallet", cleanAddress);
+    setUser((prev) => (prev ? { ...prev, walletAddress: cleanAddress } : prev));
 
     // Ensure valid JWT token for the connected wallet
     const existingToken = typeof window !== "undefined" ? localStorage.getItem("tl_jwt") : null;
@@ -508,6 +568,7 @@ export function AuthProvider({ children }) {
     setWalletAddress(null);
     localStorage.removeItem("trust_lesson_wallet");
     localStorage.removeItem("tl_jwt");
+    setUser((prev) => (prev ? { ...prev, walletAddress: null } : prev));
   };
 
   // ─── Persist user to localStorage ──────────────────────────────────────────
