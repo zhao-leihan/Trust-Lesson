@@ -102,7 +102,9 @@ export default function BookingPage() {
   const [studentNote, setStudentNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("crypto");
   const [copiedVault, setCopiedVault] = useState(false);
-  const [showTransakModal, setShowTransakModal] = useState(false);
+  const [showMoonPayModal, setShowMoonPayModal] = useState(false);
+  const [copiedMoonPayWallet, setCopiedMoonPayWallet] = useState(false);
+  const [customFiatAmount, setCustomFiatAmount] = useState("");
 
   // Processing & booking state
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -293,12 +295,14 @@ export default function BookingPage() {
   const grandTotal = Number((basePrice + platformFee).toFixed(2));
   const activeNet = getActiveNetwork();
   const escrowVaultAddress = activeNet.contracts.escrowRouter;
-  const transakApiKey = process.env.NEXT_PUBLIC_TRANSAK_API_KEY || "";
+  const moonpayApiKey = process.env.NEXT_PUBLIC_MOONPAY_API_KEY || "pk_test_Ol50lJrgbXKJ6vGqRQ7T1ePRjtdTsqF";
   const destinationWallet = (walletAddress && walletAddress.startsWith("0x") && walletAddress.length === 42)
     ? walletAddress
     : escrowVaultAddress;
-  const safeTransakAmount = Math.max(30, Math.round(grandTotal));
-  const transakTesterUrl = `https://global-stg.transak.com/?apiKey=${transakApiKey}&environment=${activeNet.transakEnv}&cryptoCurrencyCode=${currency === "USDT" ? "USDT" : "USDC"}&network=arbitrum&walletAddress=${destinationWallet}&fiatAmount=${safeTransakAmount}&fiatCurrency=USD&themeColor=7c3aed&disableWalletAddressForm=true`;
+  const safeMoonPayAmount = Math.max(30, Math.round(grandTotal));
+  const activeOnRampAmount = customFiatAmount && Number(customFiatAmount) > 0 ? Number(customFiatAmount) : safeMoonPayAmount;
+  const moonpayCurrencyCode = currency === "USDT" ? "usdt_arbitrum" : "usdc_arbitrum";
+  const moonpayTesterUrl = `https://buy-sandbox.moonpay.com/?apiKey=${moonpayApiKey}&currencyCode=${moonpayCurrencyCode}&walletAddress=${destinationWallet}&baseCurrencyAmount=${activeOnRampAmount}&baseCurrencyCode=usd&colorCode=%237c3aed`;
 
   const paymentMethods = [
     {
@@ -309,9 +313,9 @@ export default function BookingPage() {
       isWeb3: true,
     },
     {
-      id: "transak",
-      label: `Buy ${currency} via Transak (Credit Card / Apple Pay)`,
-      sub: `Fiat-to-crypto on-ramp directly to your Arbitrum wallet via Visa, Mastercard, or Apple Pay`,
+      id: "moonpay",
+      label: `Buy ${currency} via MoonPay (Card / Apple Pay)`,
+      sub: `Custom Trust Lesson fiat gateway to on-ramp directly into your Arbitrum wallet via Visa, Mastercard, or Apple Pay`,
       Icon: CreditCard,
       isWeb3: false,
     },
@@ -1301,49 +1305,54 @@ export default function BookingPage() {
                   </div>
                 )}
 
-                {/* Method 2: Transak Fiat On-Ramp */}
-                {paymentMethod === "transak" && (
-                  <div className="mt-3 p-4 bg-gradient-to-br from-blue-50/90 to-indigo-50/80 rounded-2xl border border-blue-200/90 space-y-3">
+                {/* Method 2: MoonPay Fiat On-Ramp */}
+                {paymentMethod === "moonpay" && (
+                  <div className="mt-3 p-4 bg-gradient-to-br from-purple-50/90 via-indigo-50/70 to-white rounded-2xl border border-purple-200/90 space-y-3">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
                         <CreditCard size={18} />
                       </div>
                       <div className="text-xs">
-                        <p className="font-extrabold text-slate-900">Transak Fiat On-Ramp Gateway</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-extrabold text-slate-900">Trust Lesson On-Ramp (MoonPay)</p>
+                          <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.2 rounded-full">
+                            Arbitrum L2 Native
+                          </span>
+                        </div>
                         <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
-                          Purchase {currency} directly into your Arbitrum wallet using Visa, Mastercard, Apple Pay, or Local Bank Transfer.
+                          Purchase {currency} directly into your Arbitrum wallet using Visa, Mastercard, Apple Pay, Google Pay, or SEPA Bank Transfer.
                         </p>
                       </div>
                     </div>
 
-                    {/* Regional Availability Notice */}
-                    <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2.5">
-                      <Shield size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                    {/* Non-Custodial Security Notice */}
+                    <div className="p-3 rounded-xl bg-purple-50/80 border border-purple-200/80 text-purple-950 text-[11px] flex items-start gap-2.5">
+                      <Shield size={14} className="text-purple-600 shrink-0 mt-0.5" />
                       <div className="leading-relaxed">
-                        <p className="font-bold text-amber-950">Regional Availability Notice:</p>
-                        <p className="text-amber-800 text-[10px] mt-0.5">
-                          Please note that Transak fiat on-ramp services may be restricted or unavailable in certain countries due to local financial regulations and compliance policies. If unavailable in your region, please use Web3 Wallet or Direct Transfer.
+                        <p className="font-bold text-purple-950">Non-Custodial Escrow Protection:</p>
+                        <p className="text-purple-800 text-[10px] mt-0.5">
+                          Funds purchased via MoonPay land directly in your Arbitrum address, ready to be deposited into the Trust Lesson Escrow Vault with 100% subsidized gas fees.
                         </p>
                       </div>
                     </div>
 
                     {/* Auto-filled Summary snippet */}
-                    <div className="p-2.5 bg-white/90 rounded-xl border border-blue-200 text-[11px] flex items-center justify-between text-slate-700 shadow-xs">
+                    <div className="p-2.5 bg-white rounded-xl border border-purple-200 text-[11px] flex items-center justify-between text-slate-700 shadow-xs">
                       <div>
                         <span className="text-[10px] text-slate-400 block font-semibold">Auto-Filled Payment:</span>
-                        <span className="font-extrabold text-blue-900">{formatPriceCurrency(grandTotal, currency)}</span>
-                        <span className="text-[10px] text-slate-500 ml-1">on Arbitrum One</span>
+                        <span className="font-extrabold text-purple-950 text-xs">{formatPriceCurrency(grandTotal, currency)}</span>
+                        <span className="text-[10px] text-slate-500 ml-1">on Arbitrum Sepolia</span>
                       </div>
-                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Sparkles size={11} /> Sandbox Tester
+                      <span className="text-[10px] font-bold text-purple-700 bg-purple-100/90 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <Sparkles size={11} /> MoonPay Sandbox Engine
                       </span>
                     </div>
 
-                    {/* Ready Indicator: Click Deposit button on the right */}
-                    <div className="p-3 bg-blue-100/70 rounded-xl border border-blue-200 text-blue-900 text-xs flex items-center gap-2.5">
-                      <CheckCircle2 size={16} className="text-blue-600 shrink-0" />
+                    {/* Ready Indicator */}
+                    <div className="p-3 bg-purple-100/80 rounded-xl border border-purple-200 text-purple-950 text-xs flex items-center gap-2.5">
+                      <CheckCircle2 size={16} className="text-purple-600 shrink-0" />
                       <span className="text-[11px] leading-snug">
-                        Ready for checkout. Click <strong className="text-blue-950 font-bold">&quot;Proceed to Transak Payment&quot;</strong> in the summary panel on the right to open the payment widget.
+                        Ready for checkout. Click <strong className="text-purple-950 font-bold">&quot;Open Trust Lesson On-Ramp&quot;</strong> in the summary panel on the right.
                       </span>
                     </div>
                   </div>
@@ -1593,7 +1602,7 @@ export default function BookingPage() {
                   </div>
                 )}
 
-                {/* Deposit / Transak CTA Button */}
+                {/* Deposit / MoonPay CTA Button */}
                 {existingEnrollment ? (
                   <div className="space-y-3">
                     <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl flex items-start gap-3">
@@ -1635,7 +1644,7 @@ export default function BookingPage() {
                 ) : (
                   <button
                     type="button"
-                    onClick={paymentMethod === "transak" ? () => setShowTransakModal(true) : handleDepositEscrow}
+                    onClick={paymentMethod === "moonpay" ? () => setShowMoonPayModal(true) : handleDepositEscrow}
                     disabled={isProcessing}
                     className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-sm shadow-lg shadow-purple-900/30 hover:shadow-purple-900/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
                   >
@@ -1644,10 +1653,10 @@ export default function BookingPage() {
                         <RefreshCw size={16} className="animate-spin text-purple-200" />
                         <span>{web3StatusMessage || "Interacting with Web3 wallet..."}</span>
                       </span>
-                    ) : paymentMethod === "transak" ? (
+                    ) : paymentMethod === "moonpay" ? (
                       <>
                         <CreditCard size={16} />
-                        <span>Proceed to Transak Gateway ({formatPriceCurrency(grandTotal, currency)})</span>
+                        <span>Open Trust Lesson On-Ramp ({formatPriceCurrency(grandTotal, currency)})</span>
                         <ArrowRight size={15} />
                       </>
                     ) : (
@@ -1685,91 +1694,120 @@ export default function BookingPage() {
         </div>
       </div>
       {/* ════════════════════════════════════════════════════════════════ */}
-      {/* IN-APP TRANSAK SANDBOX TESTER MODAL (AUTO-FILLED ESCROW FUNDS)   */}
+      {/* TRUST LESSON CUSTOM DESIGNED ON-RAMP WIDGET (MOONPAY ENGINE)     */}
       {/* ════════════════════════════════════════════════════════════════ */}
-      {showTransakModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-3xl w-full max-w-lg border border-purple-200 shadow-2xl overflow-hidden flex flex-col relative animate-scaleUp max-h-[92vh]">
-            {/* Modal Header */}
-            <div className="px-5 py-3.5 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-950 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/40 text-blue-300 flex items-center justify-center">
-                  <CreditCard size={16} />
+      {showMoonPayModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl w-full max-w-xl border border-purple-200/90 shadow-2xl overflow-hidden flex flex-col relative animate-scaleUp max-h-[94vh]">
+            {/* Modal Custom Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-2xl bg-purple-500/20 border border-purple-400/30 text-purple-300 flex items-center justify-center shadow-inner">
+                  <CreditCard size={18} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-xs flex items-center gap-1.5">
-                    <span>Transak Sandbox Tester</span>
-                    <span className="text-[9px] bg-blue-500/30 text-blue-200 px-2 py-0.2 rounded-full font-mono uppercase font-bold">
-                      Staging Mode
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-sm text-white">Trust Lesson On-Ramp</h3>
+                    <span className="text-[10px] bg-purple-500/30 text-purple-200 border border-purple-400/40 px-2 py-0.5 rounded-full font-mono uppercase font-bold">
+                      Arbitrum Native
                     </span>
-                  </h3>
-                  <p className="text-[10px] text-purple-200/80">
-                    Auto-filled: {formatPriceCurrency(grandTotal, currency)} on Arbitrum One
+                  </div>
+                  <p className="text-[11px] text-purple-200/70 mt-0.5">
+                    Auto-configured for {formatPriceCurrency(grandTotal, currency)} • MoonPay Sandbox Engine
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setShowTransakModal(false)}
+                onClick={() => setShowMoonPayModal(false)}
                 className="p-1.5 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Diagnostic Notice for T-INF-002 & Regional ISP blocks */}
-            <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-[11px] flex items-center justify-between gap-2 shrink-0">
-              <div className="flex items-center gap-1.5">
-                <Shield size={13} className="text-amber-600 shrink-0" />
-                <span className="text-[10px] leading-tight text-amber-900">
-                  <strong>Staging Gateway Notice:</strong> If Transak displays <em>&quot;Error code: T-INF-002&quot;</em> or regional ISP block, you can open in a new tab or click instant simulation below.
+            {/* Quick Quote & Converter Ribbon */}
+            <div className="px-5 py-3 bg-gradient-to-r from-purple-50/90 via-slate-50 to-indigo-50/80 border-b border-purple-100 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-500 font-medium text-[11px]">Destination Wallet:</span>
+                <span className="font-mono font-bold text-purple-950 text-[11px] bg-white px-2 py-0.5 rounded-lg border border-purple-200">
+                  {destinationWallet ? `${destinationWallet.slice(0, 6)}...${destinationWallet.slice(-4)}` : "Not connected"}
                 </span>
+                {destinationWallet && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(destinationWallet);
+                      setCopiedMoonPayWallet(true);
+                      setTimeout(() => setCopiedMoonPayWallet(false), 2000);
+                    }}
+                    className="p-1 rounded-md hover:bg-purple-100 text-purple-700 transition-colors cursor-pointer"
+                    title="Copy wallet address"
+                  >
+                    {copiedMoonPayWallet ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                  </button>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const iframe = document.getElementById("transakIframe");
-                  if (iframe) iframe.src = transakTesterUrl;
-                }}
-                className="text-[10px] font-bold text-purple-700 hover:text-purple-900 shrink-0 flex items-center gap-0.5 cursor-pointer px-2 py-1 rounded-md hover:bg-purple-100"
-              >
-                <RefreshCw size={10} /> Reload
-              </button>
+
+              {/* Preset Amount Chips */}
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span className="text-slate-400 font-semibold text-[10px]">Presets:</span>
+                {[
+                  { label: "Exact", val: safeMoonPayAmount },
+                  { label: "$50", val: 50 },
+                  { label: "$100", val: 100 },
+                  { label: "$250", val: 250 },
+                ].map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    onClick={() => setCustomFiatAmount(String(chip.val))}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                      activeOnRampAmount === chip.val
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "bg-white text-slate-700 hover:bg-purple-100/70 border border-slate-200"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Embedded Transak Widget Iframe */}
-            <div className="relative w-full h-[480px] bg-slate-100 flex items-center justify-center">
+            {/* Embedded MoonPay Custom Frame */}
+            <div className="relative w-full h-[470px] bg-slate-50 flex items-center justify-center overflow-hidden">
               <iframe
-                id="transakIframe"
-                src={transakTesterUrl}
+                id="moonpayIframe"
+                src={moonpayTesterUrl}
                 allow="camera;microphone;fullscreen;payment"
                 className="w-full h-full border-0"
-                title="Transak Sandbox Tester"
+                title="Trust Lesson MoonPay On-Ramp"
               />
             </div>
 
-            {/* Footer with testing actions */}
-            <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
-              <span className="text-[10px] text-slate-500 font-medium">
-                On-ramp directly to your Arbitrum Sepolia wallet
-              </span>
+            {/* Modal Footer with Actions */}
+            <div className="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2.5 text-xs shrink-0">
+              <div className="flex items-center gap-2 text-slate-500 text-[11px]">
+                <Shield size={13} className="text-purple-600 shrink-0" />
+                <span>Non-custodial deposit • 100% Platform Sponsored Gas</span>
+              </div>
               <div className="flex items-center gap-2">
                 <a
-                  href={transakTesterUrl}
+                  href={moonpayTesterUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center gap-1 transition-colors"
                 >
-                  <span>Open Fullscreen Tab</span>
+                  <span>Fullscreen Window</span>
                   <ExternalLink size={11} />
                 </a>
                 <button
                   type="button"
                   onClick={() => {
-                    setShowTransakModal(false);
+                    setShowMoonPayModal(false);
                     handleDepositEscrow();
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                  className="px-4 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                 >
                   <Check size={13} />
                   <span>Deposit Escrow via Web3 Wallet</span>
