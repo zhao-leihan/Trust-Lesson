@@ -17,7 +17,9 @@ import {
   Shield,
   Layers,
   Sparkles,
-  Link as LinkIcon,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 import { Card, PrimaryButton, GhostButton } from "@/src/components/ui/DesignTokens";
@@ -79,6 +81,11 @@ export default function MentorAvailabilityPage() {
   const [newExceptionDate, setNewExceptionDate] = useState("");
   const [newExceptionKind, setNewExceptionKind] = useState("BLOCK");
   const [newExceptionNote, setNewExceptionNote] = useState("");
+
+  // Interactive Calendar State
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+  const [selectedCalDate, setSelectedCalDate] = useState("");
 
   // Fetch Existing Settings
   useEffect(() => {
@@ -227,6 +234,59 @@ export default function MentorAvailabilityPage() {
 
     setNewExceptionDate("");
     setNewExceptionNote("");
+  };
+
+  const handleToggleDateException = (dateStr, kind, note = "") => {
+    if (!dateStr) return;
+    const startAt = new Date(`${dateStr}T00:00:00Z`);
+    const endAt = new Date(`${dateStr}T23:59:59Z`);
+
+    setExceptions((prev) => {
+      const filtered = prev.filter((e) => {
+        const d = new Date(e.startAt).toISOString().split("T")[0];
+        return d !== dateStr;
+      });
+
+      if (!kind) {
+        return filtered;
+      }
+
+      return [
+        ...filtered,
+        {
+          id: `exc-${Date.now()}`,
+          startAt,
+          endAt,
+          kind,
+          note: note ? note.trim() : null,
+        },
+      ];
+    });
+  };
+
+  const prevMonth = () => {
+    if (calMonth === 0) {
+      setCalYear((y) => y - 1);
+      setCalMonth(11);
+    } else {
+      setCalMonth((m) => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (calMonth === 11) {
+      setCalYear((y) => y + 1);
+      setCalMonth(0);
+    } else {
+      setCalMonth((m) => m + 1);
+    }
+  };
+
+  const jumpToToday = () => {
+    const d = new Date();
+    setCalYear(d.getFullYear());
+    setCalMonth(d.getMonth());
+    setSelectedCalDate(d.toISOString().split("T")[0]);
   };
 
   const handleRemoveException = (index) => {
@@ -397,23 +457,6 @@ export default function MentorAvailabilityPage() {
               </div>
             </Card>
 
-            {/* Permanent Room Link */}
-            <Card className="p-6 sm:p-8 space-y-4">
-              <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
-                <LinkIcon size={18} className="text-violet-600" />
-                <span>Permanent Meeting Room Link (Fallback)</span>
-              </h3>
-              <p className="text-gray-500 text-xs">
-                Your personal Google Meet, Zoom, or Teams link used when students book meetings.
-              </p>
-              <input
-                type="url"
-                value={meetingLink}
-                onChange={(e) => setMeetingLink(e.target.value)}
-                placeholder="https://meet.google.com/abc-defg-hij or personal Zoom URL"
-                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:border-violet-600 focus:bg-white"
-              />
-            </Card>
 
             {/* Weekly Recurring Availability Matrix */}
             <Card className="p-6 sm:p-8 space-y-6">
@@ -498,96 +541,294 @@ export default function MentorAvailabilityPage() {
               </div>
             </Card>
 
-            {/* Date Exceptions & Vacation Blocks */}
+            {/* Interactive Availability Calendar & Date Overrides */}
             <Card className="p-6 sm:p-8 space-y-6">
-              <div>
-                <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
-                  <Calendar size={18} className="text-violet-600" />
-                  <span>Date Overrides & Vacation Blocks</span>
-                </h3>
-                <p className="text-gray-400 text-xs mt-0.5">
-                  Block specific vacation days from student booking.
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                    <Calendar size={18} className="text-violet-600" />
+                    <span>Interactive Calendar Overrides & Vacation Blocks</span>
+                  </h3>
+                  <p className="text-gray-500 text-xs mt-0.5">
+                    Click any date on the calendar to toggle vacation blocks or set extra working hours.
+                  </p>
+                </div>
+
+                {/* Calendar Legend */}
+                <div className="flex flex-wrap items-center gap-2.5 text-[11px]">
+                  <span className="flex items-center gap-1.5 text-gray-600">
+                    <span className="w-2.5 h-2.5 rounded-full bg-violet-600 inline-block" />
+                    <span>Working Day</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-rose-700">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+                    <span>Blocked (Vacation)</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-emerald-700">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                    <span>Extra Available</span>
+                  </span>
+                </div>
               </div>
 
-              {/* Add Exception Controls */}
-              <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <input
-                  type="date"
-                  value={newExceptionDate}
-                  onChange={(e) => setNewExceptionDate(e.target.value)}
-                  className="p-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-violet-600"
-                />
-
-                <select
-                  value={newExceptionKind}
-                  onChange={(e) => setNewExceptionKind(e.target.value)}
-                  className="p-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-violet-600"
-                >
-                  <option value="BLOCK">Block Full Day (Unavailable)</option>
-                  <option value="EXTRA">Extra Available Day</option>
-                </select>
-
-                <input
-                  type="text"
-                  placeholder="Note (e.g. Vacation, Holiday)"
-                  value={newExceptionNote}
-                  onChange={(e) => setNewExceptionNote(e.target.value)}
-                  className="p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-violet-600 flex-1 min-w-[140px]"
-                />
-
-                <PrimaryButton
-                  type="button"
-                  onClick={handleAddException}
-                  disabled={!newExceptionDate}
-                  className="!min-h-[38px] !py-2 !px-4 text-xs"
-                >
-                  <Plus size={14} />
-                  <span>Add Override</span>
-                </PrimaryButton>
-              </div>
-
-              {/* List of Exceptions */}
-              {exceptions.length > 0 && (
-                <div className="space-y-2">
-                  {exceptions.map((exc, idx) => {
-                    const startStr = new Date(exc.startAt).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
+              {/* Month Navigation Header */}
+              <div className="flex items-center justify-between p-3.5 bg-gray-50/80 rounded-2xl border border-gray-200/80">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={prevMonth}
+                    className="p-1.5 rounded-xl bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer"
+                    title="Previous month"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <h4 className="font-extrabold text-sm text-gray-900 tracking-tight min-w-[140px] text-center">
+                    {new Date(calYear, calMonth, 1).toLocaleDateString("en-US", {
+                      month: "long",
                       year: "numeric",
+                    })}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={nextMonth}
+                    className="p-1.5 rounded-xl bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer"
+                    title="Next month"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={jumpToToday}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Jump to Today
+                </button>
+              </div>
+
+              {/* 7-Day Calendar Grid */}
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                {/* Day of Week Headers */}
+                <div className="grid grid-cols-7 bg-gray-50/90 border-b border-gray-200 text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider py-2.5">
+                  <span>Sun</span>
+                  <span>Mon</span>
+                  <span>Tue</span>
+                  <span>Wed</span>
+                  <span>Thu</span>
+                  <span>Fri</span>
+                  <span>Sat</span>
+                </div>
+
+                {/* Day Grid Cells */}
+                <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
+                  {/* Leading empty cells */}
+                  {Array.from({ length: new Date(calYear, calMonth, 1).getDay() }).map((_, idx) => (
+                    <div key={`blank-${idx}`} className="min-h-[82px] bg-gray-50/30 p-2" />
+                  ))}
+
+                  {/* Day cells of current month */}
+                  {Array.from({ length: new Date(calYear, calMonth + 1, 0).getDate() }).map((_, idx) => {
+                    const dayNum = idx + 1;
+                    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                    const dObj = new Date(calYear, calMonth, dayNum);
+                    const weekdayIndex = dObj.getDay();
+                    const isRegularWorking = weeklySchedule[weekdayIndex]?.enabled;
+                    const isToday = new Date().toISOString().split("T")[0] === dateStr;
+                    const isSelected = selectedCalDate === dateStr;
+
+                    const exc = exceptions.find((e) => {
+                      const d = new Date(e.startAt).toISOString().split("T")[0];
+                      return d === dateStr;
                     });
+                    const isBlocked = exc?.kind === "BLOCK";
+                    const isExtra = exc?.kind === "EXTRA";
 
                     return (
-                      <div
-                        key={idx}
-                        className="p-3 bg-white border border-gray-100 rounded-xl flex items-center justify-between text-xs"
+                      <button
+                        type="button"
+                        key={dateStr}
+                        onClick={() => setSelectedCalDate(dateStr)}
+                        className={`min-h-[82px] p-2 flex flex-col justify-between text-left transition-all cursor-pointer relative ${
+                          isSelected
+                            ? "bg-violet-50/90 ring-2 ring-violet-600 ring-inset z-10"
+                            : isBlocked
+                            ? "bg-rose-50/50 hover:bg-rose-50"
+                            : isExtra
+                            ? "bg-emerald-50/50 hover:bg-emerald-50"
+                            : isRegularWorking
+                            ? "bg-white hover:bg-gray-50/80"
+                            : "bg-gray-50/40 text-gray-400 hover:bg-gray-50"
+                        }`}
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center justify-between w-full">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                              exc.kind === "BLOCK"
-                                ? "bg-rose-50 text-rose-700 border border-rose-100"
-                                : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                            className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${
+                              isToday
+                                ? "bg-violet-600 text-white"
+                                : isSelected
+                                ? "text-violet-700"
+                                : "text-gray-800"
                             }`}
                           >
-                            {exc.kind === "BLOCK" ? "BLOCKED" : "EXTRA"}
+                            {dayNum}
                           </span>
-                          <span className="font-semibold text-gray-800">{startStr}</span>
-                          {exc.note && <span className="text-gray-400">• {exc.note}</span>}
+                          {isRegularWorking && !isBlocked && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-violet-500" title="Regular working day" />
+                          )}
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveException(idx)}
-                          className="text-gray-400 hover:text-rose-600 transition-colors p-1 cursor-pointer"
-                          title="Remove override"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                        {/* Status Label */}
+                        <div className="mt-1">
+                          {isBlocked ? (
+                            <span className="inline-block text-[10px] font-bold text-rose-700 bg-rose-100 border border-rose-200 px-1.5 py-0.5 rounded-md leading-none truncate max-w-full">
+                              Blocked
+                            </span>
+                          ) : isExtra ? (
+                            <span className="inline-block text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded-md leading-none truncate max-w-full">
+                              Extra Day
+                            </span>
+                          ) : isRegularWorking ? (
+                            <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
+                              {weeklySchedule[weekdayIndex].start}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-300 font-normal hidden sm:inline">
+                              Off
+                            </span>
+                          )}
+                        </div>
+                      </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Date Action Panel (Shows when a date is selected) */}
+              {selectedCalDate && (
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-violet-50/90 via-indigo-50/60 to-white rounded-2xl border border-violet-200 space-y-3 animate-fadeIn">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Calendar size={16} className="text-violet-600" />
+                        <h4 className="font-extrabold text-sm text-gray-900">
+                          {new Date(selectedCalDate + "T00:00:00").toLocaleDateString("en-US", {
+                            weekday: "long",
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </h4>
+                      </div>
+                      <p className="text-gray-500 text-xs mt-0.5">
+                        {(() => {
+                          const exc = exceptions.find((e) => {
+                            const d = new Date(e.startAt).toISOString().split("T")[0];
+                            return d === selectedCalDate;
+                          });
+                          if (exc?.kind === "BLOCK") return "This date is currently BLOCKED from student bookings.";
+                          if (exc?.kind === "EXTRA") return "This date is marked as EXTRA AVAILABLE for student bookings.";
+                          const weekday = new Date(selectedCalDate + "T00:00:00").getDay();
+                          return weeklySchedule[weekday]?.enabled
+                            ? `Regular working day (${weeklySchedule[weekday].start} - ${weeklySchedule[weekday].end}).`
+                            : "Regular weekly day off.";
+                        })()}
+                      </p>
+                    </div>
+
+                    {/* Quick Action Buttons */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(() => {
+                        const exc = exceptions.find((e) => {
+                          const d = new Date(e.startAt).toISOString().split("T")[0];
+                          return d === selectedCalDate;
+                        });
+
+                        if (exc) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDateException(selectedCalDate, null)}
+                              className="px-3 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                            >
+                              <X size={13} />
+                              <span>Remove Override</span>
+                            </button>
+                          );
+                        }
+
+                        return (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDateException(selectedCalDate, "BLOCK", "Vacation / Blocked")}
+                              className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                            >
+                              <span>Block Date (Off)</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDateException(selectedCalDate, "EXTRA", "Extra Session Day")}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                            >
+                              <Plus size={13} />
+                              <span>Set Extra Available</span>
+                            </button>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* List of Active Overrides */}
+              {exceptions.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <span className="text-xs font-bold text-gray-700 block">
+                    Active Calendar Overrides ({exceptions.length})
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {exceptions.map((exc, idx) => {
+                      const startStr = new Date(exc.startAt).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      });
+
+                      return (
+                        <div
+                          key={idx}
+                          className="p-2.5 bg-gray-50 border border-gray-200/80 rounded-xl flex items-center justify-between text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                exc.kind === "BLOCK"
+                                  ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                  : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                              }`}
+                            >
+                              {exc.kind === "BLOCK" ? "BLOCKED" : "EXTRA"}
+                            </span>
+                            <span className="font-semibold text-gray-800">{startStr}</span>
+                            {exc.note && <span className="text-gray-400 text-[11px] truncate max-w-[120px]">• {exc.note}</span>}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveException(idx)}
+                            className="text-gray-400 hover:text-rose-600 transition-colors p-1 cursor-pointer"
+                            title="Remove override"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </Card>

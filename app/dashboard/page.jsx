@@ -2759,50 +2759,129 @@ function MentorDashboardView({ user }) {
         </div>
       </div>
 
-      {/* ── Sub-Navbar Tabs: flex-wrap, no overflow cut-off at 1280px, no visual scrollbar ── */}
+      {/* ── Sub-Navbar Tabs: Responsive Dual Layout (Mobile 4x2 Grid vs Desktop Strip) ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full relative z-10">
-        <TabsList className="w-full flex flex-wrap items-center justify-start gap-1.5 bg-gray-50 p-1.5 rounded-2xl border border-gray-200 no-scrollbar">
-          <TabsTrigger value="overview" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
-            <Layers size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
-            <span>Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="courses" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
-            <BookOpen size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
-            <span>Courses & Gigs ({mentorGigs.length})</span>
-          </TabsTrigger>
-          <TabsTrigger value="transactions" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
-            <Receipt size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
-            <span>Transaction History</span>
-          </TabsTrigger>
-          <TabsTrigger value="wallet" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
-            <Wallet size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
-            <span>Payout Wallet & Security</span>
-          </TabsTrigger>
-          <TabsTrigger value="leveling" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
-            <Award size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
-            <span>Leveling & Membership</span>
-          </TabsTrigger>
-          <TabsTrigger value="portfolio" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
-            <Briefcase size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
-            <span>Portfolio & Bio</span>
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
-            <BarChart3 size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
-            <span>Analytics</span>
-          </TabsTrigger>
-          {isJurorMentor && (
+        {/* Mobile View: Compact 4x2 Grid (All 8 tabs 100% visible, zero horizontal cut-off, ~78px height) */}
+        <div className="block sm:hidden w-full">
+          <TabsList className="w-full grid grid-cols-4 gap-1 bg-slate-100/95 p-1 rounded-2xl border border-slate-200/80">
             <TabsTrigger
-              value="juror"
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+              value="overview"
+              className="w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
             >
-              <Scale size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
-              <span>Dispute Juror</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[9px] font-bold uppercase tracking-wider">
-                Council
-              </span>
+              <Layers size={16} />
+              <span className="mt-1 leading-none">Overview</span>
             </TabsTrigger>
-          )}
-        </TabsList>
+
+            <TabsTrigger
+              value="courses"
+              className="w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <BookOpen size={16} />
+              <span className="mt-1 leading-none">Gigs ({mentorGigs.length})</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="transactions"
+              className="w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <Receipt size={16} />
+              <span className="mt-1 leading-none">History</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="wallet"
+              className="w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <Wallet size={16} />
+              <span className="mt-1 leading-none">Wallet</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="leveling"
+              className="w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <Award size={16} />
+              <span className="mt-1 leading-none">Leveling</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="portfolio"
+              className="w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <Briefcase size={16} />
+              <span className="mt-1 leading-none">Bio</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="analytics"
+              className="w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <BarChart3 size={16} />
+              <span className="mt-1 leading-none">Analytics</span>
+            </TabsTrigger>
+
+            {isJurorMentor ? (
+              <TabsTrigger
+                value="juror"
+                className="w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+              >
+                <Scale size={16} />
+                <span className="mt-1 leading-none">Juror</span>
+              </TabsTrigger>
+            ) : (
+              <div className="w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] text-slate-300 pointer-events-none select-none">
+                <Shield size={16} className="opacity-40" />
+                <span className="mt-1 leading-none opacity-40">Trust</span>
+              </div>
+            )}
+          </TabsList>
+        </div>
+
+        {/* Tablet & Desktop View: Spacious Horizontal Tab Strip */}
+        <div className="hidden sm:block w-full">
+          <TabsList className="w-full flex items-center justify-start gap-1.5 bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/80 overflow-x-auto no-scrollbar flex-nowrap">
+            <TabsTrigger value="overview" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium shrink-0 whitespace-nowrap data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+              <Layers size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
+              <span>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="courses" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium shrink-0 whitespace-nowrap data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+              <BookOpen size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
+              <span>Courses & Gigs ({mentorGigs.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium shrink-0 whitespace-nowrap data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+              <Receipt size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
+              <span>Transaction History</span>
+            </TabsTrigger>
+            <TabsTrigger value="wallet" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium shrink-0 whitespace-nowrap data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+              <Wallet size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
+              <span>Payout Wallet & Security</span>
+            </TabsTrigger>
+            <TabsTrigger value="leveling" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium shrink-0 whitespace-nowrap data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+              <Award size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
+              <span>Leveling & Membership</span>
+            </TabsTrigger>
+            <TabsTrigger value="portfolio" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium shrink-0 whitespace-nowrap data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+              <Briefcase size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
+              <span>Portfolio & Bio</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium shrink-0 whitespace-nowrap data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs">
+              <BarChart3 size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
+              <span>Analytics</span>
+            </TabsTrigger>
+            {isJurorMentor && (
+              <TabsTrigger
+                value="juror"
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs rounded-xl font-medium shrink-0 whitespace-nowrap data-[state=active]:font-bold data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+              >
+                <Scale size={14} className="text-gray-400 group-data-[state=active]:text-purple-600" />
+                <span>Dispute Juror</span>
+                <span className="px-1.5 py-0.2 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[9px] font-bold uppercase tracking-wider">
+                  Council
+                </span>
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
 
         {/* ══════════════════════════════════════════════════════ */}
         {/* TAB 1: OVERVIEW (REAL FINANCIAL DATA - ZERO MOCKUP)    */}
@@ -5731,30 +5810,74 @@ function StudentDashboardView({ user }) {
         </div>
       </div>
 
-      {/* Radix UI Tabs for Student Sub-Navbar */}
+      {/* Radix UI Tabs for Student Sub-Navbar: Responsive Dual Layout */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full justify-start overflow-x-auto bg-slate-100/80 p-1.5 rounded-2xl flex-nowrap">
-          <TabsTrigger value="overview" className="flex items-center gap-2 flex-1 sm:flex-none">
-            <Layers size={14} />
-            <span>Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="transactions" className="flex items-center gap-2 flex-1 sm:flex-none">
-            <Receipt size={14} />
-            <span>Transaction History</span>
-          </TabsTrigger>
-          <TabsTrigger value="wallet" className="flex items-center gap-2 flex-1 sm:flex-none">
-            <Wallet size={14} />
-            <span>Escrow Wallet</span>
-          </TabsTrigger>
-          <TabsTrigger value="satisfaction" className="flex items-center gap-2 flex-1 sm:flex-none">
-            <MessageSquareQuote size={14} />
-            <span>User Satisfaction</span>
-          </TabsTrigger>
-          <TabsTrigger value="profile" className="flex items-center gap-2 flex-1 sm:flex-none">
-            <GraduationCap size={14} />
-            <span>Profile</span>
-          </TabsTrigger>
-        </TabsList>
+        {/* Mobile View: Compact 5-Col Equal Distribution (100% full width, zero overspace on right) */}
+        <div className="block sm:hidden w-full">
+          <TabsList className="w-full flex items-stretch justify-between gap-1 bg-slate-100/95 p-1 rounded-2xl border border-slate-200/80">
+            <TabsTrigger
+              value="overview"
+              className="flex-1 min-w-0 w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[10px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <Layers size={16} />
+              <span className="mt-1 leading-none">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="transactions"
+              className="flex-1 min-w-0 w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[10px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <Receipt size={16} />
+              <span className="mt-1 leading-none">History</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="wallet"
+              className="flex-1 min-w-0 w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[10px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <Wallet size={16} />
+              <span className="mt-1 leading-none">Wallet</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="satisfaction"
+              className="flex-1 min-w-0 w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[10px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <MessageSquareQuote size={16} />
+              <span className="mt-1 leading-none">Reviews</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="profile"
+              className="flex-1 min-w-0 w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[10px] font-semibold text-center transition-all data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-2xs"
+            >
+              <GraduationCap size={16} />
+              <span className="mt-1 leading-none">Profile</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Tablet & Desktop View: Spacious Horizontal Bar */}
+        <div className="hidden sm:block w-full">
+          <TabsList className="w-full justify-start bg-slate-100/90 p-1.5 rounded-2xl flex-nowrap border border-slate-200/80">
+            <TabsTrigger value="overview" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+              <Layers size={14} />
+              <span>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+              <Receipt size={14} />
+              <span>Transaction History</span>
+            </TabsTrigger>
+            <TabsTrigger value="wallet" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+              <Wallet size={14} />
+              <span>Escrow Wallet</span>
+            </TabsTrigger>
+            <TabsTrigger value="satisfaction" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+              <MessageSquareQuote size={14} />
+              <span>User Satisfaction</span>
+            </TabsTrigger>
+            <TabsTrigger value="profile" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+              <GraduationCap size={14} />
+              <span>Profile</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* STUDENT TAB 1: OVERVIEW */}
         <TabsContent value="overview" className="space-y-6">

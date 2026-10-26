@@ -29,6 +29,8 @@ import {
   RefreshCw,
   AlertTriangle,
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import Footer from "@/src/components/Footer";
 import { CurrencyBadge, formatPriceCurrency, UsdcIcon, UsdtIcon, ArbitrumIcon } from "@/src/components/CurrencyBadge";
@@ -95,8 +97,30 @@ export default function BookingPage() {
   );
 
   // Booking form state
-  const [selectedDate, setSelectedDate] = useState("Sep 21");
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState(() =>
+    new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  );
   const [selectedSlot, setSelectedSlot] = useState("10:30 AM");
+
+  const prevBookMonth = () => {
+    if (calMonth === 0) {
+      setCalYear((y) => y - 1);
+      setCalMonth(11);
+    } else {
+      setCalMonth((m) => m - 1);
+    }
+  };
+
+  const nextBookMonth = () => {
+    if (calMonth === 11) {
+      setCalYear((y) => y + 1);
+      setCalMonth(0);
+    } else {
+      setCalMonth((m) => m + 1);
+    }
+  };
   const [packageType, setPackageType] = useState("single"); // 'single' | 'pack'
   const [selectedPkgIndex, setSelectedPkgIndex] = useState(0);
   const [studentNote, setStudentNote] = useState("");
@@ -1135,27 +1159,96 @@ export default function BookingPage() {
 
               {/* Date & Time (for mentors) */}
               {isMentor && (
-                <div>
-                  <label className="text-slate-900 font-extrabold text-xs mb-2 block flex items-center gap-1.5">
-                    <Calendar size={13} className="text-purple-600" />
-                    <span>Select Preferred Session Date:</span>
-                  </label>
-                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mb-3">
-                    {availableDates.map((d) => (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-900 font-extrabold text-xs flex items-center gap-1.5">
+                      <Calendar size={13} className="text-purple-600" />
+                      <span>Select Preferred Session Date:</span>
+                    </label>
+                    <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                      Selected: {selectedDate}
+                    </span>
+                  </div>
+
+                  {/* Interactive Calendar Grid */}
+                  <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-2.5">
+                    {/* Month Nav */}
+                    <div className="flex items-center justify-between px-1">
                       <button
-                        key={d.date}
                         type="button"
-                        onClick={() => setSelectedDate(d.date)}
-                        className={`px-4 py-2.5 rounded-2xl text-center flex-shrink-0 transition-all cursor-pointer ${
-                          selectedDate === d.date
-                            ? "bg-purple-600 text-white font-bold shadow-md shadow-purple-500/25 scale-102"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium"
-                        }`}
+                        onClick={prevBookMonth}
+                        className="p-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Previous month"
                       >
-                        <p className="text-[10px] opacity-80 uppercase tracking-wider">{d.day}</p>
-                        <p className="text-xs font-bold mt-0.5">{d.date}</p>
+                        <ChevronLeft size={14} />
                       </button>
-                    ))}
+                      <span className="text-xs font-bold text-slate-800">
+                        {new Date(calYear, calMonth, 1).toLocaleDateString("en-US", {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={nextBookMonth}
+                        className="p-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Next month"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+
+                    {/* Weekday labels */}
+                    <div className="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 uppercase py-1">
+                      <span>Su</span>
+                      <span>Mo</span>
+                      <span>Tu</span>
+                      <span>We</span>
+                      <span>Th</span>
+                      <span>Fr</span>
+                      <span>Sa</span>
+                    </div>
+
+                    {/* Days Grid */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {Array.from({ length: new Date(calYear, calMonth, 1).getDay() }).map((_, idx) => (
+                        <div key={`book-blank-${idx}`} className="h-8" />
+                      ))}
+
+                      {Array.from({ length: new Date(calYear, calMonth + 1, 0).getDate() }).map((_, idx) => {
+                        const dayNum = idx + 1;
+                        const dObj = new Date(calYear, calMonth, dayNum);
+                        const labelStr = dObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                        const isPast = new Date(calYear, calMonth, dayNum, 23, 59, 59) < new Date();
+                        const isSelected = selectedDate === labelStr;
+
+                        if (isPast) {
+                          return (
+                            <div
+                              key={`day-${dayNum}`}
+                              className="h-8 rounded-lg flex items-center justify-center text-xs text-slate-300 cursor-not-allowed select-none"
+                            >
+                              {dayNum}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <button
+                            type="button"
+                            key={`day-${dayNum}`}
+                            onClick={() => setSelectedDate(labelStr)}
+                            className={`h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-purple-600 text-white shadow-xs"
+                                : "bg-white text-slate-700 hover:bg-purple-100/70 border border-slate-200/80"
+                            }`}
+                          >
+                            {dayNum}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <label className="text-slate-900 font-extrabold text-xs mb-2 block flex items-center gap-1.5">

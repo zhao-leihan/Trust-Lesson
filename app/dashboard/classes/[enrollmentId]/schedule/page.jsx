@@ -15,6 +15,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Sparkles,
+  ChevronLeft,
   ChevronRight,
   Shield,
   Layers,
@@ -42,6 +43,34 @@ export default function ScheduleSessionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  // Interactive Month Calendar State
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+
+  const prevMonth = () => {
+    if (calMonth === 0) {
+      setCalYear((y) => y - 1);
+      setCalMonth(11);
+    } else {
+      setCalMonth((m) => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (calMonth === 11) {
+      setCalYear((y) => y + 1);
+      setCalMonth(0);
+    } else {
+      setCalMonth((m) => m + 1);
+    }
+  };
+
+  const jumpToToday = () => {
+    const d = new Date();
+    setCalYear(d.getFullYear());
+    setCalMonth(d.getMonth());
+  };
 
   // User detected timezone
   const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -253,60 +282,177 @@ export default function ScheduleSessionPage() {
 
           {/* Main Scheduling Form */}
           <form onSubmit={handleScheduleSubmit} className="space-y-8">
-            {/* Step 1: Date Selector */}
-            <Card className="p-6 sm:p-8 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
-                  <Calendar size={18} className="text-violet-600" />
-                  <span>1. Choose a Date</span>
-                </h3>
-                <span className="text-[11px] text-gray-400 flex items-center gap-1 font-normal">
-                  <Globe size={12} />
-                  <span>Your Timezone: {userTimezone}</span>
+            {/* Step 1: Interactive Date Selector Calendar */}
+            <Card className="p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center gap-2">
+                    <Calendar size={18} className="text-violet-600" />
+                    <span>1. Choose a Session Date</span>
+                  </h3>
+                  <p className="text-gray-500 text-xs mt-0.5">
+                    Click any highlighted date on the calendar to reveal available time slots.
+                  </p>
+                </div>
+                <span className="text-[11px] text-gray-500 flex items-center gap-1.5 font-medium bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
+                  <Globe size={13} className="text-violet-600" />
+                  <span>Timezone: {userTimezone}</span>
                 </span>
               </div>
 
               {loadingSlots ? (
-                <div className="py-8 text-center text-gray-400 text-xs">
-                  <div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <div className="py-12 text-center text-gray-400 text-xs">
+                  <div className="w-7 h-7 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-2.5" />
                   Checking mentor availability...
                 </div>
-              ) : availableDates.length === 0 ? (
-                <div className="p-6 bg-gray-50 rounded-2xl text-center text-gray-400 text-xs">
-                  No free slots found in the next 14 days. Please check back soon or message your mentor.
-                </div>
               ) : (
-                <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none">
-                  {availableDates.map((dateStr) => {
-                    const d = new Date(dateStr + "T00:00:00");
-                    const isSelected = selectedDate === dateStr;
-
-                    return (
+                <div className="space-y-4">
+                  {/* Month Navigation */}
+                  <div className="flex items-center justify-between p-3.5 bg-gray-50/80 rounded-2xl border border-gray-200/80">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        key={dateStr}
-                        onClick={() => {
-                          setSelectedDate(dateStr);
-                          setSelectedSlot(null);
-                        }}
-                        className={`flex flex-col items-center justify-center min-w-[76px] py-3 px-2 rounded-2xl border text-center transition-all cursor-pointer ${
-                          isSelected
-                            ? "bg-violet-600 text-white border-violet-600 shadow-sm"
-                            : "bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
-                        }`}
+                        onClick={prevMonth}
+                        className="p-1.5 rounded-xl bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer"
+                        title="Previous month"
                       >
-                        <span className="text-[10px] uppercase font-semibold tracking-wider opacity-80">
-                          {d.toLocaleDateString("en-US", { weekday: "short" })}
-                        </span>
-                        <span className="text-base font-bold my-0.5">
-                          {d.getDate()}
-                        </span>
-                        <span className="text-[10px] font-medium opacity-80">
-                          {d.toLocaleDateString("en-US", { month: "short" })}
-                        </span>
+                        <ChevronLeft size={16} />
                       </button>
-                    );
-                  })}
+                      <h4 className="font-extrabold text-sm text-gray-900 tracking-tight min-w-[140px] text-center">
+                        {new Date(calYear, calMonth, 1).toLocaleDateString("en-US", {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={nextMonth}
+                        className="p-1.5 rounded-xl bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer"
+                        title="Next month"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={jumpToToday}
+                        className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        Jump to Today
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 7-Column Calendar Grid */}
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                    {/* Header */}
+                    <div className="grid grid-cols-7 bg-gray-50/90 border-b border-gray-200 text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider py-2.5">
+                      <span>Sun</span>
+                      <span>Mon</span>
+                      <span>Tue</span>
+                      <span>Wed</span>
+                      <span>Thu</span>
+                      <span>Fri</span>
+                      <span>Sat</span>
+                    </div>
+
+                    {/* Days */}
+                    <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
+                      {/* Leading empty cells */}
+                      {Array.from({ length: new Date(calYear, calMonth, 1).getDay() }).map((_, idx) => (
+                        <div key={`blank-${idx}`} className="min-h-[72px] bg-gray-50/30 p-2" />
+                      ))}
+
+                      {/* Month Days */}
+                      {Array.from({ length: new Date(calYear, calMonth + 1, 0).getDate() }).map((_, idx) => {
+                        const dayNum = idx + 1;
+                        const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                        const daySlots = slots.filter((s) => {
+                          const sDate = new Date(s.startAt).toLocaleDateString("en-CA");
+                          return sDate === dateStr;
+                        });
+
+                        const hasSlots = daySlots.length > 0;
+                        const isToday = new Date().toLocaleDateString("en-CA") === dateStr;
+                        const isSelected = selectedDate === dateStr;
+                        const isPast = new Date(calYear, calMonth, dayNum, 23, 59, 59) < new Date();
+
+                        if (!hasSlots || isPast) {
+                          return (
+                            <div
+                              key={dateStr}
+                              className="min-h-[72px] p-2 bg-gray-50/40 text-gray-300 flex flex-col justify-between cursor-not-allowed select-none"
+                            >
+                              <span className="text-xs font-medium">{dayNum}</span>
+                              <span className="text-[10px] text-gray-300">-</span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <button
+                            type="button"
+                            key={dateStr}
+                            onClick={() => {
+                              setSelectedDate(dateStr);
+                              setSelectedSlot(null);
+                            }}
+                            className={`min-h-[72px] p-2 flex flex-col justify-between text-left transition-all cursor-pointer relative ${
+                              isSelected
+                                ? "bg-violet-600 text-white font-bold ring-2 ring-violet-600 z-10 shadow-sm"
+                                : "bg-white hover:bg-violet-50/70 text-gray-900 border-violet-100"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span
+                                className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${
+                                  isToday && !isSelected
+                                    ? "bg-violet-100 text-violet-800"
+                                    : ""
+                                }`}
+                              >
+                                {dayNum}
+                              </span>
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isSelected ? "bg-white" : "bg-emerald-500"
+                                }`}
+                              />
+                            </div>
+                            <span
+                              className={`text-[10px] font-semibold truncate ${
+                                isSelected ? "text-violet-100" : "text-emerald-700"
+                              }`}
+                            >
+                              {daySlots.length} open
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Selected Date Indicator Banner */}
+                  {selectedDate && (
+                    <div className="p-3 bg-violet-50 rounded-xl border border-violet-200 text-violet-950 text-xs flex items-center justify-between">
+                      <span className="font-semibold">
+                        Selected:{" "}
+                        <strong className="font-extrabold text-violet-900">
+                          {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
+                            weekday: "long",
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </strong>
+                      </span>
+                      <span className="text-[11px] bg-white text-violet-700 font-bold px-2 py-0.5 rounded-md border border-violet-200">
+                        {dateSlots.length} slot(s) available below
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
