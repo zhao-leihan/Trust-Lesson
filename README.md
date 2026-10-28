@@ -38,7 +38,9 @@
 | Learner pays upfront, mentor ghosts | Funds locked in escrow — released only on milestone confirmation |
 | Mentor delivers, learner refuses payment | Milestone approval triggers automatic release; disputes resolved by 3-of-5 jury |
 | No verifiable proof of completion | Dual-party soulbound credentials (W3C JSON-LD + EIP-712) minted on-chain |
-| High gas fees pricing out users | Platform-sponsored gas relayer — users pay 0 ETH |
+| High gas fees pricing out users | Pimlico ERC-4337 Paymaster & Platform Gas Sponsor — users pay 0 ETH |
+| Clunky fiat on-ramp onboarding | Custom embedded MoonPay widget for instant card-to-crypto checkout |
+| Complex scheduling and booking clashes | Interactive visual month calendar with real-time slot reservation locks |
 
 ---
 
@@ -68,7 +70,7 @@ The protocol encompasses **8 Smart Contracts (7 Production + 1 Testnet Mock)** a
 - `IOptimisticOracle.sol`: Pluggable assertion hook for UMA Optimistic Oracle V3 integration.
 
 **Settlement Token**: [Arbitrum Sepolia USDC (`0x75fa...6AA4d`)](https://sepolia.arbiscan.io/address/0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d)  
-**Gas Sponsor Relayer**: [`0xf2cE...036098`](https://sepolia.arbiscan.io/address/0xf2cE5319aeB733fd2279a830260316358A036098)  
+**Gas Sponsor Relayer / Paymaster**: [`0xf2cE...036098`](https://sepolia.arbiscan.io/address/0xf2cE5319aeB733fd2279a830260316358A036098) + Pimlico ERC-4337 Paymaster  
 **Platform Treasury Vault**: [`0x656c...b75eC`](https://sepolia.arbiscan.io/address/0x656c943c3a8BB5d5F7306CC5ED66C3a938Cb75eC) (Receives 10% protocol fee)
 
 ---
@@ -77,14 +79,15 @@ The protocol encompasses **8 Smart Contracts (7 Production + 1 Testnet Mock)** a
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         USER LAYER                               │
+│                         USER LAYER                              │
 │  Next.js 15 App Router + React 19 + Tailwind CSS v4             │
-│  MetaMask / Rabby / Coinbase Wallet (Ethers.js v6 + Viem)       │
+│  MetaMask / Rabby / Coinbase / Rainbow (Ethers.js v6 + Viem)    │
+│  Custom MoonPay On-Ramp Widget (Direct Debit/Credit to USDC)    │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                       API & INDEXING                             │
+│                       API & INDEXING                            │
 │  Hono Edge Router (app/api/[[...route]])                        │
 │  Ponder Indexer — sub-second event indexing                     │
 │  Prisma ORM + PostgreSQL (SQLite for local dev)                 │
@@ -92,7 +95,7 @@ The protocol encompasses **8 Smart Contracts (7 Production + 1 Testnet Mock)** a
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    SMART CONTRACT LAYER                          │
+│                    SMART CONTRACT & AA LAYER                    │
 │  ┌─────────────┐  ┌──────────────────┐  ┌─────────────────┐    │
 │  │ EscrowRouter│──│ DisputeCouncil   │  │ MentorStaking   │    │
 │  │ (escrow +   │  │ (3-of-5 jury)    │  │ (stake + slash) │    │
@@ -105,13 +108,13 @@ The protocol encompasses **8 Smart Contracts (7 Production + 1 Testnet Mock)** a
 │  │(SBT + VC)   │  │                  │  │                 │    │
 │  └─────────────┘  └──────────────────┘  └─────────────────┘    │
 │                                                                 │
-│  Gas Sponsor Relayer — subsidizes 100% of user gas costs        │
+│  Pimlico Paymaster & Gas Relayer — subsidizes 100% of user gas   │
 │  Platform Treasury — receives 10% protocol fee                  │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      STORAGE LAYER                               │
+│                      STORAGE LAYER                              │
 │  Cloudflare Stream (video, HLS signed tokens)                   │
 │  Cloudflare R2 (documents, presigned URLs)                      │
 │  Pinata IPFS (dispute evidence hashes)                          │
@@ -127,6 +130,7 @@ The protocol encompasses **8 Smart Contracts (7 Production + 1 Testnet Mock)** a
 
 | Feature | Description |
 | :--- | :--- |
+| **Interactive Availability Calendar** | Interactive month calendar to set regular hours, block dates, add extra sessions, and manage automated meeting links |
 | **Real Database Analytics** | Live 30-day earnings, active escrow volume, on-chain reputation score, and hourly rate metrics |
 | **Curriculum Upload** | Native Cloudflare Stream (video) + R2 (documents) with signed HLS tokens |
 | **Zero-Budget Hosting** | Unlisted YouTube / restricted Google Drive fallback with setup guides |
@@ -138,7 +142,9 @@ The protocol encompasses **8 Smart Contracts (7 Production + 1 Testnet Mock)** a
 
 | Feature | Description |
 | :--- | :--- |
-| **Live Balance Check** | Arbitrum Sepolia USDC + ETH balance check in checkout card |
+| **Custom MoonPay Fiat On-Ramp** | Embedded brand-matched widget to buy Arbitrum Sepolia USDC directly with cards or Apple Pay |
+| **Interactive Booking Calendar** | Tap-to-select session dates with instant slot availability validation and conflict prevention |
+| **Live Balance Check** | Arbitrum Sepolia USDC + ETH balance check directly in the checkout card |
 | **Insufficient Balance Guard** | Pre-flight balance validation + direct testnet faucet integrations |
 | **Transaction Status Timeline** | Visual on-chain milestone progress: Created → Funded → In Session → Completed → Attestation |
 | **Post-Course Social Sharing** | Instant 1-click sharing to X, LinkedIn, and Instagram with pre-composed hashtags |
@@ -160,6 +166,17 @@ Internal platform routes (`/dashboard`, `/dashboard/requests`, `/leaderboard`, `
 - **API Gateway Layer**: `alreadyEnrolled` active enrollment checks and `onchainSessionId` uniqueness filters.
 - **Database Layer**: PostgreSQL transaction-level advisory locks (`pg_advisory_xact_lock`) serializing calendar slot reservations per mentor.
 - **Smart Contract Layer**: `require(!milestone.released)` and OpenZeppelin `ReentrancyGuard` preventing duplicate milestone claims.
+
+### 3. Responsive Mobile Navigation Overhaul
+- **Dual Responsive Layout**: Dedicated mobile and desktop sub-navbars in the dashboard.
+- **Mobile Student Workspace**: 5-column balanced equal-width layout (`flex-1 min-w-0 w-full`) ensuring 100% edge-to-edge distribution without cut-offs or overspace on the right.
+- **Mobile Mentor Workspace**: Touch-friendly 4x2 grid displaying all 8 tabs (Overview, Gigs, History, Wallet, Leveling, Bio, Analytics, Juror) simultaneously within an ~78px height budget.
+- **Component Integrity**: Refactored Radix UI `TabsList` and `TabsTrigger` primitives to prevent display property conflicts between `inline-flex` and responsive `grid` or `flex` utilities.
+
+### 4. Interactive Visual Calendar Engine
+- **Availability Management (`/dashboard/availability`)**: Interactive month calendar allowing mentors to toggle blocked days and custom extra availability dates with a single tap.
+- **Learner Meeting Scheduler (`/dashboard/classes/[enrollmentId]/schedule`)**: Integrated month grid showing real-time slot indicators, preventing double booking and displaying upcoming sessions.
+- **Checkout Date Selection (`/book/[type]/[id]`)**: Visual date picker with weekday indicators and instant selection feedback.
 
 Detailed technical specs can be found in [docs/system-updates-and-changelog.md](./docs/system-updates-and-changelog.md).
 
@@ -186,10 +203,11 @@ Fee parameter: `PLATFORM_FEE_BPS = 1000` (10%, adjustable by governance).
 | **Frontend** | Next.js 15 App Router, React 19, Tailwind CSS v4, Calm Learning Design Tokens |
 | **Backend** | Hono Edge Router, Prisma ORM, PostgreSQL / SQLite |
 | **Smart Contracts** | Solidity 0.8.24, Hardhat, OpenZeppelin 5.x |
-| **Web3** | Ethers.js v6, Viem, MetaMask / Rabby / Coinbase Wallet |
+| **Web3 & Wallets** | Ethers.js v6, Viem, MetaMask, Rabby, Coinbase Wallet, Rainbow |
+| **Account Abstraction & Relayer** | Pimlico ERC-4337 Paymaster & Gas Relayer (Zero-Gas Transactions) |
+| **Fiat On-Ramp** | MoonPay (Custom Trust Lesson Embedded Widget, Credit/Debit Cards, Apple Pay, Google Pay) |
 | **Indexing** | Ponder (real-time event indexing) |
 | **Storage** | Cloudflare Stream, Cloudflare R2, Pinata IPFS |
-| **Fiat On-Ramp** | Transak (Visa, Mastercard, Apple Pay) |
 | **Messaging** | WebRTC DataChannels (P2P, ephemeral signaling) |
 
 ---
@@ -210,7 +228,7 @@ The protocol is engineered with a defense-in-depth security model spanning smart
 
 ---
 
-## Protocol Evolution & Major Milestones (Phase 1–7)
+## Protocol Evolution & Major Milestones (Phase 1–8)
 
 1. **Phase 1 — Core Protocol Genesis**:
    - Deployed initial `EscrowRouter.sol`, `ReputationRegistry.sol`, and `MentorStaking.sol`.
@@ -244,6 +262,11 @@ The protocol is engineered with a defense-in-depth security model spanning smart
    - Implemented on-chain log recovery (`findRecentSessionReceipt`) preventing double billing on queued MetaMask transactions.
    - Added PostgreSQL advisory locks (`pg_advisory_xact_lock`) serializing calendar slot reservations per mentor.
    - Enforced smart contract single-release invariants and atomic database transactions (`db.$transaction`).
+8. **Phase 8 — Account Abstraction, MoonPay On-Ramp & Interactive Calendar Scheduling**:
+   - Integrated Pimlico ERC-4337 Paymaster for seamless gasless transaction execution.
+   - Embedded custom-tailored MoonPay fiat on-ramp widget supporting card and Apple Pay payments.
+   - Developed interactive visual month calendar engine for mentor availability toggling and learner meeting scheduling.
+   - Overhauled mobile navigation with balanced equal-width 5-column student tabs and 4x2 mentor grid.
 
 For the full architectural specification, refer to [docs/system-updates-and-changelog.md](./docs/system-updates-and-changelog.md).
 
@@ -287,41 +310,43 @@ npx hardhat test
 
 ```
 Trust-Lesson/
-├── app/                          # Next.js 15 App Router
-│   ├── api/[[...route]]/route.js # Hono API router + WebRTC signaling
-│   ├── book/[type]/[id]/page.jsx # Web3 checkout & live balance
-│   ├── certificate/[id]/page.jsx # SBT certificate verification
-│   ├── dashboard/                # Role-based workspace
-│   │   ├── classes/[id]/page.jsx # Student classroom & deliverables
-│   │   ├── gigs/[id]/page.jsx    # Mentor gig management & grading
-│   │   ├── chat/page.jsx         # WebRTC P2P messaging
-│   │   └── page.jsx              # Dashboard overview
-│   ├── explore/page.jsx          # Marketplace catalog
-│   └── page.jsx                  # Homepage
-├── contracts/                    # Solidity 0.8.24
-│   ├── EscrowRouter.sol          # Milestone escrow + fee division
-│   ├── ReputationRegistry.sol    # SBT reputation ledger
-│   ├── MentorStaking.sol         # Stake pool + slashing
-│   └── VideoAccess.sol           # Content access gating
-├── docs/                         # Engineering specs
-│   ├── system-updates-and-changelog.md # Detailed design system & idempotency specs
-│   ├── code architecture.md      # Full-stack blueprint
+├── app/                                        # Next.js 15 App Router
+│   ├── api/[[...route]]/route.js               # Hono API router + WebRTC signaling
+│   ├── book/[type]/[id]/page.jsx               # Web3 checkout, MoonPay modal, & calendar booking
+│   ├── certificate/[id]/page.jsx               # SBT certificate verification
+│   ├── dashboard/                              # Role-based workspace
+│   │   ├── availability/page.jsx               # Interactive mentor availability calendar
+│   │   ├── classes/[enrollmentId]/page.jsx     # Student classroom & deliverables
+│   │   ├── classes/[enrollmentId]/schedule/    # Learner meeting request calendar
+│   │   ├── gigs/[gigId]/page.jsx               # Mentor gig management & grading
+│   │   ├── chat/page.jsx                       # WebRTC P2P messaging
+│   │   └── page.jsx                            # Responsive dashboard overview & tabs
+│   ├── explore/page.jsx                        # Marketplace catalog
+│   └── page.jsx                                # Homepage
+├── contracts/                                  # Solidity 0.8.24
+│   ├── EscrowRouter.sol                        # Milestone escrow + fee division
+│   ├── ReputationRegistry.sol                  # SBT reputation ledger
+│   ├── MentorStaking.sol                       # Stake pool + slashing
+│   └── VideoAccess.sol                         # Content access gating
+├── docs/                                       # Engineering specs
+│   ├── system-updates-and-changelog.md         # Detailed design system & idempotency specs
+│   ├── code architecture.md                    # Full-stack blueprint
 │   ├── classroom-webrtc-architecture.md
-│   ├── report.md                 # Technical audit manual
-│   └── systematics.md            # Protocol state machine
-├── lib/                          # Core utilities
-│   ├── access.js                 # Authorization controller
-│   ├── networkConfig.js          # Multi-chain switcher
-│   ├── gasSponsor.js             # Paymaster relayer
-│   ├── prisma.js                 # Database client
-│   └── jwt.js                    # SIWE token signing
+│   ├── report.md                               # Technical audit manual
+│   └── systematics.md                          # Protocol state machine
+├── lib/                                        # Core utilities
+│   ├── access.js                               # Authorization controller
+│   ├── networkConfig.js                        # Multi-chain switcher
+│   ├── gasSponsor.js                           # Paymaster relayer & Pimlico client
+│   ├── prisma.js                               # Database client
+│   └── jwt.js                                  # SIWE token signing
 ├── src/
-│   ├── hooks/useWebRTCChat.js    # WebRTC DataChannel hook
-│   └── components/               # Shared UI components
-├── prisma/                       # Schema + migrations
-├── public/                       # Static assets
-├── scripts/                      # Deploy + lint automation
-└── hardhat.config.cjs            # Hardhat configuration
+│   ├── hooks/useWebRTCChat.js                  # WebRTC DataChannel hook
+│   └── components/ui/                          # Shared UI components & design tokens
+├── prisma/                                     # Schema + migrations
+├── public/                                     # Static assets
+├── scripts/                                    # Deploy + lint automation
+└── hardhat.config.cjs                          # Hardhat configuration
 ```
 
 ---
