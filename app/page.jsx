@@ -52,15 +52,24 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-slate-900 overflow-hidden">
       {/* HERO SECTION */}
       <section className="relative min-h-screen flex flex-col justify-between pt-28 pb-16 px-6 sm:px-12 lg:px-16 overflow-hidden bg-slate-950">
-        {/* Background Image: landing-page.webp */}
+        {/* Mobile Background Image: mobile-bg.webp */}
         <div
-          className="absolute inset-0 bg-cover bg-center md:bg-right-top bg-no-repeat pointer-events-none"
+          className="block md:hidden absolute inset-0 bg-cover bg-top bg-no-repeat pointer-events-none"
+          style={{ backgroundImage: "url('/mobile-bg.webp')" }}
+        />
+
+        {/* Desktop Background Image: landing-page.webp */}
+        <div
+          className="hidden md:block absolute inset-0 bg-cover bg-center md:bg-right-top bg-no-repeat pointer-events-none"
           style={{ backgroundImage: "url('/landing-page.webp')" }}
         />
 
-        {/* Gradient Overlay on Left to guarantee crisp text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent lg:w-[62%] pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent h-40 bottom-0 top-auto pointer-events-none" />
+        {/* Gradient Overlay for Mobile */}
+        <div className="block md:hidden absolute inset-0 bg-gradient-to-b from-slate-950/85 via-slate-950/60 to-slate-950/90 pointer-events-none" />
+
+        {/* Gradient Overlay on Left to guarantee crisp text legibility (Desktop) */}
+        <div className="hidden md:block absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent lg:w-[62%] pointer-events-none" />
+        <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent h-40 bottom-0 top-auto pointer-events-none" />
 
         {/* Hero Left Content */}
         <div className="relative z-10 max-w-xl lg:max-w-2xl my-auto pt-10 sm:pt-14">
