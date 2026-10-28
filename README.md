@@ -50,7 +50,7 @@ Private mentorship and coaching still run on trust and screenshots.
 | Mentor delivers, learner refuses payment | Milestone approval triggers automatic release; disputes resolved by 3-of-5 jury |
 | No verifiable proof of completion | Dual-party soulbound credentials (W3C JSON-LD + EIP-712) minted on-chain |
 | High gas fees kill UX | Pimlico ERC-4337 Paymaster + Platform Gas Sponsor &mdash; users pay **0 ETH** |
-| Fiat onboarding is painful | Embedded MoonPay widget (card / Apple Pay &rarr; USDC) |
+| Fiat onboarding is painful | Embedded Transak widget (card / Apple Pay &rarr; USDC) |
 | Booking collisions | Interactive visual calendar with real-time slot locks |
 
 ---
@@ -125,7 +125,7 @@ All core contracts are source-verified on Arbiscan.
 │                     USER LAYER                              │
 │  Next.js 15 + React 19 + Tailwind CSS v4                    │
 │  MetaMask / Rabby / Coinbase / Rainbow                      │
-│  Embedded MoonPay (Card / Apple Pay &rarr; USDC)                  │
+│  Embedded Transak (Card / Apple Pay &rarr; USDC)                  │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
@@ -160,7 +160,7 @@ All core contracts are source-verified on Arbiscan.
 - **Payout Wallet Lock Guard**: Enforce verified recipient address locking on Arbitrum before gig publishing.
 
 ### For Learners
-- **One-Click MoonPay Fiat On-Ramp**: Embedded brand-tailored widget to buy Arbitrum Sepolia USDC directly with cards or Apple Pay.
+- **One-Click Transak Fiat On-Ramp**: Embedded brand-tailored widget to buy Arbitrum Sepolia USDC directly with cards or Apple Pay.
 - **Interactive Booking Calendar**: Visual month selector with real-time slot reservation locks preventing double-booking.
 - **Live Balance & Guard**: Instant USDC + ETH balance inspection with pre-flight check and direct testnet faucet integrations.
 - **Visual Transaction Timeline**: Cryptographic milestone status (Created &rarr; Funded &rarr; In Session &rarr; Completed &rarr; Credential).
@@ -227,9 +227,9 @@ All core contracts are source-verified on Arbiscan.
    - Implemented on-chain log recovery (`findRecentSessionReceipt`) preventing double billing on queued transactions.
    - Added PostgreSQL advisory locks (`pg_advisory_xact_lock`) serializing calendar slot reservations per mentor.
    - Enforced smart contract single-release invariants and atomic database transactions (`db.$transaction`).
-8. **Phase 8 &mdash; Account Abstraction, MoonPay On-Ramp & Interactive Calendar Scheduling**:
+8. **Phase 8 &mdash; Account Abstraction, Transak On-Ramp & Interactive Calendar Scheduling**:
    - Integrated Pimlico ERC-4337 Paymaster for seamless zero-gas transaction execution.
-   - Embedded custom-tailored MoonPay fiat on-ramp widget supporting card and Apple Pay payments.
+   - Embedded custom-tailored Transak fiat on-ramp widget supporting card and Apple Pay payments.
    - Developed interactive visual month calendar engine for mentor availability toggling and learner meeting scheduling.
    - Overhauled mobile navigation with balanced equal-width 5-column student tabs and 4x2 mentor grid.
 
@@ -246,7 +246,7 @@ All core contracts are source-verified on Arbiscan.
 | **Smart Contracts** | Solidity 0.8.24, Hardhat, OpenZeppelin 5.x |
 | **Web3 & Wallets** | Ethers.js v6, Viem, MetaMask, Rabby, Coinbase Wallet, Rainbow |
 | **Account Abstraction** | Pimlico ERC-4337 Paymaster & Platform Relayer |
-| **Fiat On-Ramp** | MoonPay (Custom Embedded Widget) |
+| **Fiat On-Ramp** | Transak (Custom Embedded Widget, Visa, Mastercard, Apple Pay) |
 | **Indexing** | Ponder (Real-time sub-second event indexer) |
 | **Storage** | Cloudflare Stream, Cloudflare R2, Pinata IPFS |
 | **Messaging** | WebRTC DataChannels (P2P ephemeral) + Pusher fallback |
@@ -259,7 +259,7 @@ All core contracts are source-verified on Arbiscan.
 Trust-Lesson/
 ├── app/                                        # Next.js 15 App Router
 │   ├── api/[[...route]]/route.js               # Hono API router + WebRTC signaling
-│   ├── book/[type]/[id]/page.jsx               # Web3 checkout, MoonPay modal & calendar booking
+│   ├── book/[type]/[id]/page.jsx               # Web3 checkout, Transak modal & calendar booking
 │   ├── certificate/[id]/page.jsx               # SBT certificate verification
 │   ├── dashboard/                              # Role-based workspace
 │   │   ├── availability/page.jsx               # Interactive mentor availability calendar
