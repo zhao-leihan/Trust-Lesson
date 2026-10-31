@@ -42,13 +42,13 @@ export default function Reveal({
     if (isVisible) return "translate-x-0 translate-y-0 opacity-100";
     switch (direction) {
       case "up":
-        return "translate-y-10 opacity-0";
+        return "translate-y-2 sm:translate-y-8 opacity-0";
       case "down":
-        return "-translate-y-10 opacity-0";
+        return "-translate-y-2 sm:-translate-y-8 opacity-0";
       case "left":
-        return "-translate-x-10 opacity-0";
+        return "-translate-x-2 sm:-translate-x-8 opacity-0";
       case "right":
-        return "translate-x-10 opacity-0";
+        return "translate-x-2 sm:translate-x-8 opacity-0";
       default:
         return "opacity-0";
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { LogOut, ArrowRight, Menu, X, LayoutDashboard, MessageSquare, Bell } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/Avatar";
@@ -457,7 +458,8 @@ export default function Navbar() {
             </Link>
           )}
 
-          <button
+          <motion.button
+            whileTap={{ scale: 0.88 }}
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             className={`p-2 rounded-xl transition-colors focus:outline-none cursor-pointer ${
               isWhiteTheme
@@ -467,21 +469,34 @@ export default function Navbar() {
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
-            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+            <motion.div
+              key={mobileMenuOpen ? "close" : "open"}
+              initial={{ rotate: -90, opacity: 0, scale: 0.8 }}
+              animate={{ rotate: 0, opacity: 1, scale: 1 }}
+              exit={{ rotate: 90, opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+            >
+              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            </motion.div>
+          </motion.button>
         </div>
       </div>
 
       {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div
-          className={`md:hidden px-6 py-5 shadow-2xl transition-all animate-fadeIn ${
-            isWhiteTheme
-              ? "border-t border-purple-900/40 bg-slate-950/98 backdrop-blur-2xl text-white"
-              : "border-t border-purple-100 bg-white/98 backdrop-blur-2xl text-slate-900"
-          }`}
-        >
-          {/* Mobile User Overview if logged in */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, y: -10 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className={`overflow-hidden md:hidden px-6 py-5 shadow-2xl ${
+              isWhiteTheme
+                ? "border-t border-purple-900/40 bg-slate-950/98 backdrop-blur-2xl text-white"
+                : "border-t border-purple-100 bg-white/98 backdrop-blur-2xl text-slate-900"
+            }`}
+          >
+            {/* Mobile User Overview if logged in */}
           {user && (
             <div
               className={`mb-4 pb-4 space-y-3 ${
@@ -727,8 +742,9 @@ export default function Navbar() {
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Floating Incoming Chat Notification Toast */}
       {chatToast && (

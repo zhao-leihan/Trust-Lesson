@@ -12,6 +12,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import Reveal from "../src/components/Reveal";
+import { HeroMotionWrapper, HeroMotionItem, HeroInteractiveButton } from "../src/components/HeroMotion";
 import EcosystemLogos from "../src/components/EcosystemLogos";
 import CommunityFeedbacks from "../src/components/CommunityFeedbacks";
 import Footer from "../src/components/Footer";
@@ -51,7 +52,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 overflow-hidden">
       {/* HERO SECTION */}
-      <section className="relative min-h-screen flex flex-col justify-between pt-28 pb-16 px-6 sm:px-12 lg:px-16 overflow-hidden bg-slate-950">
+      <section className="relative min-h-0 md:min-h-screen flex flex-col justify-start md:justify-center pt-20 sm:pt-24 md:pt-28 pb-8 md:pb-16 px-5 sm:px-12 lg:px-16 overflow-hidden bg-slate-950">
         {/* Mobile Background Image: mobile-bg.webp */}
         <div
           className="block md:hidden absolute inset-0 bg-cover bg-top bg-no-repeat pointer-events-none"
@@ -72,10 +73,10 @@ export default function LandingPage() {
         <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent h-40 bottom-0 top-auto pointer-events-none" />
 
         {/* Hero Left Content */}
-        <div className="relative z-10 max-w-xl lg:max-w-2xl my-auto pt-10 sm:pt-14">
-          <Reveal direction="down">
+        <HeroMotionWrapper className="relative z-10 max-w-xl lg:max-w-2xl pt-2 sm:pt-6 md:pt-10">
+          <HeroMotionItem delay={0.05}>
             {/* Pill Badge: ★ Learn • Grow • Earn */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white/95 text-xs font-semibold mb-6 shadow-sm">
+            <div className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white/95 text-xs font-semibold mb-4 sm:mb-6 shadow-sm">
               <span className="text-amber-300">★</span>
               <span>Learn</span>
               <span className="text-white/40">•</span>
@@ -83,60 +84,61 @@ export default function LandingPage() {
               <span className="text-white/40">•</span>
               <span>Earn</span>
             </div>
-          </Reveal>
+          </HeroMotionItem>
 
-          <Reveal direction="up" delay={150}>
+          <HeroMotionItem delay={0.15}>
             {/* Main Headline */}
             <h1
-              className="font-extrabold tracking-tight text-white mb-6"
-              style={{ fontSize: "clamp(42px, 5.8vw, 72px)", lineHeight: 1.06 }}
+              className="font-extrabold tracking-tight text-white mb-4 sm:mb-6"
+              style={{ fontSize: "clamp(38px, 5.5vw, 72px)", lineHeight: 1.06 }}
             >
               Your Knowledge.<br />
               <span className="text-indigo-400 drop-shadow-[0_0_25px_rgba(129,140,248,0.45)]">
                 On-Chain.
               </span>
             </h1>
-          </Reveal>
+          </HeroMotionItem>
 
-          <Reveal direction="up" delay={250}>
+          <HeroMotionItem delay={0.25}>
             {/* Descriptive Subheading */}
-            <p className="text-white/80 text-sm sm:text-base lg:text-lg leading-relaxed mb-8 max-w-lg font-normal">
+            <p className="text-white/85 text-xs sm:text-base lg:text-lg leading-relaxed mb-6 sm:mb-8 max-w-lg font-normal">
               A decentralized platform for booking mentors, tutors, and consultants with milestone-based escrow payments. On-chain reputation that is portable, permanent, and tamper-proof protecting both learners and knowledge providers.
             </p>
-          </Reveal>
+          </HeroMotionItem>
 
-          <Reveal direction="up" delay={350}>
-            {/* Call to action buttons */}
-            <div className="flex flex-wrap items-center gap-4 mb-12">
-              <Link
+          <HeroMotionItem delay={0.35}>
+            {/* Call to action buttons with Framer Motion tap/hover interactions */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8 sm:mb-12">
+              <HeroInteractiveButton
                 href="/explore"
-                className="px-7 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm sm:text-base shadow-xl shadow-indigo-600/30 hover:scale-105 transition-all flex items-center gap-2"
+                className="px-6 sm:px-7 py-3 sm:py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-base shadow-xl shadow-indigo-600/30 transition-colors flex items-center gap-2"
+                isPrimary={true}
               >
                 <span>Get Started</span>
                 <ArrowRight size={17} />
-              </Link>
-              <a
+              </HeroInteractiveButton>
+              <HeroInteractiveButton
                 href="#monsters"
-                className="px-7 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm sm:text-base border border-white/20 backdrop-blur-md transition-all hover:scale-105"
+                className="px-6 sm:px-7 py-3 sm:py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-base border border-white/20 backdrop-blur-md transition-colors"
               >
                 Learn More
-              </a>
+              </HeroInteractiveButton>
             </div>
-          </Reveal>
+          </HeroMotionItem>
 
           {/* Bottom Ecosystem Badges (USDT, USDC, ARBITRUM) */}
-          <Reveal direction="up" delay={450}>
-            <div className="pt-2">
+          <HeroMotionItem delay={0.45}>
+            <div className="pt-1 sm:pt-2">
               <EcosystemLogos />
             </div>
-          </Reveal>
-        </div>
+          </HeroMotionItem>
+        </HeroMotionWrapper>
       </section>
 
       {/* SECTION 2: MEET THE LESSON MONSTERS */}
-      <section id="monsters" className="bg-white py-24 px-6 sm:px-12 max-w-7xl mx-auto">
-        <Reveal direction="up" className="text-center mb-16">
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 mb-3">
+      <section id="monsters" className="bg-white pt-10 sm:pt-20 pb-12 sm:pb-24 px-6 sm:px-12 max-w-7xl mx-auto">
+        <Reveal direction="up" className="text-center mb-6 sm:mb-16">
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 mb-2 sm:mb-3">
             <Sparkles size={13} className="text-purple-600" />
             Fun & Rewarding Mentorship
           </span>
