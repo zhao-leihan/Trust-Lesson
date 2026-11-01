@@ -1,6 +1,7 @@
-import { Shield, Globe, Users, Heart, Star, Sparkles, CheckCircle2, Clock, Rocket, ShieldCheck, Scale, Coins, Smartphone, Zap, ArrowRight, Layers, Check, Trophy, Flag, MapPin, Route } from "lucide-react";
+import { Shield, Globe, Users, Heart, Star, Sparkles, CheckCircle2, Clock, Rocket, ShieldCheck, Scale, Coins, Smartphone, Zap, ArrowRight, Layers, Check, Trophy, Flag, MapPin, Route, Mail } from "lucide-react";
 import Reveal from "../../src/components/Reveal";
 import Footer from "../../src/components/Footer";
+import ContactForm from "../../src/components/ContactForm";
 import { ArbitrumIcon } from "../../src/components/CurrencyBadge";
 
 export const metadata = {
@@ -10,7 +11,7 @@ export const metadata = {
 
 const team = [
   {
-    name: "Rayhan Young",
+    name: "Rayhan Aziel Abbrar",
     handle: "@0xAnakMommy",
     role: "Founder & Lead Protocol Architect",
     tagline: "Founder & Full-Stack Architect",
@@ -396,6 +397,25 @@ export default function AboutPage() {
             </Reveal>
           ))}
         </div>
+      </section>
+
+      {/* Contact Section */}
+      <section id="contact" className="pb-24 pt-4 max-w-5xl mx-auto px-6">
+        <Reveal direction="up" className="text-center mb-10">
+          <span className="text-xs font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-3.5 py-1.5 rounded-full inline-block mb-3 border border-purple-200">
+            Get in Touch
+          </span>
+          <h2 className="text-slate-900 font-extrabold text-3xl sm:text-4xl">
+            Contact Rayhan
+          </h2>
+          <p className="text-slate-500 text-sm sm:text-base mt-2 max-w-lg mx-auto">
+            Directly connect with the founder for mentorship inquiries, strategic partnerships, security findings, or general questions.
+          </p>
+        </Reveal>
+
+        <Reveal direction="up" delay={150}>
+          <ContactForm />
+        </Reveal>
       </section>
 
       {/* Footer */}

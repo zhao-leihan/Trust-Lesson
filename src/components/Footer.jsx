@@ -68,6 +68,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/about#contact" className="text-purple-300 hover:text-white font-bold transition-colors">
+                  Contact Me
+                </Link>
+              </li>
+              <li>
                 <Link href="/faucet" className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors">
                   Testnet USDC Faucet
                 </Link>
@@ -104,7 +109,10 @@ export default function Footer() {
             </h4>
             <div className="space-y-2 text-xs">
               <p className="text-slate-300">
-                Founder & Architect: <span className="font-bold text-white">Rayhan Young (@0xAnakMommy)</span>
+                Founder & Architect: <span className="font-bold text-white">Rayhan Aziel Abbrar (@0xAnakMommy)</span>
+              </p>
+              <p className="text-slate-400">
+                Direct: <a href="mailto:rayhanabbrar233@gmail.com" className="text-purple-300 hover:text-white transition-colors">rayhanabbrar233@gmail.com</a>
               </p>
             </div>
             
@@ -125,7 +133,7 @@ export default function Footer() {
         {/* Bottom Copyright & Security Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <p className="text-xs text-slate-500">
-            © 2026 Trust Lesson. Built by <span className="text-slate-300 font-bold">Rayhan Young</span>. All rights reserved.
+            © 2026 Trust Lesson. Built by <span className="text-slate-300 font-bold">Rayhan Aziel Abbrar</span>. All rights reserved.
           </p>
 
           <div className="flex items-center gap-3">

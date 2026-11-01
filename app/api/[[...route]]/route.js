@@ -7688,6 +7688,68 @@ app.post("/notifications/read-all", authMiddleware, async (c) => {
 });
 
 // ════════════════════════════════════════════════════════════════════
+// DIRECT CONTACT (Rayhan Aziel Abbrar - Non-Resend)
+// ════════════════════════════════════════════════════════════════════
+
+app.post("/contact", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { name, email, purpose, message } = body;
+
+    if (!name || !email || !message) {
+      return c.json({ error: "Name, email, and message are required." }, 400);
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return c.json({ error: "Invalid email address format." }, 400);
+    }
+
+    const contactPurpose = purpose || "General Inquiry";
+    const recipient = "rayhanabbrar233@gmail.com";
+
+    // Direct forwarding to FormSubmit.co AJAX endpoint (zero-config, non-Resend)
+    let dispatched = false;
+    try {
+      const response = await fetch(`https://formsubmit.co/ajax/${recipient}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Referer": "https://trust-lesson.vercel.app",
+          "Origin": "https://trust-lesson.vercel.app",
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          _replyto: email.trim(),
+          _subject: `[Trust Lesson] ${contactPurpose} - from ${name.trim()}`,
+          purpose: contactPurpose,
+          message: message.trim(),
+          _template: "table",
+          _captcha: "false",
+        }),
+      });
+
+      if (response.ok) {
+        dispatched = true;
+      }
+    } catch (err) {
+      console.warn("Direct contact forward notice:", err.message);
+    }
+
+    return c.json({
+      success: true,
+      message: "Your message has been dispatched to Rayhan Aziel Abbrar.",
+      recipient,
+      dispatched,
+    });
+  } catch (err) {
+    return c.json({ error: err.message || "Failed to process contact request." }, 500);
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════
 // HEALTH CHECK
 // ════════════════════════════════════════════════════════════════════
 
