@@ -52,7 +52,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 overflow-hidden">
       {/* HERO SECTION */}
-      <section className="relative min-h-0 md:min-h-screen flex flex-col justify-start md:justify-center pt-20 sm:pt-24 md:pt-28 pb-8 md:pb-16 px-5 sm:px-12 lg:px-16 overflow-hidden bg-slate-950">
+      <section className="relative min-h-0 md:min-h-screen flex flex-col justify-start md:justify-center pt-20 sm:pt-24 md:pt-28 pb-4 sm:pb-8 md:pb-14 px-5 sm:px-12 lg:px-16 overflow-hidden bg-slate-950">
         {/* Mobile Background Image: mobile-bg.webp */}
         <div
           className="block md:hidden absolute inset-0 bg-cover bg-top bg-no-repeat pointer-events-none"
@@ -136,7 +136,7 @@ export default function LandingPage() {
       </section>
 
       {/* SECTION 2: MEET THE LESSON MONSTERS */}
-      <section id="monsters" className="bg-white pt-10 sm:pt-20 pb-12 sm:pb-24 px-6 sm:px-12 max-w-7xl mx-auto">
+      <section id="monsters" className="bg-white pt-3 sm:pt-6 md:pt-10 pb-12 sm:pb-24 px-6 sm:px-12 max-w-7xl mx-auto">
         <Reveal direction="up" className="text-center mb-6 sm:mb-16">
           <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 mb-2 sm:mb-3">
             <Sparkles size={13} className="text-purple-600" />

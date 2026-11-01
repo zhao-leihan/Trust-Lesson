@@ -108,7 +108,10 @@ export default function ContactForm() {
                   </div>
                   <div>
                     <p className="text-slate-400 font-medium">Lead Architect</p>
-                    <p className="text-white font-bold">Rayhan Aziel Abbrar</p>
+                    <p className="text-white font-bold">
+                      Rayhan Aziel Abbrar{" "}
+                      <span className="text-purple-300 font-medium text-[11px]">(Rayhan Young)</span>
+                    </p>
                     <span className="text-purple-400 text-[11px] font-mono">@0xAnakMommy</span>
                   </div>
                 </div>

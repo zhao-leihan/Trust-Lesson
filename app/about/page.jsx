@@ -12,6 +12,7 @@ export const metadata = {
 const team = [
   {
     name: "Rayhan Aziel Abbrar",
+    aka: "Rayhan Young",
     handle: "@0xAnakMommy",
     role: "Founder & Lead Protocol Architect",
     tagline: "Founder & Full-Stack Architect",
@@ -382,12 +383,15 @@ export default function AboutPage() {
 
                 <div>
                   <h3 className="text-slate-900 font-extrabold text-xl sm:text-2xl">{t.name}</h3>
-                  <p className="text-purple-600 font-bold text-xs sm:text-sm mt-1">{t.role}</p>
-                  <div className="mt-2 flex justify-center">
-                    <span className="text-slate-500 font-mono text-xs font-semibold bg-slate-100 hover:bg-slate-200 px-3 py-0.5 rounded-full border border-slate-200 transition-colors">
+                  <div className="mt-1 flex items-center justify-center gap-2 flex-wrap">
+                    <span className="text-slate-600 font-semibold text-xs bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                      {t.aka}
+                    </span>
+                    <span className="text-purple-700 font-mono text-xs font-semibold bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
                       {t.handle}
                     </span>
                   </div>
+                  <p className="text-purple-600 font-bold text-xs sm:text-sm mt-1.5">{t.role}</p>
                 </div>
 
                 <p className="text-slate-600 text-xs sm:text-sm leading-relaxed max-w-xs mt-1">
