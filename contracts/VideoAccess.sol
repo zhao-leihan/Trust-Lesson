@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -12,6 +13,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * Video file stored on Cloudflare Stream; hash & access tracked on-chain.
  */
 contract VideoAccess is ReentrancyGuard, Ownable {
+    using SafeERC20 for IERC20;
     IERC20 public immutable usdc;
     uint256 public constant PLATFORM_FEE_BPS = 1000; // 10%
     uint256 public constant BPS_DENOMINATOR = 10_000;
@@ -80,12 +82,10 @@ contract VideoAccess is ReentrancyGuard, Ownable {
             uint256 fee = (v.priceUsdc * PLATFORM_FEE_BPS) / BPS_DENOMINATOR;
             uint256 toMentor = v.priceUsdc - fee;
 
-            // Transfer from learner to this contract then to mentor
-            bool ok = usdc.transferFrom(msg.sender, v.mentor, toMentor);
-            if (!ok) revert TransferFailed();
+            // Transfer from learner to mentor
+            usdc.safeTransferFrom(msg.sender, v.mentor, toMentor);
             // Fee stays in contract, owner withdraws
-            bool feeOk = usdc.transferFrom(msg.sender, address(this), fee);
-            if (!feeOk) revert TransferFailed();
+            usdc.safeTransferFrom(msg.sender, address(this), fee);
         }
 
         emit VideoPurchased(videoId, msg.sender);
@@ -106,6 +106,6 @@ contract VideoAccess is ReentrancyGuard, Ownable {
     /** @notice Owner withdraws platform fees. */
     function withdrawFees(address to) external onlyOwner nonReentrant {
         uint256 balance = usdc.balanceOf(address(this));
-        usdc.transfer(to, balance);
+        usdc.safeTransfer(to, balance);
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/ICredentialIssuer.sol";
@@ -22,6 +23,7 @@ import "./interfaces/IEscrowRouter.sol";
  * - Implements IEscrowRouter interface for DisputeCouncil callback
  */
 contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
+    using SafeERC20 for IERC20;
     // ─── Constants ───────────────────────────────────────────────────
     uint256 public constant PLATFORM_FEE_BPS = 1000; // 10%
     uint256 public constant DISPUTE_TIMEOUT  = 48 hours;
@@ -73,7 +75,8 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
     event DisputeRaised(uint256 indexed sessionId, address raisedBy, bytes32 evidenceHash);
     event DisputeResolved(uint256 indexed sessionId, uint8 releasePercent);
     event SessionCancelled(uint256 indexed sessionId);
-    event FeeWithdrawn(address to, uint256 amount);
+    event FeeWithdrawn(address indexed to, uint256 amount);
+    event ArbiterSet(address indexed arbiter);
     event CredentialIssuerSet(address indexed issuer);
     event MentorStakingModuleSet(address indexed staking);
     event DisputeCouncilSet(address indexed council);
@@ -84,11 +87,14 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
     error InvalidMilestones();
     error TransferFailed();
     error DisputeTimeoutNotReached();
+    error DisputeWindowClosed();
     error InvalidReleasePercent();
     error CannotMentorSelf();
+    error ZeroAddress();
 
     // ─── Constructor ─────────────────────────────────────────────────
     constructor(address _usdc, address _arbiter) Ownable(msg.sender) {
+        if (_usdc == address(0) || _arbiter == address(0)) revert ZeroAddress();
         usdc = IERC20(_usdc);
         arbiter = _arbiter;
     }
@@ -186,8 +192,7 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
 
         accumulatedFees += fee;
 
-        bool ok = usdc.transferFrom(msg.sender, address(this), total);
-        if (!ok) revert TransferFailed();
+        usdc.safeTransferFrom(msg.sender, address(this), total);
 
         emit SessionCreated(sessionId, msg.sender, mentor, total);
         emit SessionFunded(sessionId, total);
@@ -209,20 +214,15 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
 
     /**
      * @notice Confirms a milestone, releasing payment to mentor.
-     * Callable by learner, mentor, or platform admin/arbiter.
+     * Only learner has the authority to release normal milestones.
      * If session is FUNDED, auto-starts session to IN_SESSION.
      */
     function confirmMilestone(uint256 sessionId, uint256 milestoneIndex)
         external
+        onlyLearner(sessionId)
         nonReentrant
     {
         Session storage s = sessions[sessionId];
-        if (
-            msg.sender != s.learner &&
-            msg.sender != s.mentor &&
-            msg.sender != owner() &&
-            msg.sender != arbiter
-        ) revert Unauthorized();
 
         if (s.status == Status.FUNDED) {
             s.status = Status.IN_SESSION;
@@ -239,8 +239,7 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
         s.milestones[milestoneIndex].released = true;
         uint256 amount = s.milestones[milestoneIndex].amount;
 
-        bool ok = usdc.transfer(s.mentor, amount);
-        if (!ok) revert TransferFailed();
+        usdc.safeTransfer(s.mentor, amount);
 
         emit MilestoneReleased(sessionId, milestoneIndex, amount);
 
@@ -265,16 +264,14 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
 
     /**
      * @notice Release all remaining milestones in escrow to mentor in a single transaction.
-     * Callable by learner, mentor, or platform owner/arbiter.
+     * Only learner has the authority to release normal escrow.
      */
-    function releaseEscrow(uint256 sessionId) external nonReentrant {
+    function releaseEscrow(uint256 sessionId)
+        external
+        onlyLearner(sessionId)
+        nonReentrant
+    {
         Session storage s = sessions[sessionId];
-        if (
-            msg.sender != s.learner &&
-            msg.sender != s.mentor &&
-            msg.sender != owner() &&
-            msg.sender != arbiter
-        ) revert Unauthorized();
 
         if (s.status == Status.FUNDED) {
             s.status = Status.IN_SESSION;
@@ -298,8 +295,43 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
         emit SessionCompleted(sessionId);
 
         if (unpaid > 0) {
-            bool ok = usdc.transfer(s.mentor, unpaid);
-            if (!ok) revert TransferFailed();
+            usdc.safeTransfer(s.mentor, unpaid);
+        }
+
+        if (address(credentialIssuer) != address(0)) {
+            try credentialIssuer.issueCompositeCredential(
+                s.mentor, s.learner, sessionId, 5, s.skillTag
+            ) {} catch {}
+        }
+    }
+
+    /**
+     * @notice Mentor claims all unreleased milestones after disputeDeadline expires without dispute.
+     * Protects mentor against learner abandonment/ghosting.
+     */
+    function claimTimeout(uint256 sessionId)
+        external
+        onlyMentor(sessionId)
+        inStatus(sessionId, Status.IN_SESSION)
+        nonReentrant
+    {
+        Session storage s = sessions[sessionId];
+        if (block.timestamp <= s.disputeDeadline) revert DisputeTimeoutNotReached();
+
+        uint256 unpaid = 0;
+        for (uint256 i = 0; i < s.milestones.length; i++) {
+            if (!s.milestones[i].released) {
+                s.milestones[i].released = true;
+                unpaid += s.milestones[i].amount;
+                emit MilestoneReleased(sessionId, i, s.milestones[i].amount);
+            }
+        }
+
+        s.status = Status.COMPLETED;
+        emit SessionCompleted(sessionId);
+
+        if (unpaid > 0) {
+            usdc.safeTransfer(s.mentor, unpaid);
         }
 
         if (address(credentialIssuer) != address(0)) {
@@ -318,6 +350,7 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
         inStatus(sessionId, Status.IN_SESSION)
     {
         Session storage s = sessions[sessionId];
+        if (block.timestamp > s.disputeDeadline) revert DisputeWindowClosed();
         require(
             msg.sender == s.learner || msg.sender == s.mentor,
             "Not a party"
@@ -331,7 +364,7 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
      * @notice Resolve a dispute.
      * Callable by: arbiter, disputeCouncil, or owner.
      * In Phase 1.5: DisputeCouncil calls this after 3-of-5 quorum.
-     * @param releasePercent 0-100: % of total (minus fee) to release to mentor.
+     * @param releasePercent 0-100: % of unreleased amount to release to mentor.
      */
     function resolveDispute(uint256 sessionId, uint8 releasePercent)
         external
@@ -345,18 +378,23 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
         Session storage s = sessions[sessionId];
         s.status = Status.RESOLVED;
 
-        // Calculate amounts: remaining = total - fee (fee already counted)
-        uint256 remaining = s.totalAmount - s.platformFeeAmount;
-        uint256 toMentor  = (remaining * releasePercent) / 100;
-        uint256 toLearner = remaining - toMentor;
+        // Calculate unreleased funds across milestones to prevent double-spending
+        uint256 unreleasedAmount = 0;
+        for (uint256 i = 0; i < s.milestones.length; i++) {
+            if (!s.milestones[i].released) {
+                unreleasedAmount += s.milestones[i].amount;
+                s.milestones[i].released = true;
+            }
+        }
+
+        uint256 toMentor  = (unreleasedAmount * releasePercent) / 100;
+        uint256 toLearner = unreleasedAmount - toMentor;
 
         if (toMentor > 0) {
-            bool ok = usdc.transfer(s.mentor, toMentor);
-            if (!ok) revert TransferFailed();
+            usdc.safeTransfer(s.mentor, toMentor);
         }
         if (toLearner > 0) {
-            bool ok = usdc.transfer(s.learner, toLearner);
-            if (!ok) revert TransferFailed();
+            usdc.safeTransfer(s.learner, toLearner);
         }
 
         emit DisputeResolved(sessionId, releasePercent);
@@ -364,7 +402,7 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
 
     /**
      * @notice Cancel a session that is still in FUNDED state (not started).
-     * Only learner can cancel; full refund minus fee.
+     * Only learner can cancel; 100% full refund to learner and fee reversed.
      */
     function cancelSession(uint256 sessionId)
         external
@@ -375,11 +413,10 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
         Session storage s = sessions[sessionId];
         s.status = Status.CANCELLED;
 
-        // Refund: total - fee (fee was already accumulated)
-        uint256 refund = s.totalAmount - s.platformFeeAmount;
+        // Full refund: 100% of totalAmount returned to learner
+        uint256 total = s.totalAmount;
         accumulatedFees -= s.platformFeeAmount; // reverse fee accumulation on cancel
-        bool ok = usdc.transfer(s.learner, refund);
-        if (!ok) revert TransferFailed();
+        usdc.safeTransfer(s.learner, total);
 
         emit SessionCancelled(sessionId);
     }
@@ -414,31 +451,30 @@ contract EscrowRouter is ReentrancyGuard, Ownable, IEscrowRouter {
     function withdrawFees(address to) external onlyOwner nonReentrant {
         uint256 amount = accumulatedFees;
         accumulatedFees = 0;
-        bool ok = usdc.transfer(to, amount);
-        if (!ok) revert TransferFailed();
+        usdc.safeTransfer(to, amount);
         emit FeeWithdrawn(to, amount);
     }
 
-    function sweepFunds(address to, uint256 amount) external onlyOwner nonReentrant {
-        bool ok = usdc.transfer(to, amount);
-        if (!ok) revert TransferFailed();
-    }
-
     function setArbiter(address _arbiter) external onlyOwner {
+        if (_arbiter == address(0)) revert ZeroAddress();
         arbiter = _arbiter;
+        emit ArbiterSet(_arbiter);
     }
 
     function setDisputeCouncil(address _council) external onlyOwner {
+        if (_council == address(0)) revert ZeroAddress();
         disputeCouncil = _council;
         emit DisputeCouncilSet(_council);
     }
 
     function setCredentialIssuer(address _issuer) external onlyOwner {
+        if (_issuer == address(0)) revert ZeroAddress();
         credentialIssuer = ICredentialIssuer(_issuer);
         emit CredentialIssuerSet(_issuer);
     }
 
     function setMentorStakingModule(address _staking) external onlyOwner {
+        if (_staking == address(0)) revert ZeroAddress();
         mentorStakingModule = IMentorStaking(_staking);
         emit MentorStakingModuleSet(_staking);
     }

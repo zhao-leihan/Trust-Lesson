@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -11,6 +12,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @notice Mentors stake USDC to get Verified badge. Slashed if they lose disputes.
  */
 contract MentorStaking is ReentrancyGuard, Ownable {
+    using SafeERC20 for IERC20;
     IERC20 public immutable usdc;
 
     uint256 public constant MIN_STAKE = 100 * 10 ** 6;    // 100 USDC (PRO tier threshold)
@@ -58,8 +60,7 @@ contract MentorStaking is ReentrancyGuard, Ownable {
         s.isVerified = s.amount >= MIN_STAKE;
         s.tier = _calculateTier(s.amount);
 
-        bool ok = usdc.transferFrom(msg.sender, address(this), amount);
-        if (!ok) revert TransferFailed();
+        usdc.safeTransferFrom(msg.sender, address(this), amount);
 
         emit Staked(msg.sender, amount, s.tier);
     }
@@ -85,8 +86,7 @@ contract MentorStaking is ReentrancyGuard, Ownable {
         s.unstakeRequestAt = 0;
         s.tier = Tier.NONE;
 
-        bool ok = usdc.transfer(msg.sender, amount);
-        if (!ok) revert TransferFailed();
+        usdc.safeTransfer(msg.sender, amount);
 
         emit Unstaked(msg.sender, amount);
     }
@@ -100,8 +100,7 @@ contract MentorStaking is ReentrancyGuard, Ownable {
         s.isVerified = s.amount >= MIN_STAKE;
         s.tier = _calculateTier(s.amount);
 
-        bool ok = usdc.transfer(recipient, slashable);
-        if (!ok) revert TransferFailed();
+        usdc.safeTransfer(recipient, slashable);
 
         emit SlashApplied(mentor, slashable, recipient, s.tier);
     }
