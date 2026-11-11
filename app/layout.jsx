@@ -2,6 +2,7 @@ import { Outfit, Poppins } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../src/context/AuthContext";
 import Navbar from "../src/components/Navbar";
+import FloatingNetworkSwitch from "../src/components/FloatingNetworkSwitch";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -57,6 +58,7 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <Navbar />
           <main className="flex-1">{children}</main>
+          <FloatingNetworkSwitch />
         </AuthProvider>
         <script
           dangerouslySetInnerHTML={{
