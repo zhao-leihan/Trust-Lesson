@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
-import { LogOut, ArrowRight, Menu, X, LayoutDashboard, MessageSquare, Bell } from "lucide-react";
+import { LogOut, ArrowRight, Menu, X, LayoutDashboard, MessageSquare, Bell, Globe } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/Avatar";
 
 const DEFAULT_NAV_LINKS = [
@@ -23,6 +23,7 @@ export default function Navbar() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showNetworkNotice, setShowNetworkNotice] = useState(false);
 
   const isAdmin =
     user &&
@@ -264,6 +265,65 @@ export default function Navbar() {
 
         {/* Right Section: Desktop Controls & Profile */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Network Switcher Pill (Testnet active, Mainnet Coming Soon) */}
+          <div className="relative">
+            <div
+              className={`flex items-center p-0.5 rounded-full text-[11px] font-semibold transition-all ${
+                isWhiteTheme
+                  ? "bg-white/10 backdrop-blur-md border border-white/20"
+                  : "bg-slate-100 border border-slate-200"
+              }`}
+            >
+              <button
+                type="button"
+                className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500 text-white shadow-xs flex items-center gap-1.5 cursor-default"
+                title="Active Network: Arbitrum Sepolia Testnet"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                <span>Testnet</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNetworkNotice(true);
+                  setTimeout(() => setShowNetworkNotice(false), 3200);
+                }}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                  isWhiteTheme
+                    ? "text-white/70 hover:text-white"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+                title="Switch to Arbitrum One Mainnet"
+              >
+                <span>Mainnet</span>
+                <span className="text-[9px] px-1 py-0.2 rounded-sm bg-purple-600/80 text-white font-bold leading-tight">
+                  Soon
+                </span>
+              </button>
+            </div>
+
+            {/* Coming Soon Popover */}
+            <AnimatePresence>
+              {showNetworkNotice && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full mt-2 z-50 w-52 p-2.5 rounded-xl bg-slate-900 text-white shadow-xl border border-purple-500/30 text-xs"
+                >
+                  <div className="flex items-center gap-1.5 font-bold text-amber-300 mb-1">
+                    <Globe size={13} />
+                    <span>Mainnet Coming Soon</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+                    Arbitrum One Mainnet is under final audits. Currently running live on Arbitrum Sepolia Testnet.
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           {user ? (
             <div className="flex items-center gap-3">
               {/* Role Switcher Pill (Admin: 3 modes, Mentor: 2 modes) */}
@@ -496,7 +556,44 @@ export default function Navbar() {
                 : "border-t border-purple-100 bg-white/98 backdrop-blur-2xl text-slate-900"
             }`}
           >
-            {/* Mobile User Overview if logged in */}
+            {/* Mobile Network Switcher */}
+          <div className="mb-3 pb-3 border-b border-purple-100/10 flex items-center justify-between">
+            <span className={`text-xs font-semibold ${isWhiteTheme ? "text-slate-400" : "text-slate-500"}`}>
+              Network
+            </span>
+            <div
+              className={`flex items-center p-0.5 rounded-full text-xs font-semibold ${
+                isWhiteTheme
+                  ? "bg-white/10 border border-white/20"
+                  : "bg-slate-100 border border-slate-200"
+              }`}
+            >
+              <button
+                type="button"
+                className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500 text-white flex items-center gap-1.5 cursor-default"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                <span>Testnet</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNetworkNotice(true);
+                  setTimeout(() => setShowNetworkNotice(false), 3200);
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer flex items-center gap-1 ${
+                  isWhiteTheme ? "text-white/70 hover:text-white" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                <span>Mainnet</span>
+                <span className="text-[9px] px-1 py-0.2 rounded-sm bg-purple-600/80 text-white font-bold">
+                  Soon
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile User Overview if logged in */}
           {user && (
             <div
               className={`mb-4 pb-4 space-y-3 ${
