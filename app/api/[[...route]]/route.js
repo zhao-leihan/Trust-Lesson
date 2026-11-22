@@ -62,6 +62,14 @@ const webrtcSignalStore = new Map();
 
 const app = new Hono().basePath("/api");
 
+// ─── Network Context Middleware (Testnet / Mainnet DB Switching) ─────────────
+app.use("*", async (c, next) => {
+  const net = getCookie(c, "tl_network") || c.req.header("x-network") || "testnet";
+  c.set("network", net);
+  globalThis.__ACTIVE_NETWORK__ = net;
+  await next();
+});
+
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
 const authMiddleware = async (c, next) => {
   const token = extractBearerToken(c.req.header("Authorization")) || getCookie(c, "tl_session");
@@ -186,14 +194,11 @@ const authMiddleware = async (c, next) => {
   return c.json({ error: "Invalid or expired token" }, 401);
 };
 
-// ─── Helper: get Prisma lazily (avoid import at module level for edge compat) ─
-let _prisma = null;
-async function getPrisma() {
-  if (!_prisma) {
-    const { prisma } = await import("@/lib/prisma");
-    _prisma = prisma;
-  }
-  return _prisma;
+// ─── Helper: get Prisma lazily (supports dynamic Testnet / Mainnet DB switching) ─
+async function getPrisma(c) {
+  const { getPrismaClient } = await import("@/lib/prisma");
+  const net = c ? (c.get?.("network") || getCookie(c, "tl_network") || c.req?.header?.("x-network")) : globalThis.__ACTIVE_NETWORK__;
+  return getPrismaClient(net || "testnet");
 }
 
 // ─── Helper: get Pusher Server lazily ─────────────────────────
