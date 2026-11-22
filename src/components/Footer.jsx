@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Shield, Lock, CheckCircle2 } from "lucide-react";
 
 export default function Footer() {
@@ -136,7 +136,13 @@ export default function Footer() {
             © 2026 Trust Lesson. Built by <span className="text-slate-300 font-bold">Rayhan Aziel Abbrar</span>. All rights reserved.
           </p>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Link href="/privacy" className="text-xs text-slate-400 hover:text-purple-300 transition-colors font-medium">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="text-xs text-slate-400 hover:text-purple-300 transition-colors font-medium">
+              Terms of Service
+            </Link>
             <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300">
               <Shield size={14} className="text-emerald-400" />
               <span>Escrow Guarantee Active</span>
