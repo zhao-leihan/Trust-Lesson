@@ -4978,12 +4978,11 @@ function generateMeetingLink(platform = "Google Meet") {
     };
   }
 
-  // Google Meet standard 3-4-3 lowercase letters format (e.g. meet.google.com/abc-defg-hij)
-  const chars = "abcdefghijklmnopqrstuvwxyz";
-  const pick = (len) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  // Valid live fallback room (never generate fake Google Meet codes that Google rejects)
+  const roomSlug = `TrustLesson-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   return {
-    platform: "Google Meet",
-    joinUrl: `https://meet.google.com/${pick(3)}-${pick(4)}-${pick(3)}`,
+    platform: "Jitsi Meet",
+    joinUrl: `https://meet.jit.si/${roomSlug}`,
   };
 }
 
